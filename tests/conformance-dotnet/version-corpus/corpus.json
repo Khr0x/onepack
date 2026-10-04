@@ -1,0 +1,1605 @@
+{
+  "nuget_versioning": "7.9.0.0",
+  "cases": [
+    {
+      "input": "1",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0.0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0.1",
+      "valid": true,
+      "normalized": "1.0.0.1",
+      "full": "1.0.0.1",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 87,
+      "identity": 4
+    },
+    {
+      "input": "1.2.3",
+      "valid": true,
+      "normalized": "1.2.3",
+      "full": "1.2.3",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 107,
+      "identity": 5
+    },
+    {
+      "input": "1.2.3.4",
+      "valid": true,
+      "normalized": "1.2.3.4",
+      "full": "1.2.3.4",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 113,
+      "identity": 6
+    },
+    {
+      "input": "01.02.03",
+      "valid": true,
+      "normalized": "1.2.3",
+      "full": "1.2.3",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 107,
+      "identity": 5
+    },
+    {
+      "input": "1.00",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "0.0.0",
+      "valid": true,
+      "normalized": "0.0.0",
+      "full": "0.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 0,
+      "identity": 9
+    },
+    {
+      "input": "0.0.0.0",
+      "valid": true,
+      "normalized": "0.0.0",
+      "full": "0.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 0,
+      "identity": 9
+    },
+    {
+      "input": "2147483647.0.0",
+      "valid": true,
+      "normalized": "2147483647.0.0",
+      "full": "2147483647.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 121,
+      "identity": 11
+    },
+    {
+      "input": "2147483648.0.0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.2.3.4.5",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": ".1",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1..2",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": " ",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": " 1.0.0 ",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0 ",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1. 0.0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "-1.0.0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "+1.0.0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "v1.0.0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0a",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "a.b.c",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-alpha",
+      "valid": true,
+      "normalized": "1.0.0-alpha",
+      "full": "1.0.0-alpha",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 32,
+      "identity": 15
+    },
+    {
+      "input": "1.0.0-Alpha",
+      "valid": true,
+      "normalized": "1.0.0-Alpha",
+      "full": "1.0.0-Alpha",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 32,
+      "identity": 15
+    },
+    {
+      "input": "1.0.0-ALPHA",
+      "valid": true,
+      "normalized": "1.0.0-ALPHA",
+      "full": "1.0.0-ALPHA",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 32,
+      "identity": 15
+    },
+    {
+      "input": "1.0.0-alpha.1",
+      "valid": true,
+      "normalized": "1.0.0-alpha.1",
+      "full": "1.0.0-alpha.1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 37,
+      "identity": 18
+    },
+    {
+      "input": "1.0.0-alpha.2",
+      "valid": true,
+      "normalized": "1.0.0-alpha.2",
+      "full": "1.0.0-alpha.2",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 39,
+      "identity": 19
+    },
+    {
+      "input": "1.0.0-alpha.10",
+      "valid": true,
+      "normalized": "1.0.0-alpha.10",
+      "full": "1.0.0-alpha.10",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 40,
+      "identity": 20
+    },
+    {
+      "input": "1.0.0-alpha.beta",
+      "valid": true,
+      "normalized": "1.0.0-alpha.beta",
+      "full": "1.0.0-alpha.beta",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 42,
+      "identity": 21
+    },
+    {
+      "input": "1.0.0-alpha1",
+      "valid": true,
+      "normalized": "1.0.0-alpha1",
+      "full": "1.0.0-alpha1",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 44,
+      "identity": 22
+    },
+    {
+      "input": "1.0.0-alpha-1",
+      "valid": true,
+      "normalized": "1.0.0-alpha-1",
+      "full": "1.0.0-alpha-1",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 43,
+      "identity": 23
+    },
+    {
+      "input": "1.0.0-beta",
+      "valid": true,
+      "normalized": "1.0.0-beta",
+      "full": "1.0.0-beta",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 45,
+      "identity": 24
+    },
+    {
+      "input": "1.0.0-beta.2",
+      "valid": true,
+      "normalized": "1.0.0-beta.2",
+      "full": "1.0.0-beta.2",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 51,
+      "identity": 25
+    },
+    {
+      "input": "1.0.0-beta.11",
+      "valid": true,
+      "normalized": "1.0.0-beta.11",
+      "full": "1.0.0-beta.11",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 52,
+      "identity": 26
+    },
+    {
+      "input": "1.0.0-rc.1",
+      "valid": true,
+      "normalized": "1.0.0-rc.1",
+      "full": "1.0.0-rc.1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 53,
+      "identity": 27
+    },
+    {
+      "input": "1.0.0-1",
+      "valid": true,
+      "normalized": "1.0.0-1",
+      "full": "1.0.0-1",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 10,
+      "identity": 28
+    },
+    {
+      "input": "1.0.0-01",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-0",
+      "valid": true,
+      "normalized": "1.0.0-0",
+      "full": "1.0.0-0",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 7,
+      "identity": 29
+    },
+    {
+      "input": "1.0.0-0a",
+      "valid": true,
+      "normalized": "1.0.0-0a",
+      "full": "1.0.0-0a",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 15,
+      "identity": 30
+    },
+    {
+      "input": "1.0.0-a.01",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-a.0",
+      "valid": true,
+      "normalized": "1.0.0-a.0",
+      "full": "1.0.0-a.0",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 23,
+      "identity": 31
+    },
+    {
+      "input": "1.0.0--",
+      "valid": true,
+      "normalized": "1.0.0--",
+      "full": "1.0.0--",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 12,
+      "identity": 32
+    },
+    {
+      "input": "1.0.0-",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-.",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-a..b",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-a_b",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-á",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0+",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0+build",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+build",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0+build.1",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+build.1",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0+build.01",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+build.01",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0+Build.ABC",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+Build.ABC",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0+a..b",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0+a_b",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-beta+exp.sha.5114f85",
+      "valid": true,
+      "normalized": "1.0.0-beta",
+      "full": "1.0.0-beta+exp.sha.5114f85",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 45,
+      "identity": 24
+    },
+    {
+      "input": "1.0.0-beta+",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0.0-beta",
+      "valid": true,
+      "normalized": "1.0.0-beta",
+      "full": "1.0.0-beta",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 45,
+      "identity": 24
+    },
+    {
+      "input": "1.0.0.5-beta",
+      "valid": true,
+      "normalized": "1.0.0.5-beta",
+      "full": "1.0.0.5-beta",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 89,
+      "identity": 39
+    },
+    {
+      "input": "1.0-beta",
+      "valid": true,
+      "normalized": "1.0.0-beta",
+      "full": "1.0.0-beta",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 45,
+      "identity": 24
+    },
+    {
+      "input": "1-beta",
+      "valid": true,
+      "normalized": "1.0.0-beta",
+      "full": "1.0.0-beta",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 45,
+      "identity": 24
+    },
+    {
+      "input": "1.0.0.0+meta",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+meta",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0+meta",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+meta",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0-alpha+001",
+      "valid": true,
+      "normalized": "1.0.0-alpha",
+      "full": "1.0.0-alpha+001",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 32,
+      "identity": 15
+    },
+    {
+      "input": "1.0.0+20130313144700",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+20130313144700",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0-x.7.z.92",
+      "valid": true,
+      "normalized": "1.0.0-x.7.z.92",
+      "full": "1.0.0-x.7.z.92",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 54,
+      "identity": 46
+    },
+    {
+      "input": "1.0.0-0.3.7",
+      "valid": true,
+      "normalized": "1.0.0-0.3.7",
+      "full": "1.0.0-0.3.7",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 9,
+      "identity": 47
+    },
+    {
+      "input": "1.0.0-x-y-z.--",
+      "valid": true,
+      "normalized": "1.0.0-x-y-z.--",
+      "full": "1.0.0-x-y-z.--",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 55,
+      "identity": 48
+    },
+    {
+      "input": "2.0.0",
+      "valid": true,
+      "normalized": "2.0.0",
+      "full": "2.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 117,
+      "identity": 49
+    },
+    {
+      "input": "2.0.0-preview.1.24080.9",
+      "valid": true,
+      "normalized": "2.0.0-preview.1.24080.9",
+      "full": "2.0.0-preview.1.24080.9",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 116,
+      "identity": 50
+    },
+    {
+      "input": "2.1",
+      "valid": true,
+      "normalized": "2.1.0",
+      "full": "2.1.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 118,
+      "identity": 51
+    },
+    {
+      "input": "10.0.0",
+      "valid": true,
+      "normalized": "10.0.0",
+      "full": "10.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 119,
+      "identity": 52
+    },
+    {
+      "input": "1.10.0",
+      "valid": true,
+      "normalized": "1.10.0",
+      "full": "1.10.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 115,
+      "identity": 53
+    },
+    {
+      "input": "1.9.0",
+      "valid": true,
+      "normalized": "1.9.0",
+      "full": "1.9.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 114,
+      "identity": 54
+    },
+    {
+      "input": "1.2.3-RC.1",
+      "valid": true,
+      "normalized": "1.2.3-RC.1",
+      "full": "1.2.3-RC.1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 100,
+      "identity": 55
+    },
+    {
+      "input": "1.2.3-rc.1",
+      "valid": true,
+      "normalized": "1.2.3-rc.1",
+      "full": "1.2.3-rc.1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 100,
+      "identity": 55
+    },
+    {
+      "input": "1.2.3-rc.1+abc",
+      "valid": true,
+      "normalized": "1.2.3-rc.1",
+      "full": "1.2.3-rc.1+abc",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 100,
+      "identity": 55
+    },
+    {
+      "input": "1.2.3-rc.2",
+      "valid": true,
+      "normalized": "1.2.3-rc.2",
+      "full": "1.2.3-rc.2",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 103,
+      "identity": 58
+    },
+    {
+      "input": "1.2.3-rc",
+      "valid": true,
+      "normalized": "1.2.3-rc",
+      "full": "1.2.3-rc",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 99,
+      "identity": 59
+    },
+    {
+      "input": "1.2.3-rc1",
+      "valid": true,
+      "normalized": "1.2.3-rc1",
+      "full": "1.2.3-rc1",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 104,
+      "identity": 60
+    },
+    {
+      "input": "1.2.3-rc10",
+      "valid": true,
+      "normalized": "1.2.3-rc10",
+      "full": "1.2.3-rc10",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 105,
+      "identity": 61
+    },
+    {
+      "input": "1.2.3-rc2",
+      "valid": true,
+      "normalized": "1.2.3-rc2",
+      "full": "1.2.3-rc2",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 106,
+      "identity": 62
+    },
+    {
+      "input": "1.2.3-a",
+      "valid": true,
+      "normalized": "1.2.3-a",
+      "full": "1.2.3-a",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 94,
+      "identity": 63
+    },
+    {
+      "input": "1.2.3-b",
+      "valid": true,
+      "normalized": "1.2.3-b",
+      "full": "1.2.3-b",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 97,
+      "identity": 64
+    },
+    {
+      "input": "1.2.3-B",
+      "valid": true,
+      "normalized": "1.2.3-B",
+      "full": "1.2.3-B",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 97,
+      "identity": 64
+    },
+    {
+      "input": "1.2.3-aa",
+      "valid": true,
+      "normalized": "1.2.3-aa",
+      "full": "1.2.3-aa",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 96,
+      "identity": 66
+    },
+    {
+      "input": "1.2.3-1.a",
+      "valid": true,
+      "normalized": "1.2.3-1.a",
+      "full": "1.2.3-1.a",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 91,
+      "identity": 67
+    },
+    {
+      "input": "1.2.3-a.1",
+      "valid": true,
+      "normalized": "1.2.3-a.1",
+      "full": "1.2.3-a.1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 95,
+      "identity": 68
+    },
+    {
+      "input": "1.2.3-9",
+      "valid": true,
+      "normalized": "1.2.3-9",
+      "full": "1.2.3-9",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 92,
+      "identity": 69
+    },
+    {
+      "input": "1.2.3-10",
+      "valid": true,
+      "normalized": "1.2.3-10",
+      "full": "1.2.3-10",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 93,
+      "identity": 70
+    },
+    {
+      "input": "1.2.3",
+      "valid": true,
+      "normalized": "1.2.3",
+      "full": "1.2.3",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 107,
+      "identity": 5
+    },
+    {
+      "input": "1.2.3.0",
+      "valid": true,
+      "normalized": "1.2.3",
+      "full": "1.2.3",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 107,
+      "identity": 5
+    },
+    {
+      "input": "1.2.3.00",
+      "valid": true,
+      "normalized": "1.2.3",
+      "full": "1.2.3",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 107,
+      "identity": 5
+    },
+    {
+      "input": "1.2.03",
+      "valid": true,
+      "normalized": "1.2.3",
+      "full": "1.2.3",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 107,
+      "identity": 5
+    },
+    {
+      "input": "999999999.999999999.999999999.999999999",
+      "valid": true,
+      "normalized": "999999999.999999999.999999999.999999999",
+      "full": "999999999.999999999.999999999.999999999",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 120,
+      "identity": 75
+    },
+    {
+      "input": "1.0.0\t",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1,0,0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-beta 1",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0- beta",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0 -beta",
+      "valid": true,
+      "normalized": "1.0.0-beta",
+      "full": "1.0.0-beta",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 45,
+      "identity": 24
+    },
+    {
+      "input": "1 .0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1 . 0 . 0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0 .0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1\t.0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "\u00A01.0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0\u00A0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.\u00A00",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.+0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.-0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0.+1",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "١.0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0\n",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1 0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0 +meta",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+meta",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0-beta +meta",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-beta+ meta",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-a.b+c.d",
+      "valid": true,
+      "normalized": "1.0.0-a.b",
+      "full": "1.0.0-a.b+c.d",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 26,
+      "identity": 87
+    },
+    {
+      "input": "1.0.0+-",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+-",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0+0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+0",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0.0+00",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0+00",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "0",
+      "valid": true,
+      "normalized": "0.0.0",
+      "full": "0.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 0,
+      "identity": 9
+    },
+    {
+      "input": "00",
+      "valid": true,
+      "normalized": "0.0.0",
+      "full": "0.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 0,
+      "identity": 9
+    },
+    {
+      "input": "0.0",
+      "valid": true,
+      "normalized": "0.0.0",
+      "full": "0.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 0,
+      "identity": 9
+    },
+    {
+      "input": "1.0.0-a.B",
+      "valid": true,
+      "normalized": "1.0.0-a.B",
+      "full": "1.0.0-a.B",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 26,
+      "identity": 87
+    },
+    {
+      "input": "1.0.0-a.b",
+      "valid": true,
+      "normalized": "1.0.0-a.b",
+      "full": "1.0.0-a.b",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 26,
+      "identity": 87
+    },
+    {
+      "input": "1.0.0-A.b.1",
+      "valid": true,
+      "normalized": "1.0.0-A.b.1",
+      "full": "1.0.0-A.b.1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 29,
+      "identity": 96
+    },
+    {
+      "input": "1.0.0-a.b.1",
+      "valid": true,
+      "normalized": "1.0.0-a.b.1",
+      "full": "1.0.0-a.b.1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 29,
+      "identity": 96
+    },
+    {
+      "input": "1.0.0-alpha.1.beta",
+      "valid": true,
+      "normalized": "1.0.0-alpha.1.beta",
+      "full": "1.0.0-alpha.1.beta",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 38,
+      "identity": 98
+    },
+    {
+      "input": "1.0.0-alpha.-1",
+      "valid": true,
+      "normalized": "1.0.0-alpha.-1",
+      "full": "1.0.0-alpha.-1",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 36,
+      "identity": 99
+    },
+    {
+      "input": "1.0.0-alpha.1-",
+      "valid": true,
+      "normalized": "1.0.0-alpha.1-",
+      "full": "1.0.0-alpha.1-",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 41,
+      "identity": 100
+    },
+    {
+      "input": "4294967296.0",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.2147483648",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0.2147483647",
+      "valid": true,
+      "normalized": "1.0.0.2147483647",
+      "full": "1.0.0.2147483647",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 90,
+      "identity": 101
+    },
+    {
+      "input": "1\u3000.0",
+      "valid": true,
+      "normalized": "1.0.0",
+      "full": "1.0.0",
+      "prerelease": false,
+      "semver2": false,
+      "rank": 58,
+      "identity": 0
+    },
+    {
+      "input": "1.0​",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-99999999999999999999",
+      "valid": true,
+      "normalized": "1.0.0-99999999999999999999",
+      "full": "1.0.0-99999999999999999999",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 17,
+      "identity": 103
+    },
+    {
+      "input": "1.0.0-2147483648",
+      "valid": true,
+      "normalized": "1.0.0-2147483648",
+      "full": "1.0.0-2147483648",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 16,
+      "identity": 104
+    },
+    {
+      "input": "1.0.0-2147483647",
+      "valid": true,
+      "normalized": "1.0.0-2147483647",
+      "full": "1.0.0-2147483647",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 11,
+      "identity": 105
+    },
+    {
+      "input": "1.0.0-a",
+      "valid": true,
+      "normalized": "1.0.0-a",
+      "full": "1.0.0-a",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 18,
+      "identity": 106
+    },
+    {
+      "input": "1.0.0-z",
+      "valid": true,
+      "normalized": "1.0.0-z",
+      "full": "1.0.0-z",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 56,
+      "identity": 107
+    },
+    {
+      "input": "1.0.0-Z",
+      "valid": true,
+      "normalized": "1.0.0-Z",
+      "full": "1.0.0-Z",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 56,
+      "identity": 107
+    },
+    {
+      "input": "1.0.0-a.99999999999999999999",
+      "valid": true,
+      "normalized": "1.0.0-a.99999999999999999999",
+      "full": "1.0.0-a.99999999999999999999",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 25,
+      "identity": 109
+    },
+    {
+      "input": "1.0.0+a+b",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0-a-b+c-d",
+      "valid": true,
+      "normalized": "1.0.0-a-b",
+      "full": "1.0.0-a-b+c-d",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 31,
+      "identity": 110
+    },
+    {
+      "input": "1.0.0-a+b-c",
+      "valid": true,
+      "normalized": "1.0.0-a",
+      "full": "1.0.0-a+b-c",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 18,
+      "identity": 106
+    },
+    {
+      "input": "1.0.0.0.0-a",
+      "valid": false,
+      "normalized": null,
+      "full": null,
+      "prerelease": null,
+      "semver2": null,
+      "rank": null,
+      "identity": null
+    },
+    {
+      "input": "1.0.0.0-a+b",
+      "valid": true,
+      "normalized": "1.0.0-a",
+      "full": "1.0.0-a+b",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 18,
+      "identity": 106
+    },
+    {
+      "input": "1.0.0.1+meta",
+      "valid": true,
+      "normalized": "1.0.0.1",
+      "full": "1.0.0.1+meta",
+      "prerelease": false,
+      "semver2": true,
+      "rank": 87,
+      "identity": 4
+    },
+    {
+      "input": "1.0.0--1",
+      "valid": true,
+      "normalized": "1.0.0--1",
+      "full": "1.0.0--1",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 6,
+      "identity": 114
+    },
+    {
+      "input": "1.0.0--0",
+      "valid": true,
+      "normalized": "1.0.0--0",
+      "full": "1.0.0--0",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 7,
+      "identity": 115
+    },
+    {
+      "input": "1.0.0-a.-2",
+      "valid": true,
+      "normalized": "1.0.0-a.-2",
+      "full": "1.0.0-a.-2",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 21,
+      "identity": 116
+    },
+    {
+      "input": "1.0.0-a.-01",
+      "valid": true,
+      "normalized": "1.0.0-a.-01",
+      "full": "1.0.0-a.-01",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 22,
+      "identity": 117
+    },
+    {
+      "input": "1.0.0--2147483648",
+      "valid": true,
+      "normalized": "1.0.0--2147483648",
+      "full": "1.0.0--2147483648",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 5,
+      "identity": 118
+    },
+    {
+      "input": "1.0.0--2147483649",
+      "valid": true,
+      "normalized": "1.0.0--2147483649",
+      "full": "1.0.0--2147483649",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 14,
+      "identity": 119
+    },
+    {
+      "input": "1.0.0---1",
+      "valid": true,
+      "normalized": "1.0.0---1",
+      "full": "1.0.0---1",
+      "prerelease": true,
+      "semver2": false,
+      "rank": 13,
+      "identity": 120
+    },
+    {
+      "input": "1.0.0-a.-0",
+      "valid": true,
+      "normalized": "1.0.0-a.-0",
+      "full": "1.0.0-a.-0",
+      "prerelease": true,
+      "semver2": true,
+      "rank": 23,
+      "identity": 121
+    }
+  ]
+}
