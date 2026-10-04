@@ -75,9 +75,9 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 |---|---|---|---|---|
 | 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
 | 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
-| 2 | Núcleo de dominio y persistencia | 🟣 `EN VALIDACIÓN` | 1 | Publicación consistente, inmutable y resistente a caídas. |
-| 3 | Superficie NuGet V3 completa | ⚪ `NO INICIADA` | 2 | Matriz de clientes comprobados en verde. |
-| 4 | Identidad, autenticación y autorización | ⚪ `NO INICIADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
+| 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
+| 3 | Superficie NuGet V3 completa | 🔵 `EN DISEÑO` | 2 | Matriz de clientes comprobados en verde. |
+| 4 | Identidad, autenticación y autorización | 🔵 `EN DISEÑO` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | ⚪ `NO INICIADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | ⚪ `NO INICIADA` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
@@ -166,7 +166,7 @@ Reducir el mayor riesgo técnico **antes** de invertir en administración, permi
 
 ## Fase 2 — Núcleo de dominio y persistencia
 
-**Estatus:** 🟣 `EN VALIDACIÓN` — verde en local salvo `disk-full.sh`, que solo corre en Linux; falta el CI en GitHub.
+**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028).
 **Depende de:** Fase 1
 **ADRs:** [ADR-004](adr-mvp.md#adr-004), [ADR-005](adr-mvp.md#adr-005), [ADR-006](adr-mvp.md#adr-006), [ADR-007](adr-mvp.md#adr-007), [ADR-020](adr-mvp.md#adr-020)
 
@@ -204,7 +204,7 @@ Todas las pruebas bloqueantes automatizadas (tests de los crates y `tests/recove
 
 ## Fase 3 — Superficie NuGet V3 completa
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 2
 **ADRs:** [ADR-009](adr-mvp.md#adr-009), [ADR-013](adr-mvp.md#adr-013), [ADR-019](adr-mvp.md#adr-019)
 
@@ -245,7 +245,7 @@ Matriz de clientes con todas las celdas automatizables en verde en CI y las manu
 
 ## Fase 4 — Identidad, autenticación y autorización
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 2 (paralelizable con Fase 3)
 **ADRs:** [ADR-010](adr-mvp.md#adr-010), [ADR-011](adr-mvp.md#adr-011), [ADR-012](adr-mvp.md#adr-012)
 
@@ -465,3 +465,6 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 2 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 1) completada. |
 | 2026-10-04 | 2 | `EN DISEÑO` | `EN PROGRESO` | ADR-004, 005, 006, 007 y 020 aceptados. |
 | 2026-10-04 | 2 | `EN PROGRESO` | `EN VALIDACIÓN` | 37 tests y E2E con dotnet verdes en local. Pendiente: CI (incluye disco lleno en Linux). |
+| 2026-10-04 | 2 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028), con tests de recuperación (`fault-injection`) y disco lleno en tmpfs. |
+| 2026-10-04 | 3 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada. |
+| 2026-10-04 | 4 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada; paralelizable con la Fase 3. |
