@@ -46,3 +46,4 @@ Leyenda: ✅ comprobado · ⏳ pendiente · ➖ fuera del alcance actual.
 |---|---|---|
 | `dotnet nuget push` | Hace el `PUT` sobre `{PackagePublish}/` con barra final. | Se aceptan las dos formas. |
 | `dotnet nuget push` | Consulta el service index con Basic (tras el `401`) y publica con `X-NuGet-ApiKey`. | Las rutas NuGet aceptan ambos mecanismos (ADR-011). |
+| `nuget.exe search` | No acepta `-ConfigFile` (sí `push` e `install`); lee el `NuGet.Config` del directorio actual. | Se ejecuta desde el directorio con la configuración del feed. |

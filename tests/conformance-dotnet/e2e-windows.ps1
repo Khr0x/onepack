@@ -116,12 +116,15 @@ try {
     if ($LASTEXITCODE -eq 0 -or $dup -notmatch '409') { Fail "el push duplicado debió fallar con 409: $dup" }
 
     Step 'Buscando con nuget.exe search (sin y con prerelease)'
-    $stable = Invoke-Native $nuget @('search', 'Onepack.Fixture', '-Source', 'onepack', '-ConfigFile', $config, '-NonInteractive')
+    # `nuget search` no acepta -ConfigFile: lee el NuGet.Config del directorio actual.
+    Push-Location "$work/client"
+    $stable = Invoke-Native $nuget @('search', 'Onepack.Fixture', '-Source', 'onepack', '-NonInteractive')
     foreach ($id in 'Onepack.Fixture.Basic', 'Onepack.Fixture.Dependent', 'Onepack.Fixture.Ranged') {
         if ($stable -notmatch [regex]::Escape($id)) { Fail "la búsqueda no muestra $id`n$stable" }
     }
     if ($stable -match 'Onepack\.Fixture\.Rich') { Fail "la búsqueda sin prerelease muestra Rich`n$stable" }
-    $pre = Invoke-Native $nuget @('search', 'Onepack.Fixture', '-PreRelease', '-Source', 'onepack', '-ConfigFile', $config, '-NonInteractive')
+    $pre = Invoke-Native $nuget @('search', 'Onepack.Fixture', '-PreRelease', '-Source', 'onepack', '-NonInteractive')
+    Pop-Location
     if ($pre -notmatch 'Onepack\.Fixture\.Rich') { Fail "la búsqueda con prerelease no muestra Rich`n$pre" }
 
     Step 'Instalando con nuget.exe install (resolución por rango)'
