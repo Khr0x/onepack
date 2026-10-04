@@ -1,0 +1,13 @@
+[package]
+name = "onepack-core"
+description = "Dominio de onepack: feeds, versiones, permisos y casos de uso."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
