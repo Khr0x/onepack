@@ -77,7 +77,7 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
 | 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
 | 3 | Superficie NuGet V3 completa | 🔵 `EN DISEÑO` | 2 | Matriz de clientes comprobados en verde. |
-| 4 | Identidad, autenticación y autorización | 🔵 `EN DISEÑO` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
+| 4 | Identidad, autenticación y autorización | 🟣 `EN VALIDACIÓN` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | ⚪ `NO INICIADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | ⚪ `NO INICIADA` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
@@ -245,7 +245,7 @@ Matriz de clientes con todas las celdas automatizables en verde en CI y las manu
 
 ## Fase 4 — Identidad, autenticación y autorización
 
-**Estatus:** 🔵 `EN DISEÑO`
+**Estatus:** 🟣 `EN VALIDACIÓN` — verde en local; falta el CI en GitHub.
 **Depende de:** Fase 2 (paralelizable con Fase 3)
 **ADRs:** [ADR-010](adr-mvp.md#adr-010), [ADR-011](adr-mvp.md#adr-011), [ADR-012](adr-mvp.md#adr-012)
 
@@ -253,34 +253,36 @@ Matriz de clientes con todas las celdas automatizables en verde en CI y las manu
 Autenticación obligatoria y permisos por feed aplicados en **todos** los endpoints, incluidos metadatos, `HEAD` y respuestas condicionales.
 
 ### Entregables
-- [ ] Entidades `principal` (usuario / servicio), `token`, `grant`.
-- [ ] Tokens opacos de alta entropía con prefijo identificable, almacenados como verificador (hash), mostrados una sola vez.
-- [ ] Expiración, revocación y `last_used_at` (actualizado sin escribir en cada request).
-- [ ] Roles por feed: Reader, Publisher, Maintainer, Administrator.
-- [ ] Restricción de publicación por prefijo de id (`Hemia.Payments.*`).
-- [ ] Tres contextos de autenticación:
-  - [ ] API admin: `Authorization: Bearer`.
-  - [ ] Lectura NuGet: Basic sobre HTTPS con token como contraseña; `401` con `WWW-Authenticate`.
-  - [ ] Publicación NuGet: `X-NuGet-ApiKey`.
-- [ ] Middleware de autorización único, con test que recorre **todas** las rutas registradas.
-- [ ] `onepackd init`: genera credencial administrativa inicial en archivo con permisos `0600`; sin contraseña por defecto.
-- [ ] Respuesta `404` (no `403`) para feeds sin permiso de lectura, para no revelar existencia.
-- [ ] Auditoría de: login fallido, creación/revocación de tokens, cambios de grants, publicaciones.
-- [ ] Redacción de secretos en logs (cabeceras `Authorization`, `X-NuGet-ApiKey`).
+- [x] Entidades `principal` (usuario / servicio), `token`, `feed_grant` y `grant_publish_pattern` (`migrations/0002_identity.sql`).
+- [x] Tokens opacos `opk_<id>_<secreto>` (256 bits), almacenados como verificador SHA-256 y mostrados una sola vez (`crates/storage/src/tokens.rs`).
+- [x] Expiración obligatoria (90 días por defecto), revocación inmediata y `last_used_at` escrito como máximo cada 5 minutos por token.
+- [x] Roles por feed: Reader ⊂ Publisher ⊂ Maintainer; Administrator global (`crates/core/src/auth.rs`).
+- [x] Restricción de publicación por patrón de id (`Hemia.Payments.*`), comprobada al conocer el id del paquete.
+- [x] Mecanismos de autenticación por superficie (ver la precisión en ADR-011):
+  - [x] API admin: solo `Authorization: Bearer`.
+  - [x] NuGet: Basic con el token como contraseña, o `X-NuGet-ApiKey`; `401` con `WWW-Authenticate: Basic`.
+  - [x] Publicación NuGet: `X-NuGet-ApiKey` (o Basic, que el cliente envía tras el `401`).
+- [x] Middleware de autenticación único y global (`crates/server/src/auth.rs`), que cubre también rutas inexistentes; los handlers solo obtienen un feed mediante `authorized_feed`, que autoriza a la vez.
+- [x] `onepackd init`: migra, crea el administrador y escribe la credencial inicial en `initial-admin-token` (`0600`, directorio `0700`); sin contraseña por defecto.
+- [x] Respuesta `404` idéntica para feeds inexistentes y feeds sin permiso de lectura.
+- [x] Auditoría de fallos de autenticación, principals, tokens, grants, publicaciones y denegaciones, con el actor.
+- [x] Secretos fuera de los logs: las trazas HTTP no registran cabeceras y los rechazos solo registran el id del token.
+- [x] Gestión local: `onepackd principal create`, `token create|revoke`, `grant set|remove` (la API remota llega en la Fase 6).
+- [x] `GET /api/v1/whoami`: identidad y permisos de la credencial.
 
 ### Pruebas bloqueantes
-| Escenario | Resultado esperado |
-|---|---|
-| Token revocado | La siguiente solicitud recibe `401`. |
-| Token expirado | `401`; no se renueva implícitamente. |
-| Lectura entre feeds sin permiso | Ninguna filtración vía búsqueda, autocompletado, registros, flat container, `.nuspec` o `HEAD`. |
-| Publisher fuera de su prefijo | `403` con código `AUTH_PREFIX_DENIED`. |
-| Reader intenta publicar o hacer unlist | `403`. |
-| Logs tras flujo completo | No contienen ningún token. |
-| `dotnet restore` con credenciales por `NuGetPackageSourceCredentials_*` | Éxito. |
+| Escenario | Resultado esperado | Prueba |
+|---|---|---|
+| Token revocado | La siguiente solicitud recibe `401`. | `server/tests/auth.rs`, E2E con `dotnet` |
+| Token expirado | `401`; no se renueva implícitamente. | `server/tests/auth.rs`, `storage/tests/identity.rs` |
+| Lectura entre feeds sin permiso | Ninguna filtración vía búsqueda, autocompletado, registros, flat container, `.nuspec` o `HEAD`. | `server/tests/auth.rs` (todas las rutas existentes; búsqueda y registros se cubrirán al añadirlos en la Fase 3) |
+| Publisher fuera de su prefijo | `403` con código `AUTH_PREFIX_DENIED`. | `server/tests/auth.rs` |
+| Reader intenta publicar o hacer unlist | `403`. | `server/tests/auth.rs` (publicar; unlist llega en la Fase 3) |
+| Logs tras flujo completo | No contienen ningún token. | `server/tests/recovery.rs` (`RUST_LOG=trace`), E2E con `dotnet` |
+| `dotnet restore` con credenciales por `NuGetPackageSourceCredentials_*` | Éxito. | `scripts/e2e-dotnet.sh` |
 
 ### Gate de salida
-Test de cobertura de rutas: el 100 % de rutas registradas exige autenticación salvo la lista explícita de rutas públicas (vacía por defecto con `anonymous_read=false`).
+Test de cobertura de rutas: el 100 % de rutas registradas exige autenticación salvo la lista explícita de rutas públicas (vacía; `anonymous_read` no está implementado).
 
 ---
 
@@ -468,3 +470,5 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 2 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028), con tests de recuperación (`fault-injection`) y disco lleno en tmpfs. |
 | 2026-10-04 | 3 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada. |
 | 2026-10-04 | 4 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada; paralelizable con la Fase 3. |
+| 2026-10-04 | 4 | `EN DISEÑO` | `EN PROGRESO` | ADR-010, 011 y 012 aceptados. |
+| 2026-10-04 | 4 | `EN PROGRESO` | `EN VALIDACIÓN` | 66 tests y E2E autenticado con dotnet verdes en local. Pendiente: CI. |

@@ -42,13 +42,15 @@ sudo mount -t tmpfs -o size=8m tmpfs "$mnt"
 sudo chown "$(id -u):$(id -g)" "$mnt"
 data="$mnt/data"
 
-"$bin" migrate --data-dir "$data" >/dev/null
+"$bin" init --data-dir "$data" >/dev/null
 "$bin" feed create internal --data-dir "$data" >/dev/null
+token=$(tr -d '\n' <"$data/initial-admin-token")
+auth=(-H "X-NuGet-ApiKey: $token")
 "$bin" serve --data-dir "$data" --listen "127.0.0.1:$port" --public-url "$base" \
   --min-free-space-mib 0 >"$work/server.log" 2>&1 &
 server_pid=$!
 for _ in $(seq 1 50); do
-  curl -fsS "$base/nuget/internal/v3/index.json" >/dev/null 2>&1 && break
+  curl -fsS "${auth[@]}" "$base/nuget/internal/v3/index.json" >/dev/null 2>&1 && break
   sleep 0.2
 done
 
@@ -66,10 +68,10 @@ EOF
 push() {
   # El servidor puede responder antes de recibir todo el cuerpo (p. ej. 507); curl informa
   # entonces un error de envío aunque haya recibido el código, por eso se ignora su salida.
-  curl -s -o "$work/push.out" -w '%{http_code}' -X PUT \
+  curl -s -o "$work/push.out" -w '%{http_code}' -X PUT "${auth[@]}" \
     -F "package=@$1;type=application/octet-stream" "$base/nuget/internal/v2/package" || true
 }
-status() { curl -s -o /dev/null -w '%{http_code}' "$1"; }
+status() { curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$1"; }
 
 code=$(push "$work/Big.nupkg")
 [ "$code" = "507" ] || fail "subida con disco lleno devolvió $code (esperado 507): $(cat "$work/push.out")"
@@ -83,7 +85,7 @@ echo "ok: la versión fallida no es visible"
 
 code=$(push "$work/Small.nupkg")
 [ "$code" = "201" ] || fail "tras liberar espacio la publicación devolvió $code: $(cat "$work/push.out")"
-curl -fsS -o "$work/Small.downloaded" "$base/nuget/internal/v3/flat/small/1.0.0/small.1.0.0.nupkg"
+curl -fsS "${auth[@]}" -o "$work/Small.downloaded" "$base/nuget/internal/v3/flat/small/1.0.0/small.1.0.0.nupkg"
 cmp -s "$work/Small.nupkg" "$work/Small.downloaded" || fail "el paquete descargado no coincide"
 echo "ok: el servicio sigue operativo y sirve bytes idénticos"
 

@@ -6,10 +6,10 @@ use std::sync::Arc;
 use axum::Json;
 use axum::body::Body;
 use axum::extract::multipart::MultipartError;
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Extension, Multipart, Path, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use onepack_core::{Feed, NewVersion, PublishError};
+use onepack_core::{Access, AuthContext, Denial, Feed, NewVersion, PublishError};
 use onepack_nuget::{NuGetVersion, PackageId, read_nuspec_from, read_package_from};
 use onepack_storage::{StagingError, StoreError};
 use serde_json::json;
@@ -19,6 +19,7 @@ use crate::AppState;
 
 pub enum ApiError {
     NotFound,
+    Forbidden(Denial),
     BadRequest(String),
     Conflict(String),
     PayloadTooLarge,
@@ -29,7 +30,24 @@ pub enum ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            Self::NotFound => (StatusCode::NOT_FOUND, "no encontrado".to_owned()),
+            Self::NotFound | Self::Forbidden(Denial::NotFound) => {
+                (StatusCode::NOT_FOUND, "no encontrado".to_owned())
+            }
+            Self::Forbidden(d @ Denial::MissingScope(access)) => (
+                StatusCode::FORBIDDEN,
+                format!(
+                    "{}: la credencial es válida, pero no tiene el permiso {} en este feed",
+                    d.code(),
+                    access.scope()
+                ),
+            ),
+            Self::Forbidden(d @ Denial::PrefixDenied) => (
+                StatusCode::FORBIDDEN,
+                format!(
+                    "{}: la credencial no puede publicar este id de paquete en este feed",
+                    d.code()
+                ),
+            ),
             Self::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             Self::Conflict(m) => (StatusCode::CONFLICT, m),
             Self::PayloadTooLarge => (
@@ -95,8 +113,33 @@ impl From<MultipartError> for ApiError {
 
 type ApiResult<T> = Result<T, ApiError>;
 
-async fn feed(state: &AppState, name: &str) -> ApiResult<Feed> {
-    state.store.feed(name).await?.ok_or(ApiError::NotFound)
+/// Única forma de obtener un `Feed` en los handlers: resuelve y autoriza a la vez. Un feed
+/// inexistente y uno sin permiso de lectura responden igual (404) para no revelar cuál existe.
+async fn authorized_feed(
+    state: &AppState,
+    auth: &AuthContext,
+    name: &str,
+    access: Access,
+) -> ApiResult<Feed> {
+    let feed = state.store.feed(name).await?.ok_or(ApiError::NotFound)?;
+    if let Err(denial) = auth.check_feed(feed.id, access) {
+        if access != Access::Read {
+            let action = format!("feed.{}", access.scope());
+            let visible = denial != Denial::NotFound;
+            state
+                .store
+                .record_denied(
+                    &action,
+                    &auth.actor(),
+                    visible.then_some(&feed),
+                    None,
+                    denial.code(),
+                )
+                .await;
+        }
+        return Err(ApiError::Forbidden(denial));
+    }
+    Ok(feed)
 }
 
 /// Convierte segmentos de URL en claves de identidad. Cualquier valor inválido es un 404:
@@ -119,9 +162,10 @@ fn blocking_err(e: tokio::task::JoinError) -> ApiError {
 
 pub async fn service_index(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
     Path(feed_name): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let feed = feed(&state, &feed_name).await?;
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
     let base = format!("{}/nuget/{}", state.public_url, feed.name);
     Ok(Json(json!({
         "version": "3.0.0",
@@ -142,9 +186,10 @@ pub async fn service_index(
 
 pub async fn flat_versions(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
     Path((feed_name, id)): Path<(String, String)>,
 ) -> ApiResult<impl IntoResponse> {
-    let feed = feed(&state, &feed_name).await?;
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
     // El flat container incluye versiones listadas y no listadas (ADR-013).
     let mut versions: Vec<NuGetVersion> = state
         .store
@@ -163,9 +208,10 @@ pub async fn flat_versions(
 
 pub async fn flat_file(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
     Path((feed_name, id, version, file)): Path<(String, String, String, String)>,
 ) -> ApiResult<Response> {
-    let feed = feed(&state, &feed_name).await?;
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
     let id = id_key(&id)?;
     let version = version_key(&version)?;
     let file = file.to_lowercase();
@@ -209,11 +255,12 @@ pub async fn flat_file(
 
 pub async fn publish(
     State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
     Path(feed_name): Path<String>,
     mut multipart: Multipart,
 ) -> ApiResult<impl IntoResponse> {
-    let feed = feed(&state, &feed_name).await?;
-    // La validación de X-NuGet-ApiKey llega en la Fase 4 (ADR-011).
+    // Rol comprobado antes de leer el cuerpo; el prefijo, al conocer el id del paquete.
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Publish).await?;
 
     let mut field = multipart
         .next_field()
@@ -246,7 +293,22 @@ pub async fn publish(
         is_prerelease: manifest.version.is_prerelease(),
         is_semver2: manifest.version.is_semver2(),
     };
-    match state.store.publish(&feed, &new, staged).await {
+    if let Err(denial) = auth.check_publish(feed.id, &new.package_key) {
+        state
+            .store
+            .record_denied(
+                "package.publish",
+                &auth.actor(),
+                Some(&feed),
+                Some(&new.resource()),
+                denial.code(),
+            )
+            .await;
+        return Err(ApiError::Forbidden(denial));
+    }
+
+    let actor = auth.actor();
+    match state.store.publish(&feed, &new, staged, Some(&actor)).await {
         Ok(()) => {
             tracing::info!(feed = %feed.name, package = %new.resource(), "paquete publicado");
             Ok(StatusCode::CREATED)

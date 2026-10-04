@@ -27,12 +27,20 @@ cargo deny check
 ## Ejecutar el servidor
 
 ```bash
-cargo run -p onepack-server -- migrate --data-dir ./data
+cargo run -p onepack-server -- init --data-dir ./data
 cargo run -p onepack-server -- feed create internal --data-dir ./data
 cargo run -p onepack-server -- serve --data-dir ./data --public-url http://127.0.0.1:8080
 ```
 
-El feed queda en `http://127.0.0.1:8080/nuget/internal/v3/index.json`. Todavía no hay autenticación (Fase 4): úsalo solo en local.
+`init` escribe la credencial administrativa inicial en `./data/initial-admin-token`. Para una cuenta de CI:
+
+```bash
+cargo run -p onepack-server -- principal create ci --kind service --data-dir ./data
+cargo run -p onepack-server -- grant set --principal ci --feed internal --role publisher --data-dir ./data
+cargo run -p onepack-server -- token create --principal ci --data-dir ./data
+```
+
+El feed queda en `http://127.0.0.1:8080/nuget/internal/v3/index.json`. NuGet se autentica con Basic (token como contraseña) o `X-NuGet-ApiKey`. Usa HTTPS (directo o con reverse proxy) fuera de local.
 
 ## Estructura
 

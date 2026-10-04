@@ -13,7 +13,7 @@ async fn store() -> (Store, TempDir) {
 
 async fn feed(store: &Store, name: &str) -> Feed {
     store
-        .create_feed(&FeedName::parse(name).unwrap())
+        .create_feed(&FeedName::parse(name).unwrap(), "test")
         .await
         .unwrap()
 }
@@ -51,7 +51,7 @@ async fn open_requires_migrated_data_dir() {
     ));
 
     let report = migrate(dir.path()).await.unwrap();
-    assert_eq!(report.applied, 1);
+    assert_eq!(report.applied, 2);
     assert_eq!(report.backup, None, "una base nueva no necesita backup");
     assert_eq!(
         migrate(dir.path()).await.unwrap().applied,
@@ -98,7 +98,7 @@ async fn publish_persists_blob_and_metadata() {
     let sha = staged.sha256().to_owned();
 
     store
-        .publish(&feed, &version("Hemia.Logging", "1.0.0"), staged)
+        .publish(&feed, &version("Hemia.Logging", "1.0.0"), staged, None)
         .await
         .unwrap();
 
@@ -127,6 +127,7 @@ async fn duplicate_identity_conflicts_and_reports_if_identical() {
             &feed,
             &version("A", "1.0.0"),
             stage(&store, b"original").await,
+            None,
         )
         .await
         .unwrap();
@@ -136,6 +137,7 @@ async fn duplicate_identity_conflicts_and_reports_if_identical() {
             &feed,
             &version("A", "1.0.0"),
             stage(&store, b"original").await,
+            None,
         )
         .await;
     assert!(matches!(
@@ -148,6 +150,7 @@ async fn duplicate_identity_conflicts_and_reports_if_identical() {
             &feed,
             &version("a", "1.0.0"),
             stage(&store, b"changed").await,
+            None,
         )
         .await;
     assert!(matches!(
@@ -178,6 +181,7 @@ async fn same_package_in_two_feeds_is_independent_and_deduplicated() {
             &internal,
             &version("A", "1.0.0"),
             stage(&store, b"same").await,
+            None,
         )
         .await
         .unwrap();
@@ -186,6 +190,7 @@ async fn same_package_in_two_feeds_is_independent_and_deduplicated() {
             &customer,
             &version("A", "1.0.0"),
             stage(&store, b"same").await,
+            None,
         )
         .await
         .unwrap();
@@ -228,7 +233,7 @@ async fn concurrent_publishes_of_same_identity_confirm_exactly_one() {
                 (
                     content,
                     store
-                        .publish(&feed, &version("Race", "1.0.0"), staged)
+                        .publish(&feed, &version("Race", "1.0.0"), staged, None)
                         .await,
                 )
             })
@@ -265,6 +270,7 @@ async fn gc_removes_orphans_after_grace_and_keeps_referenced_blobs() {
             &feed,
             &version("A", "1.0.0"),
             stage(&store, b"referenced").await,
+            None,
         )
         .await
         .unwrap();

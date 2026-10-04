@@ -63,9 +63,9 @@ Señal concreta que justificaría reabrir la decisión.
 | [007](#adr-007) | Versiones inmutables y `409` ante duplicados | ✅ Aceptado | 2 |
 | [008](#adr-008) | Normalización NuGet propia validada contra `NuGet.Versioning` | ✅ Aceptado | 1 |
 | [009](#adr-009) | Recursos NuGet V3 anunciados en el MVP | ✅ Aceptado | 1, 3 |
-| [010](#adr-010) | Tokens opacos con verificador hash, no JWT | 📝 Propuesto | 4 |
-| [011](#adr-011) | Tres contextos de autenticación separados | 📝 Propuesto | 4 |
-| [012](#adr-012) | Roles por feed y restricción opcional por prefijo | 📝 Propuesto | 4 |
+| [010](#adr-010) | Tokens opacos con verificador hash, no JWT | ✅ Aceptado | 4 |
+| [011](#adr-011) | Tres contextos de autenticación separados | ✅ Aceptado | 4 |
+| [012](#adr-012) | Roles por feed y restricción opcional por prefijo | ✅ Aceptado | 4 |
 | [013](#adr-013) | `listed` y `availability` como estados independientes | 📝 Propuesto | 3, 5 |
 | [014](#adr-014) | Paquetes como contenido no confiable con presupuesto de inspección | 📝 Propuesto | 5 |
 | [015](#adr-015) | `onepackd` y `onepack` separados; CLI con contrato estable | 📝 Propuesto | 6 |
@@ -350,7 +350,7 @@ Un cliente relevante del piloto requiera un recurso no implementado (p. ej. `Rea
 <a id="adr-010"></a>
 ## ADR-010 — Tokens opacos con verificador hash, no JWT
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 4 · **Relacionados:** ADR-011, ADR-012
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 4 · **Relacionados:** ADR-011, ADR-012
 
 ### Contexto
 Se necesita expiración, revocación inmediata y permisos acotados. Los JWT de larga duración no se revocan sin una lista de bloqueo, lo que anula su ventaja.
@@ -378,7 +378,7 @@ Se integre SSO/OIDC o federación de identidades de CI (p. ej. OIDC de GitHub Ac
 <a id="adr-011"></a>
 ## ADR-011 — Tres contextos de autenticación separados
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 4 · **Relacionados:** ADR-010, ADR-016
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 4 · **Relacionados:** ADR-010, ADR-016
 
 ### Contexto
 Los clientes NuGet autentican lectura y publicación por mecanismos distintos, y el CLI administrativo tiene su propio canal.
@@ -392,6 +392,8 @@ Los clientes NuGet autentican lectura y publicación por mecanismos distintos, y
 | Publicación NuGet | `X-NuGet-ApiKey: <token>` |
 
 Todos resuelven al mismo modelo de principal y permisos. La autorización se aplica en **todas** las rutas, incluidas `HEAD` y respuestas condicionales.
+
+**Precisión (Fase 4, 2026-10-04).** El contexto se determina por la superficie, no por la operación: en las rutas NuGet se aceptan tanto Basic como `X-NuGet-ApiKey`, porque `dotnet nuget push` consulta el service index con Basic (tras el `401`) y publica con la API key. La API administrativa acepta **solo** Bearer: así un navegador que haya cacheado credenciales Basic no puede usarlas contra ella.
 
 ### Alternativas consideradas
 - **Un solo mecanismo** — no es compatible con lo que envían los clientes NuGet.
@@ -409,7 +411,7 @@ Se implemente el credential provider (ADR-016) o lectura anónima por feed.
 <a id="adr-012"></a>
 ## ADR-012 — Roles por feed y restricción opcional por prefijo
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 4 · **Relacionados:** ADR-010, ADR-011
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 4 · **Relacionados:** ADR-010, ADR-011
 
 ### Contexto
 Una cuenta de CI debe poder publicar solo lo suyo. NuGet no tiene namespaces en el protocolo.
