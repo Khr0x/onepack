@@ -1,0 +1,15 @@
+[package]
+name = "onepack-bench"
+description = "Benchmark de latencia de metadatos de onepackd (Fase 7). No se distribuye."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde_json = "1.0.151"
+ureq = { version = "3.4.2", default-features = false }
+
+[lints]
+workspace = true

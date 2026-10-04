@@ -90,3 +90,64 @@ jobs:
       - name: nuget.exe push / search / install and dotnet restore E2E (ADR-019)
         shell: pwsh
         run: ./tests/conformance-dotnet/e2e-windows.ps1
+
+  recovery-backup:
+    name: Recovery (1/2) backup on Linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish packages and take a backup with the server running (ADR-017)
+        run: ./scripts/e2e-recovery.sh backup "$RUNNER_TEMP/onepack-backup.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onepack-backup
+          path: ${{ runner.temp }}/onepack-backup.tar.gz
+          retention-days: 3
+
+  recovery-restore:
+    # Different machine and OS from the backup: the phase 7 gate.
+    name: Recovery (2/2) restore on macOS and dotnet restore
+    needs: recovery-backup
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: onepack-backup
+          path: ${{ runner.temp }}
+      - name: Restore, check and dotnet restore against the restored server
+        run: ./scripts/e2e-recovery.sh restore "$RUNNER_TEMP/onepack-backup.tar.gz"
+
+  operations:
+    name: systemd, container and reverse proxy examples
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: systemd unit with hardening, restart after SIGKILL
+        run: ./tests/ops/systemd.sh
+      - name: Container image (non-root, volume, probes)
+        run: ./tests/ops/container.sh
+      - name: Nginx and Caddy examples are valid
+        run: ./tests/ops/proxy-configs.sh
+
+  benchmark:
+    name: Benchmark (container, 2 vCPU / 1 GiB)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Benchmark
+        run: python3 scripts/bench.py --docker --out bench-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench-results.json

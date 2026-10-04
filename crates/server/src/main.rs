@@ -8,8 +8,10 @@ use onepack_core::{
     FeedName, FeedQuota, Principal, PrincipalKind, PrincipalName, PublishPattern, Role,
 };
 use onepack_nuget::{InspectionLimits, NuGetVersion, PackageId};
-use onepack_server::{Limits, RateLimit, app, backfill_metadata, gc_loop};
-use onepack_storage::{Store, VersionChange, migrate};
+use onepack_server::{Limits, RateLimit, app_with_ops, backfill_metadata, gc_loop};
+use onepack_storage::{
+    CheckReport, Store, VersionChange, backup, check, migrate, restore, schema_status,
+};
 use tracing_subscriber::EnvFilter;
 
 type CliResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -25,8 +27,23 @@ const INITIAL_TOKEN_TTL_DAYS: i64 = 30;
     about = "Servidor del registro privado onepack"
 )]
 struct Cli {
+    /// Formato de los logs (stderr): texto para personas o JSON para agregadores.
+    #[arg(
+        long,
+        global = true,
+        env = "ONEPACK_LOG_FORMAT",
+        value_enum,
+        default_value = "text"
+    )]
+    log_format: LogFormat,
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum LogFormat {
+    Text,
+    Json,
 }
 
 #[derive(Subcommand)]
@@ -35,7 +52,46 @@ enum Command {
     /// administrativa inicial.
     Init(DataDir),
     /// Crea o actualiza el esquema del directorio de datos (hace backup si ya había datos).
-    Migrate(DataDir),
+    Migrate {
+        /// Solo informa de la versión del esquema y de las migraciones pendientes.
+        #[arg(long)]
+        check: bool,
+        #[command(flatten)]
+        data: DataDir,
+    },
+    /// Copia consistente de la base y los blobs, con manifiesto (ADR-017). Activa el modo
+    /// mantenimiento mientras dura: el servidor rechaza mutaciones, las lecturas siguen.
+    Backup {
+        #[command(flatten)]
+        data: DataDir,
+        /// Directorio de destino (vacío o inexistente).
+        #[arg(long)]
+        output: PathBuf,
+        /// Duración máxima del mantenimiento si el backup se interrumpe.
+        #[arg(long, default_value_t = 3600)]
+        maintenance_timeout_secs: u64,
+    },
+    /// Restaura un backup en un directorio de datos vacío, tras verificar el manifiesto.
+    Restore {
+        /// Directorio del backup.
+        #[arg(long)]
+        from: PathBuf,
+        #[command(flatten)]
+        data: DataDir,
+    },
+    /// Integridad entre la base y los blobs: faltantes, dañados y huérfanos.
+    Check {
+        #[command(flatten)]
+        data: DataDir,
+        /// No lee cada blob: solo existencia y tamaño.
+        #[arg(long)]
+        quick: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Modo mantenimiento manual.
+    #[command(subcommand)]
+    Maintenance(MaintenanceCommand),
     /// Gestión local de feeds.
     #[command(subcommand)]
     Feed(FeedCommand),
@@ -90,6 +146,29 @@ enum FeedCommand {
         /// Número máximo de versiones.
         #[arg(long)]
         max_versions: u64,
+        #[command(flatten)]
+        data: DataDir,
+    },
+}
+
+#[derive(Subcommand)]
+enum MaintenanceCommand {
+    /// Activa el mantenimiento: el servidor rechaza mutaciones con 503.
+    On {
+        #[arg(long)]
+        reason: String,
+        /// Se desactiva solo pasado este tiempo.
+        #[arg(long, default_value_t = 3600)]
+        duration_secs: u64,
+        #[command(flatten)]
+        data: DataDir,
+    },
+    /// Termina el mantenimiento (también uno que dejó un backup interrumpido).
+    Off {
+        #[command(flatten)]
+        data: DataDir,
+    },
+    Status {
         #[command(flatten)]
         data: DataDir,
     },
@@ -219,6 +298,10 @@ struct ServeArgs {
     /// Por debajo de este espacio libre, en MiB, se emite un aviso al arrancar.
     #[arg(long, env = "ONEPACK_MIN_FREE_SPACE_MIB", default_value_t = 1024)]
     min_free_space_mib: u64,
+    /// Listener de operación sin autenticación: /metrics, /healthz y /readyz. Úsalo en una
+    /// interfaz interna (p. ej. 127.0.0.1:9464).
+    #[arg(long, env = "ONEPACK_OPS_LISTEN")]
+    ops_listen: Option<SocketAddr>,
     #[command(flatten)]
     limits: LimitArgs,
 }
@@ -320,17 +403,51 @@ async fn require_feed(store: &Store, name: &str) -> CliResult<onepack_core::Feed
 
 #[tokio::main]
 async fn main() -> CliResult {
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        // Sin códigos de color cuando el log va a un archivo o a journald.
-        .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .init();
+    let cli = Cli::parse();
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
+    match cli.log_format {
+        LogFormat::Text => tracing_subscriber::fmt()
+            .with_writer(std::io::stderr)
+            // Sin códigos de color cuando el log va a un archivo o a journald.
+            .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))
+            .with_env_filter(filter)
+            .init(),
+        // Una línea JSON por evento; los spans incluyen `request_id`.
+        LogFormat::Json => tracing_subscriber::fmt()
+            .json()
+            .with_writer(std::io::stderr)
+            .with_current_span(false)
+            .with_span_list(true)
+            .with_env_filter(filter)
+            .init(),
+    }
 
-    match Cli::parse().command {
+    match cli.command {
         Command::Init(DataDir { data_dir }) => init(&data_dir).await?,
-        Command::Migrate(DataDir { data_dir }) => {
-            let report = migrate(&data_dir).await?;
+        Command::Migrate { check: true, data } => {
+            let status = schema_status(&data.data_dir).await?;
+            match status.current {
+                None => println!(
+                    "directorio sin inicializar; esquema disponible: {}",
+                    status.latest
+                ),
+                Some(v) => println!(
+                    "esquema {v} (esta versión de onepackd llega a {})",
+                    status.latest
+                ),
+            }
+            if status.pending.is_empty() {
+                println!("sin migraciones pendientes");
+            } else {
+                println!(
+                    "{} migración(es) pendiente(s): {:?}; `onepackd migrate` hará antes un backup",
+                    status.pending.len(),
+                    status.pending
+                );
+            }
+        }
+        Command::Migrate { check: false, data } => {
+            let report = migrate(&data.data_dir).await?;
             match report.backup {
                 Some(backup) => println!(
                     "{} migración(es) aplicada(s); backup previo en {}",
@@ -340,6 +457,58 @@ async fn main() -> CliResult {
                 None => println!("{} migración(es) aplicada(s)", report.applied),
             }
         }
+        Command::Backup {
+            data,
+            output,
+            maintenance_timeout_secs,
+        } => {
+            let started = std::time::Instant::now();
+            let manifest = backup(
+                &data.data_dir,
+                &output,
+                &local_actor(),
+                maintenance_timeout_secs,
+            )
+            .await?;
+            let bytes: u64 = manifest.blobs.iter().map(|b| b.size).sum();
+            println!(
+                "backup en {} ({:.1} s): esquema {}, {} feed(s), {} versión(es), {} blob(s), {} bytes",
+                output.display(),
+                started.elapsed().as_secs_f64(),
+                manifest.schema_version,
+                manifest.feeds,
+                manifest.versions,
+                manifest.blobs.len(),
+                bytes
+            );
+            println!(
+                "No incluye la configuración del servicio (flags o variables de entorno) ni certificados: guárdalos aparte."
+            );
+        }
+        Command::Restore { from, data } => {
+            let report = restore(&from, &data.data_dir).await?;
+            restrict_permissions(&data.data_dir, 0o700)?;
+            println!(
+                "restaurado en {}: esquema {} ({} migración(es) aplicada(s)), {} versión(es), {} blob(s) verificados",
+                data.data_dir.display(),
+                report.schema_version,
+                report.migrations_applied,
+                report.versions,
+                report.blobs
+            );
+        }
+        Command::Check { data, quick, json } => {
+            let report = check(&data.data_dir, !quick).await?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                print_check(&report);
+            }
+            if !report.ok() {
+                return Err("la comprobación encontró blobs faltantes o dañados".into());
+            }
+        }
+        Command::Maintenance(cmd) => maintenance(cmd).await?,
         Command::Feed(cmd) => feed(cmd).await?,
         Command::Principal(PrincipalCommand::Create {
             name,
@@ -517,6 +686,103 @@ async fn package(cmd: PackageCommand) -> CliResult {
     }
 }
 
+fn print_check(report: &CheckReport) {
+    println!(
+        "{} versión(es), {} blob(s) comprobados{}",
+        report.versions,
+        report.blobs_checked,
+        if report.hashes_verified {
+            " con verificación de hash"
+        } else {
+            " (sin verificar hashes: --quick)"
+        }
+    );
+    for (label, problems) in [("FALTA", &report.missing), ("DAÑADO", &report.corrupt)] {
+        for p in problems {
+            println!(
+                "{label} {} ({}): {}",
+                p.sha256,
+                p.detail,
+                p.versions.join(", ")
+            );
+        }
+    }
+    if !report.orphan_files.is_empty() {
+        println!(
+            "{} blob(s) huérfano(s) (los elimina la limpieza tras el periodo de gracia)",
+            report.orphan_files.len()
+        );
+    }
+    if report.staging_files > 0 {
+        println!("{} archivo(s) en staging", report.staging_files);
+    }
+    println!(
+        "{}",
+        if report.ok() {
+            "Integridad correcta."
+        } else {
+            "Hay versiones que no se pueden descargar: restaura sus blobs desde un backup."
+        }
+    );
+}
+
+async fn maintenance(cmd: MaintenanceCommand) -> CliResult {
+    match cmd {
+        MaintenanceCommand::On {
+            reason,
+            duration_secs,
+            data,
+        } => {
+            let store = Store::open(&data.data_dir).await?;
+            let result = store
+                .begin_maintenance(&reason, duration_secs, &local_actor())
+                .await?;
+            store.close().await;
+            match result {
+                Ok(()) => println!(
+                    "mantenimiento activo ({reason}) durante {duration_secs} s como máximo"
+                ),
+                Err(active) => {
+                    return Err(format!(
+                        "ya hay un mantenimiento en curso: {} (hasta {})",
+                        active.reason, active.expires_at
+                    )
+                    .into());
+                }
+            }
+        }
+        MaintenanceCommand::Off { data } => {
+            let store = Store::open(&data.data_dir).await?;
+            let ended = store.end_maintenance(&local_actor()).await?;
+            store.close().await;
+            println!(
+                "{}",
+                if ended {
+                    "mantenimiento terminado"
+                } else {
+                    "no había mantenimiento"
+                }
+            );
+        }
+        MaintenanceCommand::Status { data } => {
+            let store = Store::open(&data.data_dir).await?;
+            let state = store.maintenance().await?;
+            store.close().await;
+            match state {
+                Some(m) => println!(
+                    "mantenimiento activo: {} (por {}, desde {}, caduca {})",
+                    m.reason,
+                    m.actor.as_deref().unwrap_or("?"),
+                    m.started_at,
+                    m.expires_at
+                ),
+                None => println!("sin mantenimiento"),
+            }
+        }
+    }
+    Ok(())
+}
+
 async fn token(cmd: TokenCommand) -> CliResult {
     match cmd {
         TokenCommand::Create {
@@ -621,7 +887,16 @@ async fn serve(args: ServeArgs) -> CliResult {
         Duration::from_secs(args.gc_grace_secs),
     ));
 
-    let router = app(store.clone(), &args.public_url, limits);
+    let (router, ops_router) = app_with_ops(store.clone(), &args.public_url, limits);
+    if let Some(addr) = args.ops_listen {
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        tracing::info!(listen = %addr, "listener de operación (/metrics, /healthz, /readyz)");
+        tokio::spawn(async move {
+            if let Err(e) = axum::serve(listener, ops_router).await {
+                tracing::error!(error = %e, "el listener de operación terminó");
+            }
+        });
+    }
     let listener = tokio::net::TcpListener::bind(args.listen).await?;
     tracing::info!(listen = %args.listen, public_url = %args.public_url, "onepackd escuchando");
     // Con la dirección del cliente, para el límite de peticiones por IP.
@@ -629,10 +904,32 @@ async fn serve(args: ServeArgs) -> CliResult {
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(async {
-        let _ = tokio::signal::ctrl_c().await;
-    })
+    .with_graceful_shutdown(shutdown_signal())
     .await?;
     store.close().await;
+    tracing::info!("onepackd detenido");
     Ok(())
+}
+
+/// Ctrl+C o SIGTERM (lo que envía systemd al parar el servicio).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut s) => {
+                s.recv().await;
+            }
+            Err(_) => std::future::pending::<()>().await,
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        () = ctrl_c => {}
+        () = terminate => {}
+    }
+    tracing::info!("parando: se terminan las peticiones en curso");
 }

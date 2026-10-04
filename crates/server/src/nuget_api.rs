@@ -43,6 +43,8 @@ pub enum ApiError {
     /// No quedan plazas de subida.
     Busy,
     RateLimited(Duration),
+    /// Modo mantenimiento (ADR-017): no se aceptan mutaciones.
+    Maintenance,
     InsufficientStorage,
     Internal(String),
 }
@@ -140,6 +142,12 @@ impl ApiError {
                 "RATE_LIMITED",
                 "demasiadas peticiones; reintenta más tarde".to_owned(),
             ),
+            Self::Maintenance => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "MAINTENANCE",
+                "el registro está en mantenimiento (p. ej. un backup); las lecturas siguen disponibles"
+                    .to_owned(),
+            ),
             Self::InsufficientStorage => {
                 tracing::error!("almacenamiento lleno");
                 (
@@ -165,11 +173,13 @@ impl ApiError {
         let retry_after = match &self {
             Self::RateLimited(wait) => Some(wait.as_secs().max(1)),
             Self::Busy => Some(5),
+            Self::Maintenance => Some(crate::ops::MAINTENANCE_RETRY_SECS),
             _ => None,
         };
         let blocked = matches!(self, Self::Blocked);
         let unauthenticated = matches!(self, Self::Unauthenticated);
         let (status, code, message) = self.parts();
+        crate::ops::metrics().record_error(code);
         let mut res = match surface {
             Surface::NuGet if status == StatusCode::NOT_FOUND => (status, message).into_response(),
             Surface::NuGet => (status, format!("{code}: {message}")).into_response(),
@@ -229,7 +239,9 @@ pub fn suggested_action(code: &str) -> Option<&'static str> {
             "pide a un administrador que amplíe la cuota: `onepack feed configure`"
         }
         "PACKAGE_BLOCKED" => "elige otra versión o consulta a quien mantiene el feed",
-        "RATE_LIMITED" | "UPLOADS_BUSY" => "reintenta pasado el tiempo de Retry-After",
+        "RATE_LIMITED" | "UPLOADS_BUSY" | "MAINTENANCE" => {
+            "reintenta pasado el tiempo de Retry-After"
+        }
         "PACKAGE_INVALID" | "PACKAGE_UNSAFE_PATH" => {
             "genera el paquete con `dotnet pack` y revisa su contenido"
         }
@@ -486,13 +498,13 @@ pub async fn search(
 ) -> ApiResult<impl IntoResponse> {
     let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
     let p = SearchParams::parse(&params);
-    let versions = state
-        .store
-        .listed_versions(&feed, p.prerelease, p.semver2)
+    let index = state
+        .search
+        .get(&state.store, &feed, p.prerelease, p.semver2)
         .await?;
     Ok(Json(v3::search(
         &feed_urls(&state, &feed),
-        versions,
+        &index,
         &p.query,
     )))
 }
@@ -505,22 +517,18 @@ pub async fn autocomplete(
 ) -> ApiResult<impl IntoResponse> {
     let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
     let p = SearchParams::parse(&params);
-    let versions = state
-        .store
-        .listed_versions(&feed, p.prerelease, p.semver2)
+    let index = state
+        .search
+        .get(&state.store, &feed, p.prerelease, p.semver2)
         .await?;
     match params.get("id") {
         Some(id) => {
             let key = PackageId::parse(id)
                 .map(|id| id.identity())
                 .unwrap_or_default();
-            let versions = versions
-                .into_iter()
-                .filter(|v| v.package_key == key)
-                .collect();
-            Ok(Json(v3::autocomplete_versions(versions)))
+            Ok(Json(v3::autocomplete_versions(index.versions_of(&key))))
         }
-        None => Ok(Json(v3::autocomplete_ids(versions, &p.query))),
+        None => Ok(Json(v3::autocomplete_ids(&index, &p.query))),
     }
 }
 
@@ -554,11 +562,14 @@ pub(crate) async fn set_listed(
             .await;
         return Err(ApiError::Forbidden(denial));
     }
-    match state
+    let change = state
         .store
         .set_listed(&feed, &id, &version, listed, &auth.actor())
-        .await?
-    {
+        .await?;
+    if change == VersionChange::Changed {
+        state.search.invalidate();
+    }
+    match change {
         VersionChange::NotFound => Err(ApiError::NotFound),
         VersionChange::Changed | VersionChange::Unchanged => Ok(()),
     }
@@ -658,11 +669,26 @@ pub async fn flat_file(
 }
 
 pub async fn publish(
+    state: State<Arc<AppState>>,
+    auth: Extension<Arc<AuthContext>>,
+    feed_name: Path<String>,
+    multipart: Multipart,
+) -> ApiResult<StatusCode> {
+    let result = publish_inner(state, auth, feed_name, multipart).await;
+    crate::ops::metrics().record_upload(match &result {
+        Ok(_) => "published",
+        Err(ApiError::Conflict(_)) => "conflict",
+        Err(_) => "rejected",
+    });
+    result
+}
+
+async fn publish_inner(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,
     Path(feed_name): Path<String>,
     mut multipart: Multipart,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiResult<StatusCode> {
     // Rol comprobado antes de leer el cuerpo; el prefijo, al conocer el id del paquete.
     let feed = authorized_feed(&state, &auth, &feed_name, Access::Publish).await?;
     // Plaza de subida antes de leer el cuerpo: una ráfaga recibe 503 en lugar de acumular
@@ -672,6 +698,7 @@ pub async fn publish(
         .clone()
         .try_acquire_owned()
         .map_err(|_| ApiError::Busy)?;
+    let _in_flight = crate::ops::metrics().upload_started();
 
     // Streaming a staging con hash incremental; nada de la subida queda en memoria (ADR-006).
     let receive = async {
@@ -753,6 +780,7 @@ pub async fn publish(
     let actor = auth.actor();
     match state.store.publish(&feed, &new, staged, Some(&actor)).await {
         Ok(()) => {
+            state.search.invalidate();
             tracing::info!(feed = %feed.name, package = %new.resource(), "paquete publicado");
             Ok(StatusCode::CREATED)
         }

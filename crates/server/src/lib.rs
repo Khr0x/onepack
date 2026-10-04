@@ -4,7 +4,9 @@ pub mod admin_api;
 pub mod auth;
 pub mod limits;
 pub mod nuget_api;
+pub mod ops;
 pub mod request_id;
+pub mod search_cache;
 
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -31,9 +33,16 @@ pub struct AppState {
     pub inspections: Semaphore,
     pub principal_limiter: limits::RateLimiter<i64>,
     pub ip_limiter: limits::RateLimiter<IpAddr>,
+    pub search: search_cache::SearchCache,
 }
 
 pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
+    app_with_ops(store, public_url, limits).0
+}
+
+/// La aplicación y el router del listener de operación (`/metrics`, sondas), que comparten
+/// estado.
+pub fn app_with_ops(store: Arc<Store>, public_url: &str, limits: Limits) -> (Router, Router) {
     let max_package_bytes = limits.max_package_bytes;
     let state = Arc::new(AppState {
         public_url: public_url.trim_end_matches('/').to_owned(),
@@ -43,10 +52,11 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
         inspections: Semaphore::new(limits.max_concurrent_inspections.max(1)),
         principal_limiter: limits::RateLimiter::new(limits.principal_rate),
         ip_limiter: limits::RateLimiter::new(limits.ip_rate),
+        search: search_cache::SearchCache::default(),
         limits,
     });
 
-    Router::new()
+    let router = Router::new()
         .route("/nuget/{feed}/v3/index.json", get(nuget_api::service_index))
         .route(
             "/nuget/{feed}/v3/flat/{id}/index.json",
@@ -80,6 +90,8 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
             "/nuget/{feed}/v2/package/{id}/{version}",
             axum::routing::delete(nuget_api::unlist).post(nuget_api::relist),
         )
+        .route("/healthz", get(ops::healthz))
+        .route("/readyz", get(ops::readyz))
         .route("/api/v1/capabilities", get(admin_api::capabilities))
         .route("/api/v1/whoami", get(admin_api::whoami))
         .route(
@@ -142,6 +154,11 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
         .layer(DefaultBodyLimit::max(
             max_package_bytes as usize + 64 * 1024,
         ))
+        // Dentro de la autenticación: en mantenimiento, las mutaciones reciben 503 (ADR-017).
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            ops::maintenance_guard,
+        ))
         // `layer` (no `route_layer`): también cubre rutas inexistentes, así que nada responde
         // sin autenticar y una ruta nueva queda protegida por defecto.
         .layer(middleware::from_fn_with_state(
@@ -154,10 +171,21 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
             limits::limit_by_ip,
         ))
         // Las trazas HTTP registran método y ruta, nunca cabeceras: los tokens no llegan al log.
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http().make_span_with(
+            |req: &axum::http::Request<axum::body::Body>| {
+                tracing::info_span!(
+                    "request",
+                    method = %req.method(),
+                    uri = %req.uri(),
+                    request_id = %request_id::current().unwrap_or_default(),
+                )
+            },
+        ))
+        .layer(middleware::from_fn(ops::track))
         // La más externa: también los rechazos por límite de IP llevan request_id.
         .layer(middleware::from_fn(request_id::assign))
-        .with_state(state)
+        .with_state(state.clone());
+    (router, ops::ops_router(state))
 }
 
 /// Limpieza periódica de staging y blobs huérfanos (ADR-006). La primera pasada es inmediata,
@@ -166,6 +194,18 @@ pub async fn gc_loop(store: Arc<Store>, interval: Duration, grace: Duration) {
     let mut ticker = tokio::time::interval(interval);
     loop {
         ticker.tick().await;
+        // Durante un backup (ADR-017) no se borra nada.
+        match store.maintenance().await {
+            Ok(Some(_)) => {
+                tracing::info!("limpieza pospuesta: mantenimiento en curso");
+                continue;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::error!(error = %e, "no se pudo consultar el modo mantenimiento");
+                continue;
+            }
+        }
         match store.gc(grace).await {
             Ok(report) if report.staging_removed + report.orphan_blobs_removed > 0 => {
                 tracing::info!(

@@ -93,6 +93,10 @@ pub async fn require_auth(
     mut req: Request,
     next: Next,
 ) -> Response {
+    // Sondas de salud: sin credencial y sin datos (Fase 7).
+    if crate::ops::is_probe(req.uri().path()) {
+        return next.run(req).await;
+    }
     let surface = Surface::of(req.uri().path());
     let Some(token) = credential(surface, req.headers()) else {
         return unauthorized(surface);

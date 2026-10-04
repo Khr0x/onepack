@@ -80,7 +80,7 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | 🟢 `COMPLETADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | 🟢 `COMPLETADA` | 4 | Operación completa del registro desde terminal. |
-| 7 | Operación, recuperación y distribución | 🔵 `EN DISEÑO` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
+| 7 | Operación, recuperación y distribución | 🟡 `EN PROGRESO` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
 | 8 | Piloto y cierre del MVP | ⚪ `NO INICIADA` | 7 | Prueba decisiva ejecutada por un equipo real. |
 
 ```mermaid
@@ -374,7 +374,7 @@ Guía "de cero a restore en CI" en `docs/` ejecutada literalmente por alguien qu
 
 ## Fase 7 — Operación, recuperación y distribución
 
-**Estatus:** 🔵 `EN DISEÑO`
+**Estatus:** 🟡 `EN PROGRESO`
 **Depende de:** Fases 5 y 6
 **ADRs:** [ADR-017](adr-mvp.md#adr-017), [ADR-018](adr-mvp.md#adr-018), [ADR-020](adr-mvp.md#adr-020)
 
@@ -382,29 +382,31 @@ Guía "de cero a restore en CI" en `docs/` ejecutada literalmente por alguien qu
 Que el servicio se pueda instalar, actualizar, observar y recuperar de forma predecible.
 
 ### Entregables — Recuperación
-- [ ] Modo mantenimiento: pausa mutaciones y limpieza de blobs.
-- [ ] `onepackd backup`: SQLite Online Backup API + blobs referenciados + configuración + manifiesto con hashes.
-- [ ] `onepackd restore` sobre directorio vacío, con verificación del manifiesto.
-- [ ] `onepackd check`: integridad BD ↔ blobs (faltantes, huérfanos, hashes incorrectos).
-- [ ] Migraciones: versión de esquema, comprobación previa, backup automático antes de migrar, forward-only.
+- [x] Modo mantenimiento: pausa mutaciones y limpieza de blobs.
+- [x] `onepackd backup`: copia consistente de la base (`VACUUM INTO`, ver precisión en ADR-017) + blobs referenciados verificados + manifiesto con hashes. La configuración del servicio no vive en el directorio de datos: se documenta guardarla aparte.
+- [x] `onepackd restore` sobre directorio vacío, con verificación del manifiesto.
+- [x] `onepackd check`: integridad BD ↔ blobs (faltantes, huérfanos, hashes incorrectos).
+- [x] Migraciones: versión de esquema, comprobación previa (`migrate --check`), backup automático antes de migrar, forward-only.
 
 ### Entregables — Observabilidad
-- [ ] Logs estructurados JSON con `request_id`.
-- [ ] Endpoint de métricas (requests, latencias, subidas, rechazos, espacio en disco).
-- [ ] `/healthz` (vivo) y `/readyz` (BD y almacenamiento accesibles).
+- [x] Logs estructurados JSON con `request_id`.
+- [x] Endpoint de métricas (requests, latencias, subidas, rechazos, espacio en disco).
+- [x] `/healthz` (vivo) y `/readyz` (BD y almacenamiento accesibles).
 
 ### Entregables — Distribución
-- [ ] Binarios servidor: Linux x86-64 y ARM64.
-- [ ] Binarios CLI: Linux, macOS (x86-64/ARM64), Windows.
-- [ ] Unidad systemd con hardening (`ProtectSystem`, `NoNewPrivileges`, usuario dedicado).
-- [ ] Imagen de contenedor opcional (no root, volumen de datos).
-- [ ] Ejemplos de reverse proxy (Nginx/Caddy) que **no** sirven blobs directamente.
-- [ ] Checksums y firma de los artefactos de release.
+- [~] Binarios servidor: Linux x86-64 y ARM64 (estáticos, musl). Workflow `release.yml` listo; falta su primera ejecución.
+- [~] Binarios CLI: Linux, macOS (x86-64/ARM64), Windows. Mismo workflow; falta su primera ejecución.
+- [x] Unidad systemd con hardening (`ProtectSystem`, `NoNewPrivileges`, usuario dedicado).
+- [x] Imagen de contenedor opcional (no root, volumen de datos).
+- [x] Ejemplos de reverse proxy (Nginx/Caddy) que **no** sirven blobs directamente.
+- [~] Checksums y firma de los artefactos de release (SHA-256 + cosign keyless, verificada en el propio workflow). Falta su primera ejecución.
 
 ### Entregables — Rendimiento
-- [ ] Benchmark reproducible en 2 vCPU / 1 GB / SSD.
-- [ ] Medición de objetivos: arranque < 2 s, RSS en reposo < 100 MiB, p95 metadatos < 50 ms, memoria acotada en transferencias.
-- [ ] Reporte con resultados reales (los objetivos no cumplidos se documentan, no se ocultan).
+- [x] Benchmark reproducible en 2 vCPU / 1 GB / SSD (`scripts/bench.py --docker`, job *Benchmark* del CI).
+- [x] Medición de objetivos: arranque < 2 s, RSS en reposo < 100 MiB, p95 metadatos < 50 ms, memoria acotada en transferencias.
+- [x] Reporte con resultados reales (los objetivos no cumplidos se documentan, no se ocultan).
+
+Evidencia: `crates/storage/tests/ops.rs`, `crates/server/tests/operations.rs`, `scripts/e2e-recovery.sh` (backup en Linux → restore en macOS en el CI), `tests/ops/` (systemd, contenedor, proxies), [docs/performance.md](../docs/performance.md) y [docs/runbooks/](../docs/runbooks/).
 
 ### Pruebas bloqueantes
 | Escenario | Resultado esperado |
@@ -494,3 +496,4 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 6 | `EN PROGRESO` | `EN VALIDACIÓN` | API `/api/v1` y CLI completos; 142 tests, `e2e-cli.sh` y la guía ejecutados en local (SDK 8). Pendiente: CI y que la guía la ejecute literalmente alguien que no escribió el código. |
 | 2026-10-04 | 6 | `EN VALIDACIÓN` | `COMPLETADA` | CI en verde: [CI run 37236552774](https://github.com/Khr0x/onepack/actions/runs/37236552774), con `e2e-cli.sh` en Linux (SDK 8 y 10) y macOS (SDK 8 y 10). Cerrada por decisión del usuario con la ejecución de la guía por un tercero diferida al piloto de la Fase 8. PR Khr0x/onepack#7. |
 | 2026-10-04 | 7 | `NO INICIADA` | `EN DISEÑO` | Dependencias (Fases 5 y 6) completadas. |
+| 2026-10-04 | 7 | `EN DISEÑO` | `EN PROGRESO` | ADR-017 aceptado. Firma de releases: SHA-256 + cosign keyless. Rama `feature/phase-7-operations`. |

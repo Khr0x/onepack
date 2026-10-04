@@ -4,6 +4,7 @@ mod admin;
 pub mod blobs;
 mod catalog;
 mod identity;
+pub mod ops;
 pub mod tokens;
 
 use std::io;
@@ -23,6 +24,10 @@ pub use admin::{
 pub use blobs::{BlobStore, StagedBlob, StagingError, StagingWriter};
 pub use catalog::{MissingMetadata, VersionChange};
 pub use identity::{AuthFailure, AuthOutcome, IssuedToken};
+pub use ops::{
+    BackupManifest, BlobProblem, CheckReport, Maintenance, OpsError, RestoreReport, backup, check,
+    restore, verify_backup,
+};
 
 static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
 
@@ -97,7 +102,16 @@ pub struct Store {
     /// Un único escritor: SQLite admite un solo escritor a la vez (ADR-004).
     writer: SqlitePool,
     reader: SqlitePool,
+    data_dir: PathBuf,
     blobs: BlobStore,
+}
+
+/// Solo lectura y sin pragmas que escriban (el modo WAL se fija al abrir para escribir).
+fn read_only_options(db: &Path) -> SqliteConnectOptions {
+    SqliteConnectOptions::new()
+        .filename(db)
+        .read_only(true)
+        .busy_timeout(Duration::from_secs(5))
 }
 
 fn connect_options(db: &Path) -> SqliteConnectOptions {
@@ -149,6 +163,45 @@ pub async fn migrate(data_dir: &Path) -> Result<MigrationReport, StoreError> {
     report.applied = pending;
     pool.close().await;
     Ok(report)
+}
+
+/// Estado del esquema sin modificar nada (para `onepackd migrate --check`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchemaStatus {
+    /// Última migración aplicada; `None` si el directorio no está inicializado.
+    pub current: Option<i64>,
+    /// Última migración que conoce esta versión de onepackd.
+    pub latest: i64,
+    /// Migraciones pendientes, en orden.
+    pub pending: Vec<i64>,
+}
+
+pub async fn schema_status(data_dir: &Path) -> Result<SchemaStatus, StoreError> {
+    let latest = MIGRATOR.iter().map(|m| m.version).max().unwrap_or(0);
+    let db = data_dir.join(DB_FILE);
+    if !tokio::fs::try_exists(&db).await? {
+        return Ok(SchemaStatus {
+            current: None,
+            latest,
+            pending: MIGRATOR.iter().map(|m| m.version).collect(),
+        });
+    }
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(read_only_options(&db))
+        .await?;
+    let applied = applied_versions(&pool).await?;
+    pool.close().await;
+    check_not_newer(&applied)?;
+    Ok(SchemaStatus {
+        current: applied.iter().max().copied(),
+        latest,
+        pending: MIGRATOR
+            .iter()
+            .map(|m| m.version)
+            .filter(|v| !applied.contains(v))
+            .collect(),
+    })
 }
 
 async fn applied_versions(pool: &SqlitePool) -> Result<Vec<i64>, StoreError> {
@@ -204,7 +257,12 @@ impl Store {
             writer,
             reader,
             blobs: BlobStore::open(data_dir).await?,
+            data_dir: data_dir.to_owned(),
         })
+    }
+
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
     }
 
     pub fn blobs(&self) -> &BlobStore {

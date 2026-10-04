@@ -22,3 +22,8 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 dbg_macro = "warn"
 todo = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

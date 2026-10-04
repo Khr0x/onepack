@@ -70,7 +70,7 @@ Señal concreta que justificaría reabrir la decisión.
 | [014](#adr-014) | Paquetes como contenido no confiable con presupuesto de inspección | ✅ Aceptado | 5 |
 | [015](#adr-015) | `onepackd` y `onepack` separados; CLI con contrato estable | ✅ Aceptado | 6 |
 | [016](#adr-016) | Credenciales NuGet vía `onepack exec`; credential provider pospuesto | ✅ Aceptado | 6 |
-| [017](#adr-017) | Backup consistente en modo mantenimiento | 📝 Propuesto | 7 |
+| [017](#adr-017) | Backup consistente en modo mantenimiento | ✅ Aceptado | 7 |
 | [018](#adr-018) | `public_url` explícito y blobs solo a través del servidor | ✅ Aceptado | 3, 7 |
 | [019](#adr-019) | Conformidad probada con clientes .NET reales, sin .NET en runtime | ✅ Aceptado | 0, 1 |
 | [020](#adr-020) | Migraciones forward-only con backup previo | ✅ Aceptado | 2, 7 |
@@ -565,7 +565,7 @@ El piloto identifique el uso desde IDE como fricción principal.
 <a id="adr-017"></a>
 ## ADR-017 — Backup consistente en modo mantenimiento
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 7 · **Relacionados:** ADR-004, ADR-005, ADR-006
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 7 · **Relacionados:** ADR-004, ADR-005, ADR-006
 
 ### Contexto
 Un backup de la base sin blobs no recupera el registro. Copiar el archivo SQLite activo sin coordinación no es fiable.
@@ -580,6 +580,8 @@ Un backup de la base sin blobs no recupera el registro. Copiar el archivo SQLite
 ### Alternativas consideradas
 - **Backup en caliente sin pausa** — riesgo de blobs recolectados entre la copia de BD y la de blobs.
 - **Delegar en snapshots del filesystem** — válido como complemento, no como único mecanismo portable.
+
+**Precisión (Fase 7, 2026-10-04).** La base se copia con `VACUUM INTO` y no con la Online Backup API: sqlx no expone esa API y llamarla directamente exigiría código `unsafe`, que el workspace prohíbe. `VACUUM INTO` produce igualmente una copia consistente (una transacción de lectura) y compacta. Los blobs que se copian son los que referencia esa copia, verificados contra su hash. El modo mantenimiento vive en la base (lo comparten el proceso de backup y el servidor) y caduca solo, para que un backup interrumpido no deje el registro bloqueado. La configuración del servicio (flags y variables de entorno) no está en el directorio de datos y no entra en el backup; se documenta que hay que guardarla aparte. `restore` aplica las migraciones si el backup es de una versión anterior. Detalle en [docs/runbooks/backup-restore.md](../docs/runbooks/backup-restore.md).
 
 ### Consecuencias
 - Ventana corta sin publicaciones durante el backup; se documenta.

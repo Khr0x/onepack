@@ -811,6 +811,7 @@ async fn set_blocked(
         return Err(ApiError::NotFound.into());
     }
     if change == VersionChange::Changed {
+        state.search.invalidate();
         tracing::info!(
             feed = %feed.name,
             package = %format!("{id_k}@{version_k}"),

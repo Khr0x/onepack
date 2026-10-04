@@ -53,7 +53,7 @@ async fn open_requires_migrated_data_dir() {
     ));
 
     let report = migrate(dir.path()).await.unwrap();
-    assert_eq!(report.applied, 4);
+    assert_eq!(report.applied, 5);
     assert_eq!(report.backup, None, "una base nueva no necesita backup");
     assert_eq!(
         migrate(dir.path()).await.unwrap().applied,

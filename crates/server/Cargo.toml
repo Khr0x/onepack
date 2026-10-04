@@ -15,12 +15,13 @@ onepack-api-client.workspace = true
 axum = { version = "0.8.9", features = ["multipart"] }
 hyper = { version = "1.11.1", features = ["http1"] }
 getrandom = "0.4.3"
+fs4 = "1.1.0"
 serde = { version = "1.0.229", features = ["derive"] }
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "fs", "net", "signal", "sync", "io-util", "time"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 serde_json = "1.0.151"
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 tower-http = { version = "0.7.1", features = ["trace"] }
 tokio-util = { version = "0.7.19", features = ["io"] }
 base64 = "0.23.1"

@@ -1,0 +1,23 @@
+# onepackd detrás de Caddy con TLS automático (Fase 7, ADR-018).
+#
+# - onepackd escucha en 127.0.0.1:8080 con --public-url https://packages.example.com.
+# - Todo se reenvía a onepackd, que autentica cada petición; nunca se sirve el directorio de
+#   datos directamente.
+# - onepackd no confía en X-Forwarded-*. Como todas las peticiones llegan con la IP del
+#   proxy, desactiva el límite por IP de onepackd (ONEPACK_IP_RATE_LIMIT=0) y limita aquí o
+#   en el firewall (Caddy no trae rate limiting sin módulos adicionales).
+
+packages.example.com {
+	request_body {
+		# Igual o mayor que --max-package-size-mib.
+		max_size 110MB
+	}
+	reverse_proxy 127.0.0.1:8080 {
+		# Subidas y descargas en streaming, sin buffer en el proxy.
+		flush_interval -1
+		transport http {
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+}

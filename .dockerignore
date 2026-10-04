@@ -1,0 +1,5 @@
+target/
+.git/
+**/bin/
+**/obj/
+*.nupkg

@@ -1,11 +1,10 @@
 //! Identificador por petición (ADR-015): va en la cabecera `X-Request-Id`, en los errores de
-//! `/api/v1` y en el span de las trazas, para cruzar lo que ve el cliente con el log.
+//! `/api/v1` y en el span `request` de las trazas, para cruzar lo que ve el cliente con el log.
 
 use axum::extract::Request;
 use axum::http::HeaderValue;
 use axum::middleware::Next;
 use axum::response::Response;
-use tracing::Instrument;
 
 pub const HEADER: &str = "x-request-id";
 
@@ -33,11 +32,7 @@ fn generate() -> String {
 /// Se genera siempre en el servidor: un id que llega del cliente no se usa.
 pub async fn assign(req: Request, next: Next) -> Response {
     let id = generate();
-    let span = tracing::info_span!("request", request_id = %id);
-    let mut res = REQUEST_ID
-        .scope(id.clone(), next.run(req))
-        .instrument(span)
-        .await;
+    let mut res = REQUEST_ID.scope(id.clone(), next.run(req)).await;
     res.headers_mut().insert(
         HEADER,
         HeaderValue::from_str(&id).expect("hexadecimal es un valor de cabecera válido"),
