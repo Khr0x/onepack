@@ -1,0 +1,21 @@
+[package]
+name = "onepack-server"
+description = "Servidor onepack (onepackd)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+onepack-core.workspace = true
+onepack-nuget.workspace = true
+onepack-storage.workspace = true
+onepack-api-client.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "onepackd"
+path = "src/main.rs"
