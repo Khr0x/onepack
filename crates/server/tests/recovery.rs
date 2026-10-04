@@ -24,18 +24,28 @@ fn onepackd(args: &[&str], data: &Path) {
     assert!(status.success(), "onepackd {args:?} falló");
 }
 
-fn init(data: &Path) {
-    onepackd(&["migrate"], data);
+/// Inicializa el directorio de datos y devuelve la credencial administrativa inicial.
+fn init(data: &Path) -> String {
+    onepackd(&["init"], data);
     onepackd(&["feed", "create", "internal"], data);
+    std::fs::read_to_string(data.join("initial-admin-token"))
+        .unwrap()
+        .trim()
+        .to_owned()
 }
 
 struct Server {
     child: Child,
     addr: SocketAddr,
+    token: String,
 }
 
 impl Server {
-    fn start(data: &Path, envs: &[(&str, &str)]) -> Self {
+    fn start(data: &Path, token: &str, envs: &[(&str, &str)]) -> Self {
+        Self::start_logging(data, token, envs, Stdio::null())
+    }
+
+    fn start_logging(data: &Path, token: &str, envs: &[(&str, &str)], stderr: Stdio) -> Self {
         let addr = TcpListener::bind("127.0.0.1:0")
             .unwrap()
             .local_addr()
@@ -60,10 +70,14 @@ impl Server {
             .arg(data)
             .envs(envs.iter().copied())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(stderr)
             .spawn()
             .unwrap();
-        let server = Self { child, addr };
+        let server = Self {
+            child,
+            addr,
+            token: token.to_owned(),
+        };
         wait_until(|| {
             server
                 .request("GET", "/nuget/internal/v3/index.json", &[])
@@ -89,8 +103,9 @@ impl Server {
             format!("Content-Type: multipart/form-data; boundary={BOUNDARY}\r\n")
         };
         let head = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n{content_type}Content-Length: {}\r\n\r\n",
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nX-NuGet-ApiKey: {}\r\n{content_type}Content-Length: {}\r\n\r\n",
             self.addr,
+            self.token,
             body.len()
         );
         stream.write_all(head.as_bytes()).ok()?;
@@ -183,14 +198,14 @@ fn files_in(dir: &Path) -> Vec<std::path::PathBuf> {
 #[test]
 fn published_bytes_survive_restart() {
     let data = TempDir::new().unwrap();
-    init(data.path());
+    let token = init(data.path());
     let package = nupkg("Hemia.Logging", "1.0.0", 10_000);
 
-    let server = Server::start(data.path(), &[]);
+    let server = Server::start(data.path(), &token, &[]);
     assert_eq!(server.push(&package), Some(201));
     server.kill();
 
-    let server = Server::start(data.path(), &[]);
+    let server = Server::start(data.path(), &token, &[]);
     let (status, body) = server
         .request(
             "GET",
@@ -205,15 +220,15 @@ fn published_bytes_survive_restart() {
 #[test]
 fn crash_during_upload_leaves_no_partial_version() {
     let data = TempDir::new().unwrap();
-    init(data.path());
+    let token = init(data.path());
     let package = nupkg("Partial", "1.0.0", 4 << 20);
     let body = multipart(&package);
 
-    let server = Server::start(data.path(), &[]);
+    let server = Server::start(data.path(), &token, &[]);
     // Envía las cabeceras y la mitad del cuerpo, y mata el servidor a mitad de la subida.
     let mut stream = TcpStream::connect(server.addr).unwrap();
     let head = format!(
-        "PUT /nuget/internal/v2/package HTTP/1.1\r\nHost: x\r\nContent-Type: multipart/form-data; boundary={BOUNDARY}\r\nContent-Length: {}\r\n\r\n",
+        "PUT /nuget/internal/v2/package HTTP/1.1\r\nHost: x\r\nX-NuGet-ApiKey: {token}\r\nContent-Type: multipart/form-data; boundary={BOUNDARY}\r\nContent-Length: {}\r\n\r\n",
         body.len()
     );
     stream.write_all(head.as_bytes()).unwrap();
@@ -231,7 +246,7 @@ fn crash_during_upload_leaves_no_partial_version() {
         "la subida interrumpida deja un archivo en staging"
     );
 
-    let server = Server::start(data.path(), &[]);
+    let server = Server::start(data.path(), &token, &[]);
     wait_until(|| files_in(&staging).is_empty());
     assert_eq!(
         server
@@ -248,12 +263,13 @@ fn crash_during_upload_leaves_no_partial_version() {
 #[test]
 fn crash_between_blob_persist_and_commit_leaves_recoverable_orphan() {
     let data = TempDir::new().unwrap();
-    init(data.path());
+    let token = init(data.path());
     let package = nupkg("Orphan", "1.0.0", 1_000);
     let blobs = data.path().join("blobs");
 
     let server = Server::start(
         data.path(),
+        &token,
         &[("ONEPACK_FAULT_ABORT_AFTER_BLOB_PERSIST", "1")],
     );
     assert_eq!(
@@ -269,7 +285,7 @@ fn crash_between_blob_persist_and_commit_leaves_recoverable_orphan() {
         "el blob quedó persistido sin metadatos"
     );
 
-    let server = Server::start(data.path(), &[]);
+    let server = Server::start(data.path(), &token, &[]);
     wait_until(|| files_in(&blobs).is_empty());
     assert_eq!(
         server
@@ -280,4 +296,64 @@ fn crash_between_blob_persist_and_commit_leaves_recoverable_orphan() {
     );
     assert_eq!(server.push(&package), Some(201));
     assert_eq!(files_in(&blobs).len(), 1);
+}
+
+#[test]
+fn init_creates_owner_only_credential_once() {
+    let data = TempDir::new().unwrap();
+    let token = init(data.path());
+    assert!(token.starts_with("opk_"));
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&data.path().join("initial-admin-token")), 0o600);
+        assert_eq!(mode(data.path()), 0o700);
+    }
+
+    let again = Command::new(BIN)
+        .args(["init", "--data-dir"])
+        .arg(data.path())
+        .output()
+        .unwrap();
+    assert!(!again.status.success(), "un segundo init debe fallar");
+}
+
+#[test]
+fn tokens_never_reach_the_logs() {
+    let data = TempDir::new().unwrap();
+    let token = init(data.path());
+    let log_path = data.path().join("server.log");
+    let log = std::fs::File::create(&log_path).unwrap();
+
+    let server = Server::start_logging(data.path(), &token, &[("RUST_LOG", "trace")], log.into());
+    assert_eq!(server.push(&nupkg("Logged", "1.0.0", 100)), Some(201));
+    let wrong = Server {
+        child: Command::new("true").spawn().unwrap(),
+        addr: server.addr,
+        token: format!("{}_{}", &token[..20], "e".repeat(64)),
+    };
+    assert_eq!(
+        wrong
+            .request("GET", "/nuget/internal/v3/index.json", &[])
+            .map(|(s, _)| s),
+        Some(401)
+    );
+    server.kill();
+
+    let logs = std::fs::read_to_string(&log_path).unwrap();
+    assert!(
+        logs.contains("autenticación rechazada"),
+        "el log registra el rechazo"
+    );
+    let secret = token.rsplit('_').next().unwrap();
+    assert!(
+        !logs.contains(secret),
+        "el secreto del token apareció en el log"
+    );
+    assert!(
+        !logs.contains(&"e".repeat(64)),
+        "el secreto de un token inválido apareció en el log"
+    );
 }

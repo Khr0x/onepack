@@ -1,7 +1,14 @@
 //! Dominio: qué significa publicar una versión, quién puede hacerlo y cuándo está disponible.
 //! No depende de NuGet, SQLx ni Axum (ADR-003).
 
+pub mod auth;
+
 use std::fmt;
+
+pub use auth::{
+    Access, AuthContext, Denial, Grant, Principal, PrincipalKind, PrincipalName, PublishPattern,
+    Role,
+};
 
 /// Nombre de feed: `[a-z0-9-]`, de 1 a 64 caracteres, empieza por letra o dígito.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

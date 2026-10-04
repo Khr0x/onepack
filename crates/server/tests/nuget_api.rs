@@ -3,9 +3,11 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
+use axum::extract::Request as AxumRequest;
+use axum::http::HeaderValue;
 use axum::http::{Method, Request, StatusCode};
 use http_body_util::BodyExt;
-use onepack_core::FeedName;
+use onepack_core::{FeedName, PrincipalKind, PrincipalName};
 use onepack_server::app;
 use onepack_storage::{Store, migrate};
 use serde_json::{Value, json};
@@ -21,15 +23,41 @@ async fn server() -> (Router, TempDir) {
     let store = Store::open(dir.path()).await.unwrap();
     for feed in ["internal", "customer-a"] {
         store
-            .create_feed(&FeedName::parse(feed).unwrap())
+            .create_feed(&FeedName::parse(feed).unwrap(), "test")
             .await
             .unwrap();
     }
+    let admin = store
+        .create_principal(
+            &PrincipalName::parse("admin").unwrap(),
+            PrincipalKind::User,
+            true,
+            "test",
+        )
+        .await
+        .unwrap();
+    let token = store
+        .create_token(&admin, None, 3600, "test")
+        .await
+        .unwrap()
+        .token;
+    // Estos tests cubren el comportamiento NuGet: todas las peticiones van como administrador.
+    // La autenticación y los permisos se prueban en `auth.rs`.
+    let api_key = HeaderValue::from_str(&token).unwrap();
     let router = app(
         Arc::new(store),
         "https://packages.example.test/",
         1024 * 1024,
-    );
+    )
+    .layer(axum::middleware::map_request(
+        move |mut req: AxumRequest| {
+            let api_key = api_key.clone();
+            async move {
+                req.headers_mut().insert("X-NuGet-ApiKey", api_key);
+                req
+            }
+        },
+    ));
     (router, dir)
 }
 
@@ -86,7 +114,6 @@ async fn push_to(router: &Router, uri: &str, package: &[u8]) -> StatusCode {
             "content-type",
             format!("multipart/form-data; boundary={BOUNDARY}"),
         )
-        .header("X-NuGet-ApiKey", "spike")
         .body(Body::from(body))
         .unwrap();
     send(router, req).await.0

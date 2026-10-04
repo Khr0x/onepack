@@ -33,9 +33,15 @@ step() { echo "==> $*"; }
 step "Compilando onepackd"
 cargo build --quiet --manifest-path "$root/Cargo.toml" -p onepack-server
 
-step "Inicializando el directorio de datos"
-"$root/target/debug/onepackd" migrate --data-dir "$work/data" >/dev/null
-"$root/target/debug/onepackd" feed create "$feed" --data-dir "$work/data" >/dev/null
+onepackd() { "$root/target/debug/onepackd" "$@" --data-dir "$work/data"; }
+
+step "Inicializando el directorio de datos y una cuenta de servicio de CI"
+onepackd init >/dev/null
+onepackd feed create "$feed" >/dev/null
+onepackd principal create ci --kind service >/dev/null
+onepackd grant set --principal ci --feed "$feed" --role publisher --publish-pattern "Onepack.Fixture.*" >/dev/null
+token=$(onepackd token create --principal ci --expires-in-days 1 2>/dev/null)
+token_id=${token:4:16}
 
 step "Iniciando onepackd en $base"
 "$root/target/debug/onepackd" serve \
@@ -45,11 +51,14 @@ step "Iniciando onepackd en $base"
   --min-free-space-mib 0 >"$work/server.log" 2>&1 &
 server_pid=$!
 for _ in $(seq 1 50); do
-  curl -fsS "$source_url" >/dev/null 2>&1 && break
+  curl -fsS -H "X-NuGet-ApiKey: $token" "$source_url" >/dev/null 2>&1 && break
   kill -0 "$server_pid" 2>/dev/null || fail "onepackd terminó al arrancar"
   sleep 0.2
 done
-curl -fsS "$source_url" >/dev/null || fail "onepackd no respondió en $source_url"
+curl -fsS -H "X-NuGet-ApiKey: $token" "$source_url" >/dev/null || fail "onepackd no respondió en $source_url"
+
+step "Comprobando que sin credenciales se rechaza (401)"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$source_url")" = "401" ] || fail "el feed respondió sin credenciales"
 
 step "Empaquetando fixtures con dotnet pack"
 for proj in "$conformance"/fixtures/*/*.csproj; do
@@ -68,14 +77,17 @@ cat >"$work/NuGet.Config" <<EOF
 </configuration>
 EOF
 
+# Credenciales por variable de entorno, sin escribir secretos en NuGet.Config (ADR-016).
+export NuGetPackageSourceCredentials_onepack="Username=ci;Password=$token"
+
 step "Publicando con dotnet nuget push"
 for pkg in "$work"/nupkgs/*.nupkg; do
-  (cd "$work" && dotnet nuget push "$pkg" --source onepack --api-key e2e-spike) || fail "push de $(basename "$pkg")"
+  (cd "$work" && dotnet nuget push "$pkg" --source onepack --api-key "$token") || fail "push de $(basename "$pkg")"
 done
 
 step "Comprobando que una versión duplicada se rechaza (409)"
 dup="$work/nupkgs/Onepack.Fixture.Basic.1.0.0.nupkg"
-if (cd "$work" && dotnet nuget push "$dup" --source onepack --api-key e2e-spike >"$work/dup.log" 2>&1); then
+if (cd "$work" && dotnet nuget push "$dup" --source onepack --api-key "$token" >"$work/dup.log" 2>&1); then
   fail "el push duplicado debió fallar"
 fi
 grep -q "409" "$work/dup.log" || fail "el push duplicado no devolvió 409: $(cat "$work/dup.log")"
@@ -99,4 +111,15 @@ output=$(cd "$work/consumer" && dotnet run --no-restore --nologo)
 expected="dependent -> hello from onepack fixture"
 [ "$output" = "$expected" ] || fail "salida inesperada: '$output'"
 
-echo "E2E OK: push, 409 en duplicado, restore transitivo con caché vacía y bytes idénticos."
+step "Revocando la credencial de CI"
+onepackd token revoke "$token_id" >/dev/null
+[ "$(curl -s -o /dev/null -w '%{http_code}' -H "X-NuGet-ApiKey: $token" "$source_url")" = "401" ] \
+  || fail "el token revocado sigue funcionando"
+if (cd "$work" && dotnet nuget push "$dup" --source onepack --api-key "$token" >"$work/revoked.log" 2>&1); then
+  fail "el push con un token revocado debió fallar"
+fi
+
+grep -q "$token" "$work/server.log" && fail "el token apareció en el log del servidor"
+
+echo "E2E OK: 401 sin credenciales, push con cuenta de servicio, 409 en duplicado, restore transitivo"
+echo "        autenticado con caché vacía, bytes idénticos y token revocado rechazado."

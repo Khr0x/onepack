@@ -1,6 +1,8 @@
 //! Persistencia: metadatos en SQLite y blobs direccionados por SHA-256 (ADR-004, ADR-005).
 
 pub mod blobs;
+mod identity;
+pub mod tokens;
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -12,6 +14,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 use sqlx::{Row, SqlitePool};
 
 pub use blobs::{BlobStore, StagedBlob, StagingError, StagingWriter};
+pub use identity::{AuthFailure, AuthOutcome, IssuedToken};
 
 static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
 
@@ -205,18 +208,23 @@ impl Store {
         self.reader.close().await;
     }
 
-    pub async fn create_feed(&self, name: &FeedName) -> Result<Feed, StoreError> {
+    pub async fn create_feed(&self, name: &FeedName, actor: &str) -> Result<Feed, StoreError> {
         let mut tx = self.writer.begin().await?;
         let id: i64 =
             sqlx::query_scalar("INSERT INTO feed (name, format) VALUES (?, 'nuget') RETURNING id")
                 .bind(name.as_str())
                 .fetch_one(&mut *tx)
                 .await?;
-        sqlx::query("INSERT INTO audit_event (action, feed_id, resource, outcome) VALUES ('feed.create', ?, ?, 'success')")
-            .bind(id)
-            .bind(name.as_str())
-            .execute(&mut *tx)
-            .await?;
+        identity::audit(
+            &mut tx,
+            "feed.create",
+            Some(actor),
+            Some(id),
+            Some(name.as_str()),
+            "success",
+            None,
+        )
+        .await?;
         tx.commit().await?;
         Ok(Feed {
             id,
@@ -263,6 +271,7 @@ impl Store {
         feed: &Feed,
         version: &NewVersion,
         staged: StagedBlob,
+        actor: Option<&str>,
     ) -> Result<(), PublishError> {
         // Comprobación previa barata; la garantía la da la restricción UNIQUE.
         if let Some(existing) = self
@@ -271,7 +280,7 @@ impl Store {
             .map_err(db_err)?
         {
             let identical = existing.blob_sha256 == staged.sha256();
-            self.audit_conflict(feed, version, identical).await;
+            self.audit_conflict(feed, version, identical, actor).await;
             return Err(PublishError::Conflict { identical });
         }
 
@@ -284,7 +293,10 @@ impl Store {
             std::process::abort();
         }
 
-        match self.insert_version(feed, version, &sha256, size).await {
+        match self
+            .insert_version(feed, version, &sha256, size, actor)
+            .await
+        {
             Ok(()) => Ok(()),
             Err(e)
                 if e.as_database_error()
@@ -296,7 +308,7 @@ impl Store {
                     .await
                     .map_err(db_err)?;
                 let identical = existing.is_some_and(|v| v.blob_sha256 == sha256);
-                self.audit_conflict(feed, version, identical).await;
+                self.audit_conflict(feed, version, identical, actor).await;
                 Err(PublishError::Conflict { identical })
             }
             Err(e) => Err(sqlx_to_publish(e)),
@@ -309,6 +321,7 @@ impl Store {
         v: &NewVersion,
         sha256: &str,
         size: i64,
+        actor: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         let mut tx = self.writer.begin().await?;
         sqlx::query(
@@ -344,9 +357,10 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         sqlx::query(
-            "INSERT INTO audit_event (action, feed_id, resource, outcome, detail)
-             VALUES ('package.publish', ?, ?, 'success', json_object('sha256', ?, 'size', ?))",
+            "INSERT INTO audit_event (action, actor, feed_id, resource, outcome, detail)
+             VALUES ('package.publish', ?, ?, ?, 'success', json_object('sha256', ?, 'size', ?))",
         )
+        .bind(actor)
         .bind(feed.id)
         .bind(v.resource())
         .bind(sha256)
@@ -356,11 +370,18 @@ impl Store {
         tx.commit().await
     }
 
-    async fn audit_conflict(&self, feed: &Feed, v: &NewVersion, identical: bool) {
+    async fn audit_conflict(
+        &self,
+        feed: &Feed,
+        v: &NewVersion,
+        identical: bool,
+        actor: Option<&str>,
+    ) {
         let result = sqlx::query(
-            "INSERT INTO audit_event (action, feed_id, resource, outcome, detail)
-             VALUES ('package.publish', ?, ?, 'conflict', json_object('identical', json(?)))",
+            "INSERT INTO audit_event (action, actor, feed_id, resource, outcome, detail)
+             VALUES ('package.publish', ?, ?, ?, 'conflict', json_object('identical', json(?)))",
         )
+        .bind(actor)
         .bind(feed.id)
         .bind(v.resource())
         .bind(if identical { "true" } else { "false" })
@@ -368,6 +389,35 @@ impl Store {
         .await;
         if let Err(e) = result {
             tracing::error!(error = %e, "no se pudo auditar el conflicto de publicación");
+        }
+    }
+
+    /// Auditoría de un intento denegado. Un fallo al auditar se registra en el log y no
+    /// cambia la respuesta.
+    pub async fn record_denied(
+        &self,
+        action: &str,
+        actor: &str,
+        feed: Option<&Feed>,
+        resource: Option<&str>,
+        code: &str,
+    ) {
+        let result = async {
+            let mut conn = self.writer.acquire().await?;
+            identity::audit(
+                &mut conn,
+                action,
+                Some(actor),
+                feed.map(|f| f.id),
+                resource,
+                "denied",
+                Some(format!(r#"{{"code":"{code}"}}"#)),
+            )
+            .await
+        }
+        .await;
+        if let Err(e) = result {
+            tracing::error!(error = %e, "no se pudo auditar la denegación");
         }
     }
 
@@ -483,5 +533,57 @@ fn sqlx_to_publish(e: sqlx::Error) -> PublishError {
             PublishError::StorageFull
         }
         e => PublishError::Database(e.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn migrating_existing_schema_takes_a_backup_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join(DB_FILE);
+        // Simula una instalación anterior con solo la primera migración aplicada.
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(connect_options(&db).create_if_missing(true))
+            .await
+            .unwrap();
+        MIGRATOR.run_to(1, &pool).await.unwrap();
+        sqlx::query("INSERT INTO feed (name, format) VALUES ('legacy', 'nuget')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+
+        let report = migrate(dir.path()).await.unwrap();
+        assert_eq!(report.applied, MIGRATOR.iter().count() - 1);
+        let backup = report.backup.expect("debe existir un backup previo");
+
+        let old = SqlitePoolOptions::new()
+            .connect_with(SqliteConnectOptions::new().filename(&backup))
+            .await
+            .unwrap();
+        let versions: Vec<i64> = sqlx::query_scalar("SELECT version FROM _sqlx_migrations")
+            .fetch_all(&old)
+            .await
+            .unwrap();
+        assert_eq!(versions, [1], "el backup conserva el esquema anterior");
+        let feeds: i64 = sqlx::query_scalar("SELECT count(*) FROM feed")
+            .fetch_one(&old)
+            .await
+            .unwrap();
+        assert_eq!(feeds, 1, "el backup conserva los datos");
+
+        assert!(
+            Store::open(dir.path())
+                .await
+                .unwrap()
+                .feed("legacy")
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 }

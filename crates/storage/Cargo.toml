@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 fs4 = "1.1.0"
+getrandom = "0.4.3"
 onepack-core.workspace = true
 sha2 = "0.11.0"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
