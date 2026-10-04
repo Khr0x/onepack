@@ -29,6 +29,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Tests (including fault injection)
         run: cargo test --workspace --all-features --locked
+      - name: Security suite (ADR-014)
+        run: cargo test -p onepack-server --test security --locked -- --nocapture
       - name: Disk-full recovery (tmpfs)
         run: ./tests/recovery/disk-full.sh
       - name: Crate boundaries (ADR-003)
@@ -63,7 +65,7 @@ jobs:
       - name: Version corpus up to date with NuGet.Versioning (ADR-008)
         if: matrix.corpus
         run: ./scripts/version-corpus.sh --check
-      - name: dotnet push / search / restore / unlist E2E (ADR-019)
+      - name: dotnet push / search / restore / unlist / block E2E (ADR-019)
         run: ./scripts/e2e-dotnet.sh
         env:
           ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100

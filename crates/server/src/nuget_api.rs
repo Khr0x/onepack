@@ -3,21 +3,24 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Json;
 use axum::body::Body;
 use axum::extract::multipart::MultipartError;
 use axum::extract::{Extension, Multipart, Path, Query, State};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use onepack_core::{Access, AuthContext, Denial, Feed, NewVersion, PublishError};
+use hyper::ext::ReasonPhrase;
+use onepack_core::{Access, AuthContext, Denial, Feed, NewVersion, PublishError, QuotaKind};
 use onepack_nuget::v3::{self, FeedUrls, SearchQuery};
-use onepack_nuget::{NuGetVersion, PackageId, read_nuspec_from, read_package_from};
-use onepack_storage::{ListedChange, StagingError, StoreError};
+use onepack_nuget::{NuGetVersion, PackageError, PackageId, read_nuspec_from, read_package_from};
+use onepack_storage::{StagingError, StoreError, VersionChange};
 use serde_json::json;
 use tokio_util::io::ReaderStream;
 
 use crate::AppState;
+use crate::auth::Surface;
 
 pub enum ApiError {
     NotFound,
@@ -25,41 +28,105 @@ pub enum ApiError {
     BadRequest(String),
     Conflict(String),
     PayloadTooLarge,
+    /// El paquete no supera la inspección (ADR-014).
+    Package(PackageError),
+    Quota(QuotaKind),
+    /// La versión está bloqueada (ADR-013).
+    Blocked,
+    UploadTimeout,
+    /// No quedan plazas de subida.
+    Busy,
+    RateLimited(Duration),
     InsufficientStorage,
     Internal(String),
 }
 
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        let (status, message) = match self {
-            Self::NotFound | Self::Forbidden(Denial::NotFound) => {
-                (StatusCode::NOT_FOUND, "no encontrado".to_owned())
-            }
+/// Frase de estado de las descargas bloqueadas. Los clientes .NET la muestran tal cual
+/// ("Response status code does not indicate success: 410 (...)"), así que es lo que verá
+/// quien ejecute `restore`. Solo ASCII.
+const BLOCKED_REASON_PHRASE: &[u8] = b"PACKAGE_BLOCKED - version blocked by the registry";
+
+impl ApiError {
+    /// Estado HTTP, código estable y mensaje.
+    fn parts(&self) -> (StatusCode, &'static str, String) {
+        match self {
+            Self::NotFound | Self::Forbidden(Denial::NotFound) => (
+                StatusCode::NOT_FOUND,
+                "NOT_FOUND",
+                "no encontrado".to_owned(),
+            ),
             Self::Forbidden(d @ Denial::MissingScope(access)) => (
                 StatusCode::FORBIDDEN,
+                d.code(),
                 format!(
-                    "{}: la credencial es válida, pero no tiene el permiso {} en este feed",
-                    d.code(),
+                    "la credencial es válida, pero no tiene el permiso {} en este feed",
                     access.scope()
                 ),
             ),
             Self::Forbidden(d @ Denial::PrefixDenied) => (
                 StatusCode::FORBIDDEN,
-                format!(
-                    "{}: la credencial no puede publicar este id de paquete en este feed",
-                    d.code()
-                ),
+                d.code(),
+                "la credencial no puede publicar este id de paquete en este feed".to_owned(),
             ),
-            Self::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
-            Self::Conflict(m) => (StatusCode::CONFLICT, m),
+            Self::BadRequest(m) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", m.clone()),
+            Self::Conflict(m) => (StatusCode::CONFLICT, "PACKAGE_VERSION_EXISTS", m.clone()),
             Self::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
+                "PACKAGE_TOO_LARGE",
                 "el paquete supera el tamaño máximo permitido".to_owned(),
+            ),
+            Self::Package(e) => {
+                let status = if e.code() == "PACKAGE_LIMIT_EXCEEDED" {
+                    StatusCode::PAYLOAD_TOO_LARGE
+                } else {
+                    StatusCode::BAD_REQUEST
+                };
+                let message = e.to_string();
+                let message = message
+                    .strip_prefix(&format!("{}: ", e.code()))
+                    .unwrap_or(&message)
+                    .to_owned();
+                (status, e.code(), message)
+            }
+            Self::Quota(kind) => {
+                let (status, what) = match kind {
+                    QuotaKind::Versions => (StatusCode::FORBIDDEN, "número de versiones"),
+                    QuotaKind::Storage => (StatusCode::PAYLOAD_TOO_LARGE, "almacenamiento"),
+                };
+                (
+                    status,
+                    kind.code(),
+                    format!("el feed alcanzó su cuota de {what}; el paquete no se publicó"),
+                )
+            }
+            Self::Blocked => (
+                StatusCode::GONE,
+                "PACKAGE_BLOCKED",
+                "esta versión está bloqueada por el registro y no se puede descargar; \
+                 elige otra versión o consulta a quien mantiene el feed"
+                    .to_owned(),
+            ),
+            Self::UploadTimeout => (
+                StatusCode::REQUEST_TIMEOUT,
+                "UPLOAD_TIMEOUT",
+                "la subida superó el tiempo máximo".to_owned(),
+            ),
+            Self::Busy => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "UPLOADS_BUSY",
+                "el servidor está procesando el máximo de subidas simultáneas; reintenta"
+                    .to_owned(),
+            ),
+            Self::RateLimited(_) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "RATE_LIMITED",
+                "demasiadas peticiones; reintenta más tarde".to_owned(),
             ),
             Self::InsufficientStorage => {
                 tracing::error!("almacenamiento lleno");
                 (
                     StatusCode::INSUFFICIENT_STORAGE,
+                    "STORAGE_FULL",
                     "no queda espacio en el servidor; el paquete no se publicó".to_owned(),
                 )
             }
@@ -67,11 +134,47 @@ impl IntoResponse for ApiError {
                 tracing::error!(error = %m, "error interno");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
+                    "INTERNAL",
                     "error interno".to_owned(),
                 )
             }
+        }
+    }
+
+    /// Respuesta en el formato de cada superficie: texto `CÓDIGO: mensaje` para los clientes
+    /// NuGet, que lo muestran tal cual, y JSON para `/api`.
+    pub fn render(self, surface: Surface) -> Response {
+        let retry_after = match &self {
+            Self::RateLimited(wait) => Some(wait.as_secs().max(1)),
+            Self::Busy => Some(5),
+            _ => None,
         };
-        (status, message).into_response()
+        let blocked = matches!(self, Self::Blocked);
+        let (status, code, message) = self.parts();
+        let mut res = match surface {
+            Surface::NuGet if status == StatusCode::NOT_FOUND => (status, message).into_response(),
+            Surface::NuGet => (status, format!("{code}: {message}")).into_response(),
+            Surface::Admin => (
+                status,
+                Json(json!({ "error": { "code": code, "message": message } })),
+            )
+                .into_response(),
+        };
+        if let Some(secs) = retry_after {
+            res.headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from(secs));
+        }
+        if blocked {
+            res.extensions_mut()
+                .insert(ReasonPhrase::from_static(BLOCKED_REASON_PHRASE));
+        }
+        res
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        self.render(Surface::NuGet)
     }
 }
 
@@ -117,7 +220,7 @@ type ApiResult<T> = Result<T, ApiError>;
 
 /// Única forma de obtener un `Feed` en los handlers: resuelve y autoriza a la vez. Un feed
 /// inexistente y uno sin permiso de lectura responden igual (404) para no revelar cuál existe.
-async fn authorized_feed(
+pub(crate) async fn authorized_feed(
     state: &AppState,
     auth: &AuthContext,
     name: &str,
@@ -146,13 +249,13 @@ async fn authorized_feed(
 
 /// Convierte segmentos de URL en claves de identidad. Cualquier valor inválido es un 404:
 /// nunca llega a la base ni al sistema de archivos texto sin validar.
-fn id_key(raw: &str) -> ApiResult<String> {
+pub(crate) fn id_key(raw: &str) -> ApiResult<String> {
     PackageId::parse(raw)
         .map(|id| id.identity())
         .map_err(|_| ApiError::NotFound)
 }
 
-fn version_key(raw: &str) -> ApiResult<String> {
+pub(crate) fn version_key(raw: &str) -> ApiResult<String> {
     NuGetVersion::parse(raw)
         .map(|v| v.identity())
         .map_err(|_| ApiError::NotFound)
@@ -381,8 +484,8 @@ async fn set_listed(
         .set_listed(&feed, &id, &version, listed, &auth.actor())
         .await?
     {
-        ListedChange::NotFound => Err(ApiError::NotFound),
-        ListedChange::Changed | ListedChange::Unchanged => Ok(()),
+        VersionChange::NotFound => Err(ApiError::NotFound),
+        VersionChange::Changed | VersionChange::Unchanged => Ok(()),
     }
 }
 
@@ -440,6 +543,11 @@ pub async fn flat_file(
         .version(&feed, &id, &version)
         .await?
         .ok_or(ApiError::NotFound)?;
+    // Sigue apareciendo en los metadatos, pero ni el .nupkg ni el .nuspec se sirven (ADR-013).
+    if published.blocked {
+        tracing::info!(feed = %feed.name, package = %format!("{id}@{version}"), "descarga de una versión bloqueada rechazada");
+        return Err(ApiError::Blocked);
+    }
 
     if file == format!("{id}.{version}.nupkg") {
         let blob = state
@@ -463,7 +571,8 @@ pub async fn flat_file(
             .await?
             .into_std()
             .await;
-        let nuspec = tokio::task::spawn_blocking(move || read_nuspec_from(blob))
+        let limits = state.limits.inspection.clone();
+        let nuspec = tokio::task::spawn_blocking(move || read_nuspec_from(blob, &limits))
             .await
             .map_err(blocking_err)?
             .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -481,28 +590,65 @@ pub async fn publish(
 ) -> ApiResult<impl IntoResponse> {
     // Rol comprobado antes de leer el cuerpo; el prefijo, al conocer el id del paquete.
     let feed = authorized_feed(&state, &auth, &feed_name, Access::Publish).await?;
-
-    let mut field = multipart
-        .next_field()
-        .await?
-        .ok_or_else(|| ApiError::BadRequest("la solicitud no contiene el paquete".into()))?;
+    // Plaza de subida antes de leer el cuerpo: una ráfaga recibe 503 en lugar de acumular
+    // tareas y archivos en staging. Se libera al terminar el handler.
+    let _upload = state
+        .uploads
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| ApiError::Busy)?;
 
     // Streaming a staging con hash incremental; nada de la subida queda en memoria (ADR-006).
-    let mut writer = state
-        .store
-        .blobs()
-        .begin_staging(state.max_package_bytes)
-        .await?;
-    while let Some(chunk) = field.chunk().await? {
-        writer.write(&chunk).await?;
-    }
-    let staged = writer.finish().await?;
-
-    let file = std::fs::File::open(staged.path())?;
-    let manifest = tokio::task::spawn_blocking(move || read_package_from(file))
+    let receive = async {
+        let mut field = multipart
+            .next_field()
+            .await?
+            .ok_or_else(|| ApiError::BadRequest("la solicitud no contiene el paquete".into()))?;
+        let mut writer = state
+            .store
+            .blobs()
+            .begin_staging(state.limits.max_package_bytes)
+            .await?;
+        while let Some(chunk) = field.chunk().await? {
+            writer.write(&chunk).await?;
+        }
+        Ok::<_, ApiError>(writer.finish().await?)
+    };
+    let staged = tokio::time::timeout(state.limits.upload_timeout, receive)
         .await
-        .map_err(blocking_err)?
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+        .map_err(|_| ApiError::UploadTimeout)??;
+
+    // Inspección con concurrencia limitada, en el pool de hilos bloqueantes: no ocupa los
+    // hilos que atienden descargas (ADR-014).
+    let manifest = {
+        let _inspection = state
+            .inspections
+            .acquire()
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        let file = std::fs::File::open(staged.path())?;
+        let limits = state.limits.inspection.clone();
+        tokio::task::spawn_blocking(move || read_package_from(file, &limits))
+            .await
+            .map_err(blocking_err)?
+    };
+    let manifest = match manifest {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!(feed = %feed.name, code = e.code(), error = %e, "paquete rechazado en la inspección");
+            state
+                .store
+                .record_denied(
+                    "package.publish",
+                    &auth.actor(),
+                    Some(&feed),
+                    None,
+                    e.code(),
+                )
+                .await;
+            return Err(ApiError::Package(e));
+        }
+    };
 
     let new = NewVersion {
         package_id: manifest.id.as_str().to_owned(),
@@ -545,6 +691,10 @@ pub async fn publish(
                 "con contenido distinto"
             }
         ))),
+        Err(PublishError::QuotaExceeded(kind)) => {
+            tracing::warn!(feed = %feed.name, package = %new.resource(), code = kind.code(), "cuota del feed superada");
+            Err(ApiError::Quota(kind))
+        }
         Err(PublishError::StorageFull) => Err(ApiError::InsufficientStorage),
         Err(PublishError::Io(e)) => Err(e.into()),
         Err(PublishError::Database(e)) => Err(ApiError::Internal(e)),

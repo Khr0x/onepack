@@ -11,7 +11,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use http_body_util::BodyExt;
 use onepack_core::{FeedName, PrincipalKind, PrincipalName, PublishPattern, Role};
-use onepack_server::app;
+use onepack_server::{Limits, app};
 use onepack_storage::{Store, migrate};
 use serde_json::Value;
 use tempfile::TempDir;
@@ -85,7 +85,14 @@ async fn env() -> Env {
     )
     .await;
 
-    let router = app(store.clone(), "https://packages.example.test", 1024 * 1024);
+    let router = app(
+        store.clone(),
+        "https://packages.example.test",
+        Limits {
+            max_package_bytes: 1024 * 1024,
+            ..Limits::default()
+        },
+    );
     let env = Env {
         router,
         store,
@@ -236,6 +243,15 @@ const ROUTES: &[(&str, &str)] = &[
     ("GET", "/nuget/internal/v3/autocomplete?q=hemia"),
     ("GET", "/nuget/internal/v3/autocomplete?id=hemia.secret"),
     ("GET", "/api/v1/whoami"),
+    ("GET", "/api/v1/feeds/internal/packages/hemia.secret/1.0.0"),
+    (
+        "POST",
+        "/api/v1/feeds/internal/packages/hemia.secret/1.0.0/block",
+    ),
+    (
+        "POST",
+        "/api/v1/feeds/internal/packages/hemia.secret/1.0.0/unblock",
+    ),
     ("GET", "/api/v1/does-not-exist"),
     ("GET", "/nuget/missing/v3/index.json"),
     ("GET", "/"),

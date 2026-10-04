@@ -7,7 +7,7 @@ pub mod version;
 
 pub use id::{InvalidPackageId, PackageId};
 pub use package::{
-    Dependency, DependencyGroup, License, Metadata, PackageError, PackageManifest, PackageType,
-    read_nuspec_from, read_package, read_package_from,
+    Dependency, DependencyGroup, InspectionLimits, License, Metadata, PackageError,
+    PackageManifest, PackageType, read_nuspec_from, read_package, read_package_from,
 };
 pub use version::{InvalidVersion, NuGetVersion};

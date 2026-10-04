@@ -25,6 +25,7 @@ use onepack_storage::AuthOutcome;
 use serde_json::json;
 
 use crate::AppState;
+use crate::nuget_api::ApiError;
 
 const REALM: &str = "onepack";
 /// Frecuencia máxima con la que se escribe `last_used_at` de un token (ADR-010).
@@ -129,6 +130,10 @@ pub async fn require_auth(
 
     match state.store.authenticate(&token).await {
         Ok(AuthOutcome::Valid(ctx)) => {
+            if let Err(retry_after) = state.principal_limiter.check(ctx.principal.id) {
+                tracing::warn!(principal = %ctx.principal.name, "límite de peticiones por principal alcanzado");
+                return ApiError::RateLimited(retry_after).render(surface);
+            }
             if state.touched.should_touch(&ctx.token_id) {
                 let store = state.store.clone();
                 let id = ctx.token_id.clone();

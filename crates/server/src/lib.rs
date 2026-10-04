@@ -2,32 +2,47 @@
 
 pub mod admin_api;
 pub mod auth;
+pub mod limits;
 pub mod nuget_api;
 
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::middleware;
-use axum::routing::{get, put};
+use axum::routing::{get, post, put};
+use onepack_nuget::InspectionLimits;
 use onepack_storage::Store;
+use tokio::sync::Semaphore;
 use tower_http::trace::TraceLayer;
+
+pub use limits::{Limits, RateLimit};
 
 pub struct AppState {
     /// URL pública explícita: base de todas las URLs absolutas (ADR-018).
     pub public_url: String,
     pub store: Arc<Store>,
-    pub max_package_bytes: u64,
+    pub limits: Limits,
     pub touched: auth::TouchTracker,
+    pub uploads: Arc<Semaphore>,
+    pub inspections: Semaphore,
+    pub principal_limiter: limits::RateLimiter<i64>,
+    pub ip_limiter: limits::RateLimiter<IpAddr>,
 }
 
-pub fn app(store: Arc<Store>, public_url: &str, max_package_bytes: u64) -> Router {
+pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
+    let max_package_bytes = limits.max_package_bytes;
     let state = Arc::new(AppState {
         public_url: public_url.trim_end_matches('/').to_owned(),
         store,
-        max_package_bytes,
         touched: auth::TouchTracker::default(),
+        uploads: Arc::new(Semaphore::new(limits.max_concurrent_uploads.max(1))),
+        inspections: Semaphore::new(limits.max_concurrent_inspections.max(1)),
+        principal_limiter: limits::RateLimiter::new(limits.principal_rate),
+        ip_limiter: limits::RateLimiter::new(limits.ip_rate),
+        limits,
     });
 
     Router::new()
@@ -65,6 +80,18 @@ pub fn app(store: Arc<Store>, public_url: &str, max_package_bytes: u64) -> Route
             axum::routing::delete(nuget_api::unlist).post(nuget_api::relist),
         )
         .route("/api/v1/whoami", get(admin_api::whoami))
+        .route(
+            "/api/v1/feeds/{feed}/packages/{id}/{version}",
+            get(admin_api::package_version),
+        )
+        .route(
+            "/api/v1/feeds/{feed}/packages/{id}/{version}/block",
+            post(admin_api::block),
+        )
+        .route(
+            "/api/v1/feeds/{feed}/packages/{id}/{version}/unblock",
+            post(admin_api::unblock),
+        )
         // Margen sobre el tamaño del paquete para las cabeceras multipart; el límite exacto
         // del paquete lo aplica el staging.
         .layer(DefaultBodyLimit::max(
@@ -75,6 +102,11 @@ pub fn app(store: Arc<Store>, public_url: &str, max_package_bytes: u64) -> Route
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_auth,
+        ))
+        // Antes de autenticar: también frena ráfagas de credenciales inválidas.
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            limits::limit_by_ip,
         ))
         // Las trazas HTTP registran método y ruta, nunca cabeceras: los tokens no llegan al log.
         .layer(TraceLayer::new_for_http())
@@ -103,7 +135,10 @@ pub async fn gc_loop(store: Arc<Store>, interval: Duration, grace: Duration) {
 
 /// Rellena los metadatos de versiones publicadas antes de la migración 0003 leyendo el
 /// `.nuspec` de su blob. Es idempotente: sin versiones pendientes no hace nada.
-pub async fn backfill_metadata(store: &Store) -> Result<usize, onepack_storage::StoreError> {
+pub async fn backfill_metadata(
+    store: &Store,
+    limits: &InspectionLimits,
+) -> Result<usize, onepack_storage::StoreError> {
     let mut filled = 0;
     for missing in store.versions_missing_metadata().await? {
         let blob = store
@@ -112,9 +147,11 @@ pub async fn backfill_metadata(store: &Store) -> Result<usize, onepack_storage::
             .await?
             .into_std()
             .await;
-        let manifest = tokio::task::spawn_blocking(move || onepack_nuget::read_package_from(blob))
-            .await
-            .map_err(|e| onepack_storage::StoreError::Io(std::io::Error::other(e)))?;
+        let limits = limits.clone();
+        let manifest =
+            tokio::task::spawn_blocking(move || onepack_nuget::read_package_from(blob, &limits))
+                .await
+                .map_err(|e| onepack_storage::StoreError::Io(std::io::Error::other(e)))?;
         match manifest {
             Ok(m) => {
                 let metadata = onepack_nuget::v3::catalog_metadata(&m).to_string();

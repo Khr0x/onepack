@@ -67,11 +67,11 @@ Señal concreta que justificaría reabrir la decisión.
 | [011](#adr-011) | Tres contextos de autenticación separados | ✅ Aceptado | 4 |
 | [012](#adr-012) | Roles por feed y restricción opcional por prefijo | ✅ Aceptado | 4 |
 | [013](#adr-013) | `listed` y `availability` como estados independientes | ✅ Aceptado | 3, 5 |
-| [014](#adr-014) | Paquetes como contenido no confiable con presupuesto de inspección | 📝 Propuesto | 5 |
+| [014](#adr-014) | Paquetes como contenido no confiable con presupuesto de inspección | ✅ Aceptado | 5 |
 | [015](#adr-015) | `onepackd` y `onepack` separados; CLI con contrato estable | 📝 Propuesto | 6 |
 | [016](#adr-016) | Credenciales NuGet vía `onepack exec`; credential provider pospuesto | 📝 Propuesto | 6 |
 | [017](#adr-017) | Backup consistente en modo mantenimiento | 📝 Propuesto | 7 |
-| [018](#adr-018) | `public_url` explícito y blobs solo a través del servidor | 📝 Propuesto | 3, 7 |
+| [018](#adr-018) | `public_url` explícito y blobs solo a través del servidor | ✅ Aceptado | 3, 7 |
 | [019](#adr-019) | Conformidad probada con clientes .NET reales, sin .NET en runtime | ✅ Aceptado | 0, 1 |
 | [020](#adr-020) | Migraciones forward-only con backup previo | ✅ Aceptado | 2, 7 |
 
@@ -463,6 +463,8 @@ availability: available | blocked   (descarga; Maintainer+ vía /api/v1, con mot
 - Se documenta que bloquear no elimina copias ya descargadas en cachés de clientes.
 - Bloqueos y desbloqueos se auditan con motivo.
 
+**Precisión (Fase 5, 2026-10-04).** Una versión bloqueada sigue en el flat container y en los registros (anunciada como obsoleta, sin publicar el motivo) y sale de la búsqueda. Así `restore` falla con un error explícito en lugar de resolver otra versión en silencio. La descarga responde `410` con el código `PACKAGE_BLOCKED` en el cuerpo y en la frase de estado, que es lo que muestran los clientes .NET. Desbloquear también exige motivo.
+
 ### Revisar cuando
 Se requiera cuarentena automática (p. ej. tras un escáner).
 
@@ -471,7 +473,7 @@ Se requiera cuarentena automática (p. ej. tras un escáner).
 <a id="adr-014"></a>
 ## ADR-014 — Paquetes como contenido no confiable con presupuesto de inspección
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 5 · **Relacionados:** ADR-006
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 5 · **Relacionados:** ADR-006
 
 ### Contexto
 Un `.nupkg` es un ZIP con XML: expuesto a ZIP bombs, XML bombs, path traversal y fallos de parser.
@@ -492,6 +494,8 @@ Un `.nupkg` es un ZIP con XML: expuesto a ZIP bombs, XML bombs, path traversal y
 ### Consecuencias
 - Paquetes legítimos muy grandes pueden requerir ajustar límites; los límites son del registro, no de NuGet.
 - Suite `tests/security` con artefactos maliciosos sintéticos.
+
+**Precisión (Fase 5, 2026-10-04).** Los límites, sus valores por defecto y los códigos de error están en [docs/security.md](../docs/security.md). El número de entradas se lee del registro de fin del ZIP antes de cargar el directorio central; los tamaños descomprimidos se validan con los declarados y solo se descomprime el `.nuspec`, con lectura cortada en el límite. Las rutas se validan también con el escape `%XX` resuelto. La concurrencia de subidas no encola (`503` con `Retry-After`) y el límite por IP se aplica antes de autenticar, con la IP del socket (ADR-018).
 
 ### Revisar cuando
 Se añada verificación de firmas o integración con escáneres.
@@ -585,7 +589,7 @@ El tamaño de datos haga inaceptable la ventana de mantenimiento.
 <a id="adr-018"></a>
 ## ADR-018 — `public_url` explícito y blobs solo a través del servidor
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 3, 7 · **Relacionados:** ADR-005, ADR-009, ADR-011
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 3, 7 · **Relacionados:** ADR-005, ADR-009, ADR-011
 
 ### Contexto
 Detrás de un reverse proxy, derivar URLs de la cabecera `Host` permite envenenamiento de URLs. Servir blobs directamente desde el proxy eludiría la autorización.

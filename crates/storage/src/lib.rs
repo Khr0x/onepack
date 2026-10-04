@@ -9,13 +9,15 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use onepack_core::{Feed, FeedName, NewVersion, PublishError, PublishedVersion};
+use onepack_core::{
+    Feed, FeedName, FeedQuota, FeedUsage, NewVersion, PublishError, PublishedVersion, QuotaKind,
+};
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sqlx::{Row, SqlitePool};
 
 pub use blobs::{BlobStore, StagedBlob, StagingError, StagingWriter};
-pub use catalog::{ListedChange, MissingMetadata};
+pub use catalog::{MissingMetadata, VersionChange};
 pub use identity::{AuthFailure, AuthOutcome, IssuedToken};
 
 static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
@@ -286,6 +288,15 @@ impl Store {
             return Err(PublishError::Conflict { identical });
         }
 
+        // Comprobación previa de cuotas para no persistir el blob en vano; la garantía la da
+        // la comprobación dentro de la transacción.
+        let quota = self.feed_quota(feed).await.map_err(db_err)?;
+        let usage = self.feed_usage(feed).await.map_err(db_err)?;
+        if let Some(kind) = quota.exceeded_by(usage, staged.size()) {
+            self.audit_quota(feed, version, kind, actor).await;
+            return Err(PublishError::QuotaExceeded(kind));
+        }
+
         let sha256 = staged.sha256().to_owned();
         let size = staged.size() as i64;
         self.blobs.persist(staged).await?;
@@ -299,7 +310,12 @@ impl Store {
             .insert_version(feed, version, &sha256, size, actor)
             .await
         {
-            Ok(()) => Ok(()),
+            Ok(None) => Ok(()),
+            // El blob queda huérfano y lo recoge la limpieza (ADR-006).
+            Ok(Some(kind)) => {
+                self.audit_quota(feed, version, kind, actor).await;
+                Err(PublishError::QuotaExceeded(kind))
+            }
             Err(e)
                 if e.as_database_error()
                     .is_some_and(|d| d.is_unique_violation()) =>
@@ -324,8 +340,25 @@ impl Store {
         sha256: &str,
         size: i64,
         actor: Option<&str>,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<Option<QuotaKind>, sqlx::Error> {
         let mut tx = self.writer.begin().await?;
+        // Dentro de la transacción del único escritor: dos publicaciones concurrentes no
+        // pueden superar juntas la cuota.
+        let quota = quota_row(
+            &sqlx::query("SELECT max_storage_bytes, max_versions FROM feed WHERE id = ?")
+                .bind(feed.id)
+                .fetch_one(&mut *tx)
+                .await?,
+        );
+        let usage = usage_row(
+            &sqlx::query(USAGE_SQL)
+                .bind(feed.id)
+                .fetch_one(&mut *tx)
+                .await?,
+        );
+        if let Some(kind) = quota.exceeded_by(usage, size as u64) {
+            return Ok(Some(kind));
+        }
         sqlx::query(
             "INSERT INTO blob (sha256, size) VALUES (?, ?) ON CONFLICT (sha256) DO NOTHING",
         )
@@ -371,7 +404,75 @@ impl Store {
         .bind(size)
         .execute(&mut *tx)
         .await?;
-        tx.commit().await
+        tx.commit().await?;
+        Ok(None)
+    }
+
+    async fn audit_quota(&self, feed: &Feed, v: &NewVersion, kind: QuotaKind, actor: Option<&str>) {
+        let result = sqlx::query(
+            "INSERT INTO audit_event (action, actor, feed_id, resource, outcome, detail)
+             VALUES ('package.publish', ?, ?, ?, 'denied', json_object('code', ?))",
+        )
+        .bind(actor)
+        .bind(feed.id)
+        .bind(v.resource())
+        .bind(kind.code())
+        .execute(&self.writer)
+        .await;
+        if let Err(e) = result {
+            tracing::error!(error = %e, "no se pudo auditar la cuota superada");
+        }
+    }
+
+    pub async fn feed_quota(&self, feed: &Feed) -> Result<FeedQuota, StoreError> {
+        let row = sqlx::query("SELECT max_storage_bytes, max_versions FROM feed WHERE id = ?")
+            .bind(feed.id)
+            .fetch_one(&self.reader)
+            .await?;
+        Ok(quota_row(&row))
+    }
+
+    pub async fn feed_usage(&self, feed: &Feed) -> Result<FeedUsage, StoreError> {
+        let row = sqlx::query(USAGE_SQL)
+            .bind(feed.id)
+            .fetch_one(&self.reader)
+            .await?;
+        Ok(usage_row(&row))
+    }
+
+    /// Fija las cuotas de un feed. No afecta a lo ya publicado aunque lo supere.
+    pub async fn set_feed_quota(
+        &self,
+        feed: &Feed,
+        quota: FeedQuota,
+        actor: &str,
+    ) -> Result<(), StoreError> {
+        let as_i64 = |v: Option<u64>| v.map(|v| i64::try_from(v).unwrap_or(i64::MAX));
+        let mut tx = self.writer.begin().await?;
+        sqlx::query("UPDATE feed SET max_storage_bytes = ?, max_versions = ? WHERE id = ?")
+            .bind(as_i64(quota.max_storage_bytes))
+            .bind(as_i64(quota.max_versions))
+            .bind(feed.id)
+            .execute(&mut *tx)
+            .await?;
+        identity::audit(
+            &mut tx,
+            "feed.quota",
+            Some(actor),
+            Some(feed.id),
+            Some(feed.name.as_str()),
+            "success",
+            Some(
+                serde_json::json!({
+                    "max_storage_bytes": quota.max_storage_bytes,
+                    "max_versions": quota.max_versions,
+                })
+                .to_string(),
+            ),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     async fn audit_conflict(
@@ -433,8 +534,8 @@ impl Store {
     ) -> Result<Option<PublishedVersion>, StoreError> {
         let row = sqlx::query(
             "SELECT v.package_id, v.normalized_package_id, v.version, v.normalized_version, v.full_version,
-                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.published_at,
-                    v.metadata, v.search_text
+                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.availability,
+                    v.published_at, v.metadata, v.search_text
              FROM package_version v JOIN blob b ON b.sha256 = v.blob_sha256
              WHERE v.feed_id = ? AND v.normalized_package_id = ? AND v.normalized_version = ?",
         )
@@ -454,8 +555,8 @@ impl Store {
     ) -> Result<Vec<PublishedVersion>, StoreError> {
         let rows = sqlx::query(
             "SELECT v.package_id, v.normalized_package_id, v.version, v.normalized_version, v.full_version,
-                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.published_at,
-                    v.metadata, v.search_text
+                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.availability,
+                    v.published_at, v.metadata, v.search_text
              FROM package_version v JOIN blob b ON b.sha256 = v.blob_sha256
              WHERE v.feed_id = ? AND v.normalized_package_id = ?",
         )
@@ -511,6 +612,25 @@ impl Store {
     }
 }
 
+const USAGE_SQL: &str = "SELECT count(*) AS versions, coalesce(sum(b.size), 0) AS storage_bytes
+     FROM package_version v JOIN blob b ON b.sha256 = v.blob_sha256 WHERE v.feed_id = ?";
+
+fn usage_row(r: &sqlx::sqlite::SqliteRow) -> FeedUsage {
+    FeedUsage {
+        versions: r.get::<i64, _>("versions") as u64,
+        storage_bytes: r.get::<i64, _>("storage_bytes") as u64,
+    }
+}
+
+fn quota_row(r: &sqlx::sqlite::SqliteRow) -> FeedQuota {
+    FeedQuota {
+        max_storage_bytes: r
+            .get::<Option<i64>, _>("max_storage_bytes")
+            .map(|v| v as u64),
+        max_versions: r.get::<Option<i64>, _>("max_versions").map(|v| v as u64),
+    }
+}
+
 pub(crate) fn to_published(r: &sqlx::sqlite::SqliteRow) -> PublishedVersion {
     PublishedVersion {
         package_id: r.get("package_id"),
@@ -523,6 +643,7 @@ pub(crate) fn to_published(r: &sqlx::sqlite::SqliteRow) -> PublishedVersion {
         blob_sha256: r.get("blob_sha256"),
         size: r.get::<i64, _>("size") as u64,
         listed: r.get("listed"),
+        blocked: r.get::<&str, _>("availability") == "blocked",
         published_at: r.get("published_at"),
         metadata: r.get("metadata"),
         search_text: r.get("search_text"),

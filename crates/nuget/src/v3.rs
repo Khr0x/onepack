@@ -249,6 +249,18 @@ fn catalog_entry(urls: &FeedUrls, v: &PublishedVersion) -> Value {
             .unwrap_or(Value::Bool(false)),
     );
     entry.insert("listed".into(), Value::Bool(v.listed));
+    // Una versión bloqueada (ADR-013) se anuncia como obsoleta para que el IDE lo muestre
+    // antes de que falle la descarga. El motivo no se publica: puede ser sensible.
+    if v.blocked {
+        entry.insert(
+            "deprecation".into(),
+            json!({
+                "@id": format!("{}#deprecation", urls.leaf(v)),
+                "reasons": ["Other"],
+                "message": "Versión bloqueada por el registro: no se puede descargar.",
+            }),
+        );
+    }
     entry.insert("published".into(), Value::String(v.published_at.clone()));
     entry.insert(
         "packageContent".into(),

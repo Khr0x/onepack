@@ -53,7 +53,7 @@ async fn open_requires_migrated_data_dir() {
     ));
 
     let report = migrate(dir.path()).await.unwrap();
-    assert_eq!(report.applied, 3);
+    assert_eq!(report.applied, 4);
     assert_eq!(report.backup, None, "una base nueva no necesita backup");
     assert_eq!(
         migrate(dir.path()).await.unwrap().applied,
@@ -338,7 +338,7 @@ async fn listed_versions_apply_prerelease_and_semver2_filters() {
 
 #[tokio::test]
 async fn unlist_hides_from_listing_but_keeps_the_version() {
-    use onepack_storage::ListedChange;
+    use onepack_storage::VersionChange;
     let (store, _dir) = store().await;
     let feed = feed(&store, "internal").await;
     store
@@ -356,21 +356,21 @@ async fn unlist_hides_from_listing_but_keeps_the_version() {
             .set_listed(&feed, "a", "1.0.0", false, "test")
             .await
             .unwrap(),
-        ListedChange::Changed
+        VersionChange::Changed
     );
     assert_eq!(
         store
             .set_listed(&feed, "a", "1.0.0", false, "test")
             .await
             .unwrap(),
-        ListedChange::Unchanged
+        VersionChange::Unchanged
     );
     assert_eq!(
         store
             .set_listed(&feed, "a", "9.9.9", false, "test")
             .await
             .unwrap(),
-        ListedChange::NotFound
+        VersionChange::NotFound
     );
     assert!(
         store
@@ -387,7 +387,7 @@ async fn unlist_hides_from_listing_but_keeps_the_version() {
             .set_listed(&feed, "a", "1.0.0", true, "test")
             .await
             .unwrap(),
-        ListedChange::Changed
+        VersionChange::Changed
     );
     assert_eq!(
         store

@@ -13,15 +13,16 @@ pub struct MissingMetadata {
     pub blob_sha256: String,
 }
 
+/// Resultado de cambiar el estado de una versión.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ListedChange {
+pub enum VersionChange {
     NotFound,
     Unchanged,
     Changed,
 }
 
 impl Store {
-    /// Versiones listadas de un feed, con los filtros de prerelease y SemVer 2.0.0. La búsqueda
+    /// Versiones listadas y disponibles de un feed, con los filtros de prerelease y SemVer 2.0.0. La búsqueda
     /// por texto y el orden los aplica el adaptador del formato.
     pub async fn listed_versions(
         &self,
@@ -31,10 +32,10 @@ impl Store {
     ) -> Result<Vec<PublishedVersion>, StoreError> {
         let rows = sqlx::query(
             "SELECT v.package_id, v.normalized_package_id, v.version, v.normalized_version, v.full_version,
-                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.published_at,
-                    v.metadata, v.search_text
+                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.availability,
+                    v.published_at, v.metadata, v.search_text
              FROM package_version v JOIN blob b ON b.sha256 = v.blob_sha256
-             WHERE v.feed_id = ? AND v.listed = 1
+             WHERE v.feed_id = ? AND v.listed = 1 AND v.availability = 'available'
                AND (? OR v.is_prerelease = 0)
                AND (? OR v.is_semver2 = 0)
              ORDER BY v.normalized_package_id",
@@ -55,7 +56,7 @@ impl Store {
         version_key: &str,
         listed: bool,
         actor: &str,
-    ) -> Result<ListedChange, StoreError> {
+    ) -> Result<VersionChange, StoreError> {
         let mut tx = self.writer.begin().await?;
         let row = sqlx::query(
             "SELECT id, listed, package_id, version FROM package_version
@@ -67,10 +68,10 @@ impl Store {
         .fetch_optional(&mut *tx)
         .await?;
         let Some(row) = row else {
-            return Ok(ListedChange::NotFound);
+            return Ok(VersionChange::NotFound);
         };
         if row.get::<bool, _>("listed") == listed {
-            return Ok(ListedChange::Unchanged);
+            return Ok(VersionChange::Unchanged);
         }
         sqlx::query("UPDATE package_version SET listed = ? WHERE id = ?")
             .bind(listed)
@@ -98,7 +99,84 @@ impl Store {
         )
         .await?;
         tx.commit().await?;
-        Ok(ListedChange::Changed)
+        Ok(VersionChange::Changed)
+    }
+
+    /// Bloquea o desbloquea la descarga de una versión (ADR-013). El motivo es obligatorio y
+    /// queda en la auditoría.
+    pub async fn set_blocked(
+        &self,
+        feed: &Feed,
+        package_key: &str,
+        version_key: &str,
+        blocked: bool,
+        reason: &str,
+        actor: &str,
+    ) -> Result<VersionChange, StoreError> {
+        let mut tx = self.writer.begin().await?;
+        let row = sqlx::query(
+            "SELECT id, availability, package_id, version FROM package_version
+             WHERE feed_id = ? AND normalized_package_id = ? AND normalized_version = ?",
+        )
+        .bind(feed.id)
+        .bind(package_key)
+        .bind(version_key)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(row) = row else {
+            return Ok(VersionChange::NotFound);
+        };
+        if (row.get::<&str, _>("availability") == "blocked") == blocked {
+            return Ok(VersionChange::Unchanged);
+        }
+        let (availability, action) = if blocked {
+            ("blocked", "package.block")
+        } else {
+            ("available", "package.unblock")
+        };
+        sqlx::query("UPDATE package_version SET availability = ?, blocked_reason = ? WHERE id = ?")
+            .bind(availability)
+            .bind(blocked.then_some(reason))
+            .bind(row.get::<i64, _>("id"))
+            .execute(&mut *tx)
+            .await?;
+        let resource = format!(
+            "{}@{}",
+            row.get::<&str, _>("package_id"),
+            row.get::<&str, _>("version")
+        );
+        audit(
+            &mut tx,
+            action,
+            Some(actor),
+            Some(feed.id),
+            Some(&resource),
+            "success",
+            Some(serde_json::json!({ "reason": reason }).to_string()),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(VersionChange::Changed)
+    }
+
+    /// Motivo del bloqueo vigente de una versión, si está bloqueada.
+    pub async fn blocked_reason(
+        &self,
+        feed: &Feed,
+        package_key: &str,
+        version_key: &str,
+    ) -> Result<Option<String>, StoreError> {
+        Ok(sqlx::query_scalar(
+            "SELECT blocked_reason FROM package_version
+             WHERE feed_id = ? AND normalized_package_id = ? AND normalized_version = ?
+               AND availability = 'blocked'",
+        )
+        .bind(feed.id)
+        .bind(package_key)
+        .bind(version_key)
+        .fetch_optional(&self.reader)
+        .await?
+        .flatten())
     }
 
     pub async fn versions_missing_metadata(&self) -> Result<Vec<MissingMetadata>, StoreError> {
