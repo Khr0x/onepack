@@ -57,10 +57,10 @@ Señal concreta que justificaría reabrir la decisión.
 | [001](#adr-001) | MVP: registro NuGet privado, una organización, un nodo | ✅ Aceptado | 0 |
 | [002](#adr-002) | Rust + Tokio + Axum como stack del servidor y CLI | ✅ Aceptado | 1 |
 | [003](#adr-003) | Monolito modular en un workspace de crates | ✅ Aceptado | 0 |
-| [004](#adr-004) | SQLite en WAL con `synchronous=FULL` para metadatos | 📝 Propuesto | 2 |
-| [005](#adr-005) | Blobs direccionados por SHA-256 en filesystem local, bytes originales | 📝 Propuesto | 2 |
-| [006](#adr-006) | Blob durable antes de confirmar metadatos | 📝 Propuesto | 2 |
-| [007](#adr-007) | Versiones inmutables y `409` ante duplicados | 📝 Propuesto | 2 |
+| [004](#adr-004) | SQLite en WAL con `synchronous=FULL` para metadatos | ✅ Aceptado | 2 |
+| [005](#adr-005) | Blobs direccionados por SHA-256 en filesystem local, bytes originales | ✅ Aceptado | 2 |
+| [006](#adr-006) | Blob durable antes de confirmar metadatos | ✅ Aceptado | 2 |
+| [007](#adr-007) | Versiones inmutables y `409` ante duplicados | ✅ Aceptado | 2 |
 | [008](#adr-008) | Normalización NuGet propia validada contra `NuGet.Versioning` | ✅ Aceptado | 1 |
 | [009](#adr-009) | Recursos NuGet V3 anunciados en el MVP | ✅ Aceptado | 1, 3 |
 | [010](#adr-010) | Tokens opacos con verificador hash, no JWT | 📝 Propuesto | 4 |
@@ -73,7 +73,7 @@ Señal concreta que justificaría reabrir la decisión.
 | [017](#adr-017) | Backup consistente en modo mantenimiento | 📝 Propuesto | 7 |
 | [018](#adr-018) | `public_url` explícito y blobs solo a través del servidor | 📝 Propuesto | 3, 7 |
 | [019](#adr-019) | Conformidad probada con clientes .NET reales, sin .NET en runtime | ✅ Aceptado | 0, 1 |
-| [020](#adr-020) | Migraciones forward-only con backup previo | 📝 Propuesto | 2, 7 |
+| [020](#adr-020) | Migraciones forward-only con backup previo | ✅ Aceptado | 2, 7 |
 
 ---
 
@@ -172,7 +172,7 @@ Aparezca un requisito real de escalar una superficie de forma independiente.
 <a id="adr-004"></a>
 ## ADR-004 — SQLite en WAL con `synchronous=FULL` para metadatos
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 2 · **Relacionados:** ADR-001, ADR-017
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-001, ADR-017
 
 ### Contexto
 El MVP no debe exigir instalar otra base de datos. SQLite en WAL admite lectores concurrentes y **un solo escritor**, y no es apto para compartirse por filesystem de red.
@@ -201,7 +201,7 @@ Los benchmarks muestren contención de escritura relevante o se requiera más de
 <a id="adr-005"></a>
 ## ADR-005 — Blobs direccionados por SHA-256 en filesystem local, bytes originales
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 2 · **Relacionados:** ADR-006, ADR-018
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-006, ADR-018
 
 ### Contexto
 Los `.nupkg` pueden ser grandes; guardarlos en SQLite penaliza la base y el backup. Se necesita poder responder "¿cuál es el archivo exacto que distribuimos?".
@@ -229,7 +229,7 @@ Se implemente almacenamiento S3 compatible (primera evolución).
 <a id="adr-006"></a>
 ## ADR-006 — Blob durable antes de confirmar metadatos
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 2 · **Relacionados:** ADR-004, ADR-005, ADR-007
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-004, ADR-005, ADR-007
 
 ### Contexto
 SQLite y el filesystem no comparten transacción. Hay que elegir qué inconsistencia se tolera ante una caída.
@@ -263,7 +263,7 @@ Se introduzca un `BlobStore` remoto con semántica de consistencia distinta.
 <a id="adr-007"></a>
 ## ADR-007 — Versiones inmutables y `409` ante duplicados
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 2 · **Relacionados:** ADR-006, ADR-008, ADR-013
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-006, ADR-008, ADR-013
 
 ### Contexto
 Reemplazar el contenido de una versión publicada rompe la reproducibilidad y la trazabilidad, y el protocolo NuGet prevé `409` para identidades existentes.
@@ -632,7 +632,7 @@ Se añada otro formato (npm, PyPI), que requerirá su propia suite de conformida
 <a id="adr-020"></a>
 ## ADR-020 — Migraciones forward-only con backup previo
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 2, 7 · **Relacionados:** ADR-004, ADR-017
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2, 7 · **Relacionados:** ADR-004, ADR-017
 
 ### Contexto
 Volver al binario anterior no revierte una migración de datos. Las migraciones "down" rara vez se prueban.

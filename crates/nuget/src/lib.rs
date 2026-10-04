@@ -5,5 +5,8 @@ pub mod package;
 pub mod version;
 
 pub use id::{InvalidPackageId, PackageId};
-pub use package::{Dependency, DependencyGroup, PackageError, PackageManifest, read_package};
+pub use package::{
+    Dependency, DependencyGroup, PackageError, PackageManifest, read_nuspec_from, read_package,
+    read_package_from,
+};
 pub use version::{InvalidVersion, NuGetVersion};
