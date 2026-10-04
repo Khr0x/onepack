@@ -21,16 +21,18 @@ No implementados: API V2 (OData), catálogo, `ReadmeUriTemplate`, `PackageDetail
 
 Leyenda: ✅ comprobado · ⏳ pendiente · ➖ fuera del alcance actual.
 
+CI de referencia: ejecución [37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143) (2026-10-04).
+
 | Cliente | Versión | Plataforma | Operaciones comprobadas | Cómo | Estado |
 |---|---|---|---|---|---|
-| `dotnet` CLI | SDK 8.0 (LTS anterior) | Linux | push, 409, search (con y sin prerelease, exacta), restore con rango, delete (unlist) | `scripts/e2e-dotnet.sh` en CI | ⏳ CI |
-| `dotnet` CLI | SDK 10.0 (LTS actual) | Linux, detrás de nginx con TLS | igual que arriba, por HTTPS con CA propia | `ONEPACK_E2E_TLS=1` en CI | ⏳ CI |
-| `dotnet` CLI | SDK 8.0 y 10.0 | macOS | igual que arriba | `scripts/e2e-dotnet.sh` en CI | ⏳ CI (SDK 8 verificado en local, 2026-10-04) |
-| `dotnet` CLI | SDK 8.0 | Windows | restore con credenciales en `NuGet.Config`, run | `tests/conformance-dotnet/e2e-windows.ps1` en CI | ⏳ CI |
+| `dotnet` CLI | SDK 8.0 (LTS anterior) | Linux | push, 409, search (con y sin prerelease, exacta), restore con rango, delete (unlist) | `scripts/e2e-dotnet.sh` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| `dotnet` CLI | SDK 10.0 (LTS actual) | Linux, detrás de nginx con TLS | igual que arriba, por HTTPS con CA propia | `ONEPACK_E2E_TLS=1` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| `dotnet` CLI | SDK 8.0 y 10.0 | macOS | igual que arriba | `scripts/e2e-dotnet.sh` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| `dotnet` CLI | SDK 8.0 | Windows | restore con credenciales en `NuGet.Config`, run | `tests/conformance-dotnet/e2e-windows.ps1` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
 | `nuget.exe` | última de dist.nuget.org | Windows | push, 409, search (con y sin prerelease), install con rango | `tests/conformance-dotnet/e2e-windows.ps1` en CI | ⏳ CI |
-| GitHub Actions | — | Linux, macOS, Windows | push y restore con credenciales inyectadas por variables de entorno | los propios jobs de CI | ⏳ CI |
-| Visual Studio | — | Windows | navegación y restore | manual | ⏳ pendiente |
-| JetBrains Rider | — | Windows / macOS | navegación y restore | manual | ⏳ pendiente |
+| GitHub Actions | — | Linux, macOS, Windows | push y restore con credenciales inyectadas por variables de entorno | los propios jobs de CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| Visual Studio | — | Windows | navegación y restore | manual | ⏳ diferido al piloto (Fase 8) |
+| JetBrains Rider | — | Windows / macOS | navegación y restore | manual | ⏳ diferido al piloto (Fase 8) |
 | Azure Pipelines | — | Linux | restore y push | — | ➖ sin entorno de prueba |
 
 ### Verificación manual (IDE)

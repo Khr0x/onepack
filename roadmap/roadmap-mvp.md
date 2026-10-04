@@ -76,9 +76,9 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
 | 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
 | 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
-| 3 | Superficie NuGet V3 completa | 🟣 `EN VALIDACIÓN` | 2 | Matriz de clientes comprobados en verde. |
+| 3 | Superficie NuGet V3 completa | 🟢 `COMPLETADA` | 2 | Matriz de clientes comprobados en verde. |
 | 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
-| 5 | Endurecimiento frente a paquetes y abuso | ⚪ `NO INICIADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
+| 5 | Endurecimiento frente a paquetes y abuso | 🔵 `EN DISEÑO` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | 🔵 `EN DISEÑO` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
 | 8 | Piloto y cierre del MVP | ⚪ `NO INICIADA` | 7 | Prueba decisiva ejecutada por un equipo real. |
@@ -204,7 +204,7 @@ Todas las pruebas bloqueantes automatizadas (tests de los crates y `tests/recove
 
 ## Fase 3 — Superficie NuGet V3 completa
 
-**Estatus:** 🟣 `EN VALIDACIÓN` — verde en local (SDK 8, macOS); falta la matriz en CI y las celdas manuales de IDE.
+**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Las celdas manuales de IDE quedan diferidas al piloto (Fase 8).
 **Depende de:** Fase 2
 **ADRs:** [ADR-009](adr-mvp.md#adr-009), [ADR-013](adr-mvp.md#adr-013), [ADR-019](adr-mvp.md#adr-019)
 
@@ -221,7 +221,7 @@ Implementar todos los recursos anunciados con sus requisitos reales y publicar u
 - [x] URLs absolutas solo desde `public_url`; test con `Host` y `X-Forwarded-*` manipulados y E2E detrás de nginx con TLS.
 - [x] Metadatos del `.nuspec` (título, autores, etiquetas, licencia, icono, readme, tipos de paquete…) guardados al publicar (migración 0003) y rellenados al arrancar para versiones anteriores.
 - [x] Corpus de paquetes creado con `dotnet pack`: multi-target con dependencias (`Dependent`), rango de dependencia (`Ranged`), prerelease SemVer 2.0.0 con metadatos extensos, icono y readme (`Rich`), y tres versiones de `Basic`.
-- [~] Matriz de clientes comprobados en [docs/compatibility.md](../docs/compatibility.md): celdas automáticas en CI; las de IDE son manuales.
+- [x] Matriz de clientes comprobados en [docs/compatibility.md](../docs/compatibility.md): todas las celdas automáticas en verde; las de IDE (manuales) diferidas al piloto.
 
 ### Matriz de clientes objetivo (mínimo)
 | Cliente | Plataforma | Operaciones | Prueba |
@@ -289,7 +289,7 @@ Test de cobertura de rutas: el 100 % de rutas registradas exige autenticación s
 
 ## Fase 5 — Endurecimiento frente a paquetes y abuso
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fases 3 y 4
 **ADRs:** [ADR-013](adr-mvp.md#adr-013), [ADR-014](adr-mvp.md#adr-014), [ADR-018](adr-mvp.md#adr-018)
 
@@ -426,6 +426,7 @@ Validar con un equipo real que el producto resuelve el problema y ejecutar la pr
 - [ ] Instalación hecha por el equipo piloto siguiendo solo la documentación.
 - [ ] Uso en builds y publicaciones habituales durante un periodo acordado (p. ej. 2–4 semanas).
 - [ ] Ejercicio de incidente: revocar credencial de CI, bloquear una versión, restaurar desde backup.
+- [ ] Verificación manual con Visual Studio y Rider (diferida desde la Fase 3), anotada en `docs/compatibility.md`.
 - [ ] Registro de fricciones, errores y peticiones; clasificación en "bloqueante MVP" / "post-MVP".
 - [ ] Corrección de todos los bloqueantes MVP.
 - [ ] Retrospectiva y actualización del orden de evolución (credential provider, S3, proxy…).
@@ -477,3 +478,5 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 6 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 4) completada; paralelizable con la Fase 5. |
 | 2026-10-04 | 3 | `EN DISEÑO` | `EN PROGRESO` | ADR-013 aceptado. |
 | 2026-10-04 | 3 | `EN PROGRESO` | `EN VALIDACIÓN` | Tests y E2E con SDK 8 verdes en local. Pendiente: matriz en CI (SDK 8/10, macOS, Windows, TLS) e IDE manuales. |
+| 2026-10-04 | 3 | `EN VALIDACIÓN` | `COMPLETADA` | Matriz automática en verde: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Cerrada por decisión del usuario con las celdas manuales de IDE (Visual Studio, Rider) diferidas al piloto de la Fase 8. |
+| 2026-10-04 | 5 | `NO INICIADA` | `EN DISEÑO` | Dependencias (Fases 3 y 4) completadas. |
