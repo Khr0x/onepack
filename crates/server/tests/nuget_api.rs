@@ -1,10 +1,13 @@
 use std::io::{Cursor, Write};
+use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use http_body_util::BodyExt;
-use onepack_server::{Config, app};
+use onepack_core::FeedName;
+use onepack_server::app;
+use onepack_storage::{Store, migrate};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use tower::ServiceExt;
@@ -14,15 +17,26 @@ const BOUNDARY: &str = "onepack-test-boundary";
 
 async fn server() -> (Router, TempDir) {
     let dir = TempDir::new().unwrap();
-    let router = app(Config {
-        data_dir: dir.path(),
-        public_url: "https://packages.example.test/",
-        feed: "internal",
-        max_package_bytes: 1024 * 1024,
-    })
-    .await
-    .unwrap();
+    migrate(dir.path()).await.unwrap();
+    let store = Store::open(dir.path()).await.unwrap();
+    for feed in ["internal", "customer-a"] {
+        store
+            .create_feed(&FeedName::parse(feed).unwrap())
+            .await
+            .unwrap();
+    }
+    let router = app(
+        Arc::new(store),
+        "https://packages.example.test/",
+        1024 * 1024,
+    );
     (router, dir)
+}
+
+fn staging_files(dir: &TempDir) -> usize {
+    std::fs::read_dir(dir.path().join("staging"))
+        .unwrap()
+        .count()
 }
 
 fn nupkg(id: &str, version: &str) -> Vec<u8> {
@@ -258,4 +272,90 @@ async fn publish_accepts_trailing_slash_like_the_nuget_client() {
     let (router, _dir) = server().await;
     let status = push_to(&router, "/nuget/internal/v2/package/", &nupkg("A", "1.0.0")).await;
     assert_eq!(status, StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn rejected_uploads_leave_nothing_in_staging() {
+    let (router, dir) = server().await;
+    assert_eq!(
+        push(&router, "internal", b"not a zip").await,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        push(&router, "internal", &vec![0u8; 2 * 1024 * 1024]).await,
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    assert_eq!(
+        push(&router, "internal", &nupkg("A", "1.0.0")).await,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        push(&router, "internal", &nupkg("A", "1.0.0")).await,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(staging_files(&dir), 0);
+}
+
+#[tokio::test]
+async fn feeds_are_isolated() {
+    let (router, _dir) = server().await;
+    assert_eq!(
+        push(&router, "internal", &nupkg("A", "1.0.0")).await,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        get(&router, "/nuget/customer-a/v3/flat/a/index.json")
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        push(&router, "customer-a", &nupkg("A", "1.0.0")).await,
+        StatusCode::CREATED
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_http_publishes_confirm_exactly_one() {
+    let (router, _dir) = server().await;
+    let packages: Vec<Vec<u8>> = (0..6)
+        .map(|i| {
+            // Mismo id y versión, contenido distinto.
+            let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+            zip.start_file("Race.nuspec", SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(
+                b"<package><metadata><id>Race</id><version>1.0.0</version></metadata></package>",
+            )
+            .unwrap();
+            zip.start_file(format!("content-{i}.txt"), SimpleFileOptions::default())
+                .unwrap();
+            zip.finish().unwrap().into_inner()
+        })
+        .collect();
+
+    let tasks: Vec<_> = packages
+        .iter()
+        .cloned()
+        .map(|p| {
+            let router = router.clone();
+            tokio::spawn(async move { (push(&router, "internal", &p).await, p) })
+        })
+        .collect();
+    let mut created = Vec::new();
+    for t in tasks {
+        let (status, package) = t.await.unwrap();
+        match status {
+            StatusCode::CREATED => created.push(package),
+            StatusCode::CONFLICT => {}
+            other => panic!("estado inesperado: {other}"),
+        }
+    }
+    assert_eq!(created.len(), 1);
+    let (_, body) = get(
+        &router,
+        "/nuget/internal/v3/flat/race/1.0.0/race.1.0.0.nupkg",
+    )
+    .await;
+    assert_eq!(body, created[0]);
 }

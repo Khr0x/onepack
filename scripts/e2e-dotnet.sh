@@ -33,12 +33,16 @@ step() { echo "==> $*"; }
 step "Compilando onepackd"
 cargo build --quiet --manifest-path "$root/Cargo.toml" -p onepack-server
 
+step "Inicializando el directorio de datos"
+"$root/target/debug/onepackd" migrate --data-dir "$work/data" >/dev/null
+"$root/target/debug/onepackd" feed create "$feed" --data-dir "$work/data" >/dev/null
+
 step "Iniciando onepackd en $base"
 "$root/target/debug/onepackd" serve \
   --listen "127.0.0.1:$port" \
   --data-dir "$work/data" \
   --public-url "$base" \
-  --feed "$feed" >"$work/server.log" 2>&1 &
+  --min-free-space-mib 0 >"$work/server.log" 2>&1 &
 server_pid=$!
 for _ in $(seq 1 50); do
   curl -fsS "$source_url" >/dev/null 2>&1 && break

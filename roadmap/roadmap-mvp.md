@@ -75,9 +75,9 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 |---|---|---|---|---|
 | 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
 | 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
-| 2 | Núcleo de dominio y persistencia | 🔵 `EN DISEÑO` | 1 | Publicación consistente, inmutable y resistente a caídas. |
-| 3 | Superficie NuGet V3 completa | ⚪ `NO INICIADA` | 2 | Matriz de clientes comprobados en verde. |
-| 4 | Identidad, autenticación y autorización | ⚪ `NO INICIADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
+| 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
+| 3 | Superficie NuGet V3 completa | 🔵 `EN DISEÑO` | 2 | Matriz de clientes comprobados en verde. |
+| 4 | Identidad, autenticación y autorización | 🔵 `EN DISEÑO` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | ⚪ `NO INICIADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | ⚪ `NO INICIADA` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
@@ -166,7 +166,7 @@ Reducir el mayor riesgo técnico **antes** de invertir en administración, permi
 
 ## Fase 2 — Núcleo de dominio y persistencia
 
-**Estatus:** 🔵 `EN DISEÑO`
+**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028).
 **Depende de:** Fase 1
 **ADRs:** [ADR-004](adr-mvp.md#adr-004), [ADR-005](adr-mvp.md#adr-005), [ADR-006](adr-mvp.md#adr-006), [ADR-007](adr-mvp.md#adr-007), [ADR-020](adr-mvp.md#adr-020)
 
@@ -174,36 +174,37 @@ Reducir el mayor riesgo técnico **antes** de invertir en administración, permi
 Convertir el spike en un núcleo durable: varios feeds, versiones inmutables, publicación consistente aunque el proceso caiga.
 
 ### Entregables
-- [ ] Esquema SQLite con migraciones SQLx embebidas: `feed`, `package`, `package_version`, `blob`, `audit_event` (identidades en Fase 4).
-- [ ] `UNIQUE(feed_id, normalized_package_id, normalized_version)` en la base.
-- [ ] SQLite en WAL, `synchronous=FULL`, `busy_timeout`, un pool de escritura serializado.
-- [ ] Abstracción `BlobStore` con implementación filesystem: `blobs/sha256/ab/cd/<hash>`, `staging/`.
-- [ ] Flujo de publicación: streaming a staging → hash → inspección → `fsync` del archivo y directorio → rename atómico → transacción de metadatos + auditoría.
-- [ ] Ninguna transacción SQLite abierta durante la subida.
-- [ ] Conflicto de identidad → `409`; contenido idéntico detectable para `--skip-existing-identical`.
-- [ ] Tarea de mantenimiento: limpieza de staging y de blobs huérfanos con periodo de gracia.
-- [ ] Verificación al arranque: esquema, permisos de directorio, espacio libre.
-- [ ] Separación de crates respetada: `core` no depende de `nuget` ni de `sqlx`.
-- [ ] Gestión de feeds por configuración interna o tests (la gestión por CLI llega en Fase 6).
+- [x] Esquema SQLite con migraciones SQLx embebidas (`migrations/0001_initial.sql`, tablas `STRICT`): `feed`, `package`, `package_version`, `blob`, `audit_event`.
+- [x] `UNIQUE(feed_id, normalized_package_id, normalized_version)` en la base.
+- [x] SQLite en WAL, `synchronous=FULL`, `busy_timeout` de 5 s, `foreign_keys`; pool de escritura de una conexión y pool de lectura separado.
+- [x] `BlobStore` en filesystem (`crates/storage/src/blobs.rs`): `blobs/sha256/ab/cd/<hash>` y `staging/`, con deduplicación.
+- [x] Flujo de publicación: streaming a staging con hash incremental → inspección desde el archivo → `fsync` del archivo → rename atómico → `fsync` de directorios → transacción de metadatos + auditoría.
+- [x] Ninguna transacción SQLite abierta durante la subida; la subida no se carga en memoria.
+- [x] Conflicto de identidad → `409`; el dominio indica si el contenido es idéntico (`PublishError::Conflict { identical }`) para `--skip-existing-identical`.
+- [x] Limpieza de staging y blobs huérfanos con periodo de gracia (`--gc-grace-secs`), al arrancar y periódicamente.
+- [x] Verificación al arranque: base inicializada, migraciones pendientes o esquema más nuevo, escritura en el directorio de datos, aviso de poco espacio libre.
+- [x] Migraciones forward-only con `onepackd migrate` y copia `VACUUM INTO` previa si ya había datos (ADR-020).
+- [x] Separación de crates respetada: `core` sin dependencias externas; `storage` sin `nuget` ni `axum`.
+- [x] Gestión de feeds local con `onepackd feed create|list` (la gestión remota llega con la API en la Fase 6).
 
 ### Pruebas bloqueantes
-| Escenario | Resultado esperado |
-|---|---|
-| Dos publicaciones simultáneas de la misma identidad | Solo una confirmada; la otra recibe `409`; sin sobrescritura. |
-| Kill del proceso durante la subida | No aparece una versión parcialmente disponible. |
-| Kill entre persistir blob y confirmar BD | Blob huérfano detectado y limpiado tras el periodo de gracia. |
-| Disco lleno durante la subida | Error controlado; ningún metadato apunta a un blob inexistente. |
-| Reinicio tras publicar | Bytes descargados idénticos (hash) a los publicados. |
-| Mismo paquete en dos feeds | Dos identidades independientes; blob puede deduplicarse. |
+| Escenario | Resultado esperado | Prueba |
+|---|---|---|
+| Dos publicaciones simultáneas de la misma identidad | Solo una confirmada; la otra recibe `409`; sin sobrescritura. | `storage/tests/store.rs` (8 tareas), `server/tests/nuget_api.rs` (6 por HTTP) |
+| Kill del proceso durante la subida | No aparece una versión parcialmente disponible. | `server/tests/recovery.rs` (SIGKILL a mitad de subida) |
+| Kill entre persistir blob y confirmar BD | Blob huérfano detectado y limpiado tras el periodo de gracia. | `server/tests/recovery.rs` (`abort` inyectado, feature `fault-injection`) |
+| Disco lleno durante la subida | Error controlado; ningún metadato apunta a un blob inexistente. | `tests/recovery/disk-full.sh` (tmpfs de 8 MiB, solo Linux/CI) |
+| Reinicio tras publicar | Bytes descargados idénticos (hash) a los publicados. | `server/tests/recovery.rs` |
+| Mismo paquete en dos feeds | Dos identidades independientes; blob puede deduplicarse. | `storage/tests/store.rs`, `server/tests/nuget_api.rs` |
 
 ### Gate de salida
-Todas las pruebas bloqueantes automatizadas en `tests/integration` o `tests/recovery` y verdes en CI.
+Todas las pruebas bloqueantes automatizadas (tests de los crates y `tests/recovery`) y verdes en CI.
 
 ---
 
 ## Fase 3 — Superficie NuGet V3 completa
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 2
 **ADRs:** [ADR-009](adr-mvp.md#adr-009), [ADR-013](adr-mvp.md#adr-013), [ADR-019](adr-mvp.md#adr-019)
 
@@ -244,7 +245,7 @@ Matriz de clientes con todas las celdas automatizables en verde en CI y las manu
 
 ## Fase 4 — Identidad, autenticación y autorización
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 2 (paralelizable con Fase 3)
 **ADRs:** [ADR-010](adr-mvp.md#adr-010), [ADR-011](adr-mvp.md#adr-011), [ADR-012](adr-mvp.md#adr-012)
 
@@ -462,3 +463,8 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 1 | `EN PROGRESO` | `EN VALIDACIÓN` | Corpus sin divergencias y E2E verde en local. Pendiente: CI en GitHub. |
 | 2026-10-04 | 1 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37176042099](https://github.com/Khr0x/onepack/actions/runs/37176042099) (corpus + E2E con dotnet). ADR-002 aceptado (Rust). PR Khr0x/onepack#2. |
 | 2026-10-04 | 2 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 1) completada. |
+| 2026-10-04 | 2 | `EN DISEÑO` | `EN PROGRESO` | ADR-004, 005, 006, 007 y 020 aceptados. |
+| 2026-10-04 | 2 | `EN PROGRESO` | `EN VALIDACIÓN` | 37 tests y E2E con dotnet verdes en local. Pendiente: CI (incluye disco lleno en Linux). |
+| 2026-10-04 | 2 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028), con tests de recuperación (`fault-injection`) y disco lleno en tmpfs. |
+| 2026-10-04 | 3 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada. |
+| 2026-10-04 | 4 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada; paralelizable con la Fase 3. |

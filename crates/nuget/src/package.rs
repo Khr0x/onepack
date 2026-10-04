@@ -1,7 +1,7 @@
 //! Lectura de `.nupkg`: localiza el `.nuspec` en la raíz del ZIP y extrae la identidad y las
 //! dependencias. No extrae nada a disco ni ejecuta contenido del paquete (ADR-014).
 
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek};
 
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
@@ -58,13 +58,21 @@ impl std::fmt::Display for PackageError {
 impl std::error::Error for PackageError {}
 
 pub fn read_package(nupkg: &[u8]) -> Result<PackageManifest, PackageError> {
-    let nuspec = read_nuspec_bytes(nupkg)?;
-    parse_nuspec(nuspec)
+    read_package_from(Cursor::new(nupkg))
+}
+
+/// Lee el manifiesto sin cargar el paquete completo en memoria (p. ej. desde un archivo).
+pub fn read_package_from<R: Read + Seek>(nupkg: R) -> Result<PackageManifest, PackageError> {
+    parse_nuspec(read_nuspec_from(nupkg)?)
 }
 
 /// Devuelve solo los bytes del `.nuspec` (para servir `/{id}/{version}/{id}.nuspec`).
 pub fn read_nuspec_bytes(nupkg: &[u8]) -> Result<Vec<u8>, PackageError> {
-    let mut archive = zip::ZipArchive::new(Cursor::new(nupkg)).map_err(PackageError::NotAZip)?;
+    read_nuspec_from(Cursor::new(nupkg))
+}
+
+pub fn read_nuspec_from<R: Read + Seek>(nupkg: R) -> Result<Vec<u8>, PackageError> {
+    let mut archive = zip::ZipArchive::new(nupkg).map_err(PackageError::NotAZip)?;
 
     let mut found = None;
     for i in 0..archive.len() {
