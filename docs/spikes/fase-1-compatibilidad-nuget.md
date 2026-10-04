@@ -81,4 +81,4 @@ Fue la única incompatibilidad, y el E2E la detectó en el primer intento. Es ju
 
 **Ratificar ADR-002 (Rust).** Los dos riesgos que justificaban la alternativa en C# eran las reglas de versionado y el comportamiento de los clientes reales. Las reglas de versionado quedan cubiertas por un corpus generado con la biblioteca oficial y verificado en cada CI. El comportamiento de los clientes queda cubierto por un E2E que publica y restaura con `dotnet`. El coste fue bajo y la única incompatibilidad apareció y se corrigió dentro del propio spike.
 
-La ratificación queda pendiente de que el gate se cumpla en el CI de GitHub, no solo en local.
+**Ratificado el 2026-10-04:** gate cumplido en [CI](https://github.com/Khr0x/onepack/actions/runs/37176042099); ADR-002 pasa a `Aceptado`.

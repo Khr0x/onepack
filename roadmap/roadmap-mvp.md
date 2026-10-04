@@ -74,8 +74,8 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | # | Fase | Estatus | Depende de | Gate de salida (resumen) |
 |---|---|---|---|---|
 | 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
-| 1 | Spike de compatibilidad NuGet | 🟣 `EN VALIDACIÓN` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
-| 2 | Núcleo de dominio y persistencia | ⚪ `NO INICIADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
+| 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
+| 2 | Núcleo de dominio y persistencia | 🔵 `EN DISEÑO` | 1 | Publicación consistente, inmutable y resistente a caídas. |
 | 3 | Superficie NuGet V3 completa | ⚪ `NO INICIADA` | 2 | Matriz de clientes comprobados en verde. |
 | 4 | Identidad, autenticación y autorización | ⚪ `NO INICIADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | ⚪ `NO INICIADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
@@ -131,7 +131,7 @@ Cualquier endpoint funcional.
 
 ## Fase 1 — Spike de compatibilidad NuGet
 
-**Estatus:** 🟣 `EN VALIDACIÓN` — pruebas bloqueantes verdes en local; falta el CI en GitHub.
+**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37176042099](https://github.com/Khr0x/onepack/actions/runs/37176042099), [informe del spike](../docs/spikes/fase-1-compatibilidad-nuget.md).
 **Depende de:** Fase 0
 **ADRs:** [ADR-002](adr-mvp.md#adr-002), [ADR-008](adr-mvp.md#adr-008), [ADR-009](adr-mvp.md#adr-009), [ADR-019](adr-mvp.md#adr-019)
 
@@ -166,7 +166,7 @@ Reducir el mayor riesgo técnico **antes** de invertir en administración, permi
 
 ## Fase 2 — Núcleo de dominio y persistencia
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 1
 **ADRs:** [ADR-004](adr-mvp.md#adr-004), [ADR-005](adr-mvp.md#adr-005), [ADR-006](adr-mvp.md#adr-006), [ADR-007](adr-mvp.md#adr-007), [ADR-020](adr-mvp.md#adr-020)
 
@@ -460,3 +460,5 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 1 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 0) completada. |
 | 2026-10-04 | 1 | `EN DISEÑO` | `EN PROGRESO` | ADR-008 y ADR-009 aceptados. |
 | 2026-10-04 | 1 | `EN PROGRESO` | `EN VALIDACIÓN` | Corpus sin divergencias y E2E verde en local. Pendiente: CI en GitHub. |
+| 2026-10-04 | 1 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37176042099](https://github.com/Khr0x/onepack/actions/runs/37176042099) (corpus + E2E con dotnet). ADR-002 aceptado (Rust). PR Khr0x/onepack#2. |
+| 2026-10-04 | 2 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 1) completada. |

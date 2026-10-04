@@ -55,7 +55,7 @@ Señal concreta que justificaría reabrir la decisión.
 | ADR | Decisión | Estatus | Fase |
 |---|---|---|---|
 | [001](#adr-001) | MVP: registro NuGet privado, una organización, un nodo | ✅ Aceptado | 0 |
-| [002](#adr-002) | Rust + Tokio + Axum como stack del servidor y CLI | 🧪 Condicionado | 1 |
+| [002](#adr-002) | Rust + Tokio + Axum como stack del servidor y CLI | ✅ Aceptado | 1 |
 | [003](#adr-003) | Monolito modular en un workspace de crates | ✅ Aceptado | 0 |
 | [004](#adr-004) | SQLite en WAL con `synchronous=FULL` para metadatos | 📝 Propuesto | 2 |
 | [005](#adr-005) | Blobs direccionados por SHA-256 en filesystem local, bytes originales | 📝 Propuesto | 2 |
@@ -108,7 +108,7 @@ El piloto (Fase 8) muestre que una funcionalidad excluida es condición para ado
 <a id="adr-002"></a>
 ## ADR-002 — Rust + Tokio + Axum como stack del servidor y CLI
 
-**Estatus:** 🧪 Condicionado · **Fecha:** 2026-10-03 · **Fase:** 1 · **Relacionados:** ADR-008, ADR-019
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 1 · **Relacionados:** ADR-008, ADR-019
 
 ### Contexto
 El producto prioriza binarios nativos, pocos componentes, control de recursos y un CLI central. C#/ASP.NET Core reduciría el riesgo de NuGet al reutilizar `NuGet.Packaging`, `NuGet.Versioning` y `NuGet.Protocol`.
@@ -118,8 +118,10 @@ Servidor y CLI en **Rust**: Tokio, Axum, Tower/tower-http, SQLx (SQLite), clap, 
 
 **Condición:** la decisión se ratifica solo si el spike de la Fase 1 demuestra publish/restore con `dotnet` real y cero divergencias de normalización frente a `NuGet.Versioning`. Si no, se crea un ADR que lo reemplace a favor de C#.
 
+**Validación:** condición cumplida el 2026-10-04: 0 divergencias frente a `NuGet.Versioning` y E2E con `dotnet` en verde ([CI](https://github.com/Khr0x/onepack/actions/runs/37176042099), [informe](../docs/spikes/fase-1-compatibilidad-nuget.md)).
+
 ### Alternativas consideradas
-- **C# / ASP.NET Core** — menor riesgo de compatibilidad; runtime más pesado y CLI menos nativo. Alternativa seria y vigente hasta cerrar el spike.
+- **C# / ASP.NET Core** — menor riesgo de compatibilidad; runtime más pesado y CLI menos nativo. Descartada tras el spike de la Fase 1.
 - **Go** — viable, sin ventaja clara frente a Rust y con el mismo trabajo de compatibilidad NuGet.
 
 ### Consecuencias
