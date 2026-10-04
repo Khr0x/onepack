@@ -8,7 +8,7 @@ use axum::http::HeaderValue;
 use axum::http::{Method, Request, StatusCode};
 use http_body_util::BodyExt;
 use onepack_core::{FeedName, PrincipalKind, PrincipalName};
-use onepack_server::app;
+use onepack_server::{Limits, app};
 use onepack_storage::{Store, migrate};
 use serde_json::{Value, json};
 use tempfile::TempDir;
@@ -47,7 +47,10 @@ async fn server() -> (Router, TempDir) {
     let router = app(
         Arc::new(store),
         "https://packages.example.test/",
-        1024 * 1024,
+        Limits {
+            max_package_bytes: 1024 * 1024,
+            ..Limits::default()
+        },
     )
     .layer(axum::middleware::map_request(
         move |mut req: AxumRequest| {

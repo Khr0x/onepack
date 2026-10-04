@@ -11,6 +11,8 @@ Registro privado de paquetes NuGet, self-hosted y operado desde CLI.
 - [Roadmap por fases](roadmap/roadmap-mvp.md)
 - [Decisiones de arquitectura (ADR)](roadmap/adr-mvp.md)
 - [Convenciones](docs/conventions.md)
+- [Clientes comprobados](docs/compatibility.md)
+- [Seguridad: límites, cuotas y bloqueo de versiones](docs/security.md)
 
 ## Desarrollo
 
@@ -41,6 +43,8 @@ cargo run -p onepack-server -- token create --principal ci --data-dir ./data
 ```
 
 El feed queda en `http://127.0.0.1:8080/nuget/internal/v3/index.json`. NuGet se autentica con Basic (token como contraseña) o `X-NuGet-ApiKey`. Usa HTTPS (directo o con reverse proxy) fuera de local.
+
+Los límites de inspección, las cuotas por feed y el bloqueo de versiones (`onepackd feed quota`, `onepackd package block`) se describen en [docs/security.md](docs/security.md). `onepackd serve --help` lista todos los límites.
 
 ## Estructura
 

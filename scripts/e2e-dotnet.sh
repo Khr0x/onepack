@@ -266,6 +266,34 @@ step "Volviendo a listar Basic 2.0.0 (relist)"
   "$base/nuget/$feed/v2/package/Onepack.Fixture.Basic/2.0.0")" = "200" ] || fail "relist"
 grep -q '"2.0.0"' <<<"$(search Onepack.Fixture.Basic)" || fail "tras el relist la búsqueda debería mostrar 2.0.0"
 
+# --- Bloqueo ---------------------------------------------------------------------------------
+
+admin_token=$(cat "$work/data/initial-admin-token")
+availability() {
+  curl -s -o "$work/availability.json" -w '%{http_code}' -X POST \
+    -H "Authorization: Bearer $admin_token" -H 'Content-Type: application/json' \
+    -d "{\"reason\": \"$2\"}" "$base/api/v1/feeds/$feed/packages/onepack.fixture.basic/1.1.0/$1"
+}
+
+step "Bloqueando Basic 1.1.0 por la API administrativa"
+[ "$(availability block 'prueba e2e')" = "200" ] || fail "block: $(cat "$work/availability.json")"
+
+step "Comprobando que restore falla con un mensaje claro (caché vacía)"
+export NUGET_PACKAGES="$work/packages-blocked" NUGET_HTTP_CACHE_PATH="$work/http-cache-blocked"
+rm -rf "$client/consumer/obj"
+if (cd "$client/consumer" && dotnet restore --configfile "$client/NuGet.Config" --nologo "-p:ConsumerTargetFramework=$tfm") \
+  >"$work/restore-blocked.log" 2>&1; then
+  fail "restore debió fallar con Basic 1.1.0 bloqueada"
+fi
+grep -q "410" "$work/restore-blocked.log" && grep -q "PACKAGE_BLOCKED" "$work/restore-blocked.log" \
+  || { cat "$work/restore-blocked.log"; fail "el error de restore no explica el bloqueo"; }
+grep -m1 "PACKAGE_BLOCKED" "$work/restore-blocked.log" | sed 's/^ */    /'
+
+step "Desbloqueando Basic 1.1.0 y restaurando de nuevo"
+[ "$(availability unblock 'fin de la prueba')" = "200" ] || fail "unblock: $(cat "$work/availability.json")"
+(cd "$client/consumer" && dotnet restore --configfile "$client/NuGet.Config" --nologo "-p:ConsumerTargetFramework=$tfm") \
+  >"$work/restore-unblocked.log" 2>&1 || { cat "$work/restore-unblocked.log"; fail "restore tras desbloquear"; }
+
 # --- Revocación ------------------------------------------------------------------------------
 
 step "Revocando la credencial de CI"
@@ -277,6 +305,7 @@ if (cd "$client" && dotnet nuget push "$dup" --source onepack --api-key "$token"
 fi
 
 grep -q "$token" "$work/server.log" && fail "el token apareció en el log del servidor"
+grep -q "$admin_token" "$work/server.log" && fail "el token administrativo apareció en el log del servidor"
 
 step "Comprobando qué recursos usaron los clientes"
 for resource in /v3/index.json /v3/flat/ /v3/registration/ /v3/query /v2/package; do
@@ -284,4 +313,5 @@ for resource in /v3/index.json /v3/flat/ /v3/registration/ /v3/query /v2/package
 done
 
 echo "E2E OK (SDK $sdk_version$([ "$tls" = 1 ] && echo ', TLS')): 401 sin credenciales, push, 409, búsqueda con y sin"
-echo "        prerelease, búsqueda exacta, restore con rango y caché vacía, unlist/relist y revocación."
+echo "        prerelease, búsqueda exacta, restore con rango y caché vacía, unlist/relist, bloqueo"
+echo "        y revocación."

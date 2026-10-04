@@ -9,7 +9,7 @@ use axum::extract::Request as AxumRequest;
 use axum::http::{HeaderValue, Method, Request, StatusCode};
 use http_body_util::BodyExt;
 use onepack_core::{FeedName, PrincipalKind, PrincipalName};
-use onepack_server::app;
+use onepack_server::{Limits, app};
 use onepack_storage::{Store, migrate};
 use serde_json::{Value, json};
 use tempfile::TempDir;
@@ -42,15 +42,23 @@ async fn server() -> (Router, TempDir) {
         .unwrap()
         .token;
     let api_key = HeaderValue::from_str(&token).unwrap();
-    let router = app(Arc::new(store), "https://packages.example.test", 1 << 20).layer(
-        axum::middleware::map_request(move |mut req: AxumRequest| {
+    let router = app(
+        Arc::new(store),
+        "https://packages.example.test",
+        Limits {
+            max_package_bytes: 1 << 20,
+            ..Limits::default()
+        },
+    )
+    .layer(axum::middleware::map_request(
+        move |mut req: AxumRequest| {
             let api_key = api_key.clone();
             async move {
                 req.headers_mut().insert("X-NuGet-ApiKey", api_key);
                 req
             }
-        }),
-    );
+        },
+    ));
     (router, dir)
 }
 

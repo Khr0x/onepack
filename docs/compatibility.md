@@ -9,11 +9,11 @@
 
 | Recurso (`@type`) | Ruta | Notas |
 |---|---|---|
-| `PackageBaseAddress/3.0.0` | `/nuget/{feed}/v3/flat/` | Incluye versiones no listadas. |
-| `RegistrationsBaseUrl/3.6.0` | `/nuget/{feed}/v3/registration/` | Incluye SemVer 2.0.0 y versiones no listadas (`listed: false`). Páginas de 64 versiones, inline hasta 128. Sin compresión gzip. |
+| `PackageBaseAddress/3.0.0` | `/nuget/{feed}/v3/flat/` | Incluye versiones no listadas y bloqueadas; la descarga de una bloqueada responde `410`. |
+| `RegistrationsBaseUrl/3.6.0` | `/nuget/{feed}/v3/registration/` | Incluye SemVer 2.0.0, versiones no listadas (`listed: false`) y bloqueadas (con `deprecation`). Páginas de 64 versiones, inline hasta 128. Sin compresión gzip. |
 | `SearchQueryService` (y `/3.0.0-beta`, `/3.0.0-rc`, `/3.5.0`) | `/nuget/{feed}/v3/query` | `q`, `skip`, `take`, `prerelease`, `semVerLevel`, `packageType`. Solo versiones listadas. Sintaxis: términos libres, `id:` y `packageid:`. |
 | `SearchAutocompleteService` (y `/3.0.0-beta`, `/3.0.0-rc`, `/3.5.0`) | `/nuget/{feed}/v3/autocomplete` | Ids (`q`) y versiones de un id (`id`). |
-| `PackagePublish/2.0.0` | `/nuget/{feed}/v2/package` | `PUT` (publicar), `DELETE` (unlist), `POST` (relist). |
+| `PackagePublish/2.0.0` | `/nuget/{feed}/v2/package` | `PUT` (publicar), `DELETE` (unlist), `POST` (relist). Errores con código estable al inicio del texto (`CÓDIGO: mensaje`). |
 
 No implementados: API V2 (OData), catálogo, `ReadmeUriTemplate`, `PackageDetailsUriTemplate`, servidor de símbolos, contadores de descargas (siempre 0) e iconos embebidos (`iconUrl` solo si el paquete declara una URL).
 
@@ -48,4 +48,5 @@ CI de referencia: ejecución [37185158143](https://github.com/Khr0x/onepack/acti
 |---|---|---|
 | `dotnet nuget push` | Hace el `PUT` sobre `{PackagePublish}/` con barra final. | Se aceptan las dos formas. |
 | `dotnet nuget push` | Consulta el service index con Basic (tras el `401`) y publica con `X-NuGet-ApiKey`. | Las rutas NuGet aceptan ambos mecanismos (ADR-011). |
+| `dotnet restore` | Ante un error de descarga muestra el estado y la frase de estado HTTP, no el cuerpo. | Las versiones bloqueadas responden `410` con la frase `PACKAGE_BLOCKED - version blocked by the registry` ([docs/security.md](security.md)). |
 | `nuget.exe search` | No acepta `-ConfigFile` (sí `push` e `install`); lee el `NuGet.Config` del directorio actual. | Se ejecuta desde el directorio con la configuración del feed. |
