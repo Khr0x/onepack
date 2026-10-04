@@ -3,7 +3,7 @@
 > Plan por fases derivado de [mvp-registro-privado-paquetes-nuget.md](mvp-registro-privado-paquetes-nuget.md).
 > Las decisiones de arquitectura están en [adr-mvp.md](adr-mvp.md).
 >
-> Última actualización: 2026-10-03
+> Última actualización: 2026-10-04
 
 ---
 
@@ -73,8 +73,8 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 
 | # | Fase | Estatus | Depende de | Gate de salida (resumen) |
 |---|---|---|---|---|
-| 0 | Fundaciones del proyecto | 🟣 `EN VALIDACIÓN` | — | Workspace compila en CI y ADRs base aceptados. |
-| 1 | Spike de compatibilidad NuGet | ⚪ `NO INICIADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
+| 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
+| 1 | Spike de compatibilidad NuGet | 🔵 `EN DISEÑO` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
 | 2 | Núcleo de dominio y persistencia | ⚪ `NO INICIADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
 | 3 | Superficie NuGet V3 completa | ⚪ `NO INICIADA` | 2 | Matriz de clientes comprobados en verde. |
 | 4 | Identidad, autenticación y autorización | ⚪ `NO INICIADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
@@ -103,7 +103,7 @@ Las fases 3 y 4 pueden avanzar en paralelo. La fase 6 puede avanzar en paralelo 
 
 ## Fase 0 — Fundaciones del proyecto
 
-**Estatus:** 🟣 `EN VALIDACIÓN` — falta la primera ejecución del pipeline de CI en GitHub (gate de salida).
+**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37174401011](https://github.com/Khr0x/onepack/actions/runs/37174401011).
 **Depende de:** —
 **ADRs:** [ADR-001](adr-mvp.md#adr-001), [ADR-003](adr-mvp.md#adr-003), [ADR-019](adr-mvp.md#adr-019)
 
@@ -113,9 +113,9 @@ Dejar un repositorio donde cualquier cambio se compila, se prueba y se revisa de
 ### Entregables
 - [x] Workspace Cargo con crates vacíos: `core`, `nuget`, `storage`, `api-client`, `server`, `cli` (paquetes `onepack-*`). Fronteras de ADR-003 verificadas por `scripts/check-crate-deps.sh`.
 - [x] Estructura de carpetas: `migrations/`, `tests/{integration,conformance-dotnet,security,recovery}`, `packaging/{systemd,container}`, `docs/`.
-- [~] CI (`.github/workflows/ci.yml`): `cargo fmt --check`, `clippy -D warnings`, `cargo test`, fronteras entre crates, `cargo deny` (licencias, advisories, fuentes). *Verde en local; pendiente de la primera ejecución en GitHub.*
+- [x] CI (`.github/workflows/ci.yml`, runners `ubuntu-24.04`): `cargo fmt --check`, `clippy -D warnings`, `cargo test`, fronteras entre crates, `cargo deny` (licencias, advisories, fuentes). [Verde en GitHub](https://github.com/Khr0x/onepack/actions/runs/37174401011).
 - [x] Toolchain fijado (`rust-toolchain.toml`, 1.96.1); MSRV = `rust-version` 1.96, documentado en `docs/conventions.md`.
-- [~] Job de CI con SDK .NET 8 que empaqueta las fixtures de `tests/conformance-dotnet/fixtures` (sin ser dependencia del servidor). *`dotnet pack` verificado en local.*
+- [x] Job de CI con SDK .NET 8 que empaqueta las fixtures de `tests/conformance-dotnet/fixtures` (sin ser dependencia del servidor). [Verde en GitHub](https://github.com/Khr0x/onepack/actions/runs/37174401011).
 - [x] Convenciones en `docs/conventions.md`: formato de errores, prefijos de códigos, códigos de salida provisionales del CLI, commits y ramas.
 - [x] Nombres de binarios confirmados: `onepackd` (servidor) y `onepack` (CLI).
 - [x] ADR-001, ADR-003 y ADR-019 en `Aceptado` (2026-10-03); ADR-002 sigue `Condicionado` hasta el gate de la Fase 1.
@@ -131,7 +131,7 @@ Cualquier endpoint funcional.
 
 ## Fase 1 — Spike de compatibilidad NuGet
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 0
 **ADRs:** [ADR-002](adr-mvp.md#adr-002), [ADR-008](adr-mvp.md#adr-008), [ADR-009](adr-mvp.md#adr-009), [ADR-019](adr-mvp.md#adr-019)
 
@@ -456,3 +456,5 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-03 | 0 | `NO INICIADA` | `EN DISEÑO` | Roadmap y ADRs iniciales redactados. |
 | 2026-10-03 | 0 | `EN DISEÑO` | `EN PROGRESO` | ADR-001, 003 y 019 aceptados; binarios `onepackd`/`onepack`. |
 | 2026-10-03 | 0 | `EN PROGRESO` | `EN VALIDACIÓN` | Entregables implementados; checks verdes en local. Pendiente: CI en GitHub. |
+| 2026-10-04 | 0 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37174401011](https://github.com/Khr0x/onepack/actions/runs/37174401011). Runner fijado en `ubuntu-24.04` (con `ubuntu-latest` los jobs no recibían runner). |
+| 2026-10-04 | 1 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 0) completada. |
