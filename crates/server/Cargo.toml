@@ -12,6 +12,13 @@ onepack-core.workspace = true
 onepack-nuget.workspace = true
 onepack-storage.workspace = true
 onepack-api-client.workspace = true
+axum = { version = "0.8.9", features = ["multipart"] }
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "fs", "net", "signal", "sync", "io-util"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+serde_json = "1.0.151"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tower-http = { version = "0.7.1", features = ["trace"] }
 
 [lints]
 workspace = true
@@ -19,3 +26,9 @@ workspace = true
 [[bin]]
 name = "onepackd"
 path = "src/main.rs"
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tempfile = "3.27.0"
+tower = { version = "0.5.3", features = ["util"] }
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }

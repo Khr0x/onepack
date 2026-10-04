@@ -61,8 +61,8 @@ Señal concreta que justificaría reabrir la decisión.
 | [005](#adr-005) | Blobs direccionados por SHA-256 en filesystem local, bytes originales | 📝 Propuesto | 2 |
 | [006](#adr-006) | Blob durable antes de confirmar metadatos | 📝 Propuesto | 2 |
 | [007](#adr-007) | Versiones inmutables y `409` ante duplicados | 📝 Propuesto | 2 |
-| [008](#adr-008) | Normalización NuGet propia validada contra `NuGet.Versioning` | 📝 Propuesto | 1 |
-| [009](#adr-009) | Recursos NuGet V3 anunciados en el MVP | 📝 Propuesto | 1, 3 |
+| [008](#adr-008) | Normalización NuGet propia validada contra `NuGet.Versioning` | ✅ Aceptado | 1 |
+| [009](#adr-009) | Recursos NuGet V3 anunciados en el MVP | ✅ Aceptado | 1, 3 |
 | [010](#adr-010) | Tokens opacos con verificador hash, no JWT | 📝 Propuesto | 4 |
 | [011](#adr-011) | Tres contextos de autenticación separados | 📝 Propuesto | 4 |
 | [012](#adr-012) | Roles por feed y restricción opcional por prefijo | 📝 Propuesto | 4 |
@@ -288,7 +288,7 @@ Exista un requisito legal de eliminación (p. ej. contenido filtrado por error) 
 <a id="adr-008"></a>
 ## ADR-008 — Normalización NuGet propia validada contra `NuGet.Versioning`
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 1 · **Relacionados:** ADR-002, ADR-019
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 1 · **Relacionados:** ADR-002, ADR-019
 
 ### Contexto
 Las versiones NuGet no son SemVer puro: cuarto segmento, equivalencias (`1.0` ≡ `1.0.0`), metadatos de build ignorados en la identidad, ids case-insensitive. Un error aquí produce duplicados o colisiones.
@@ -314,7 +314,7 @@ NuGet cambie sus reglas de versionado.
 <a id="adr-009"></a>
 ## ADR-009 — Recursos NuGet V3 anunciados en el MVP
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 1, 3 · **Relacionados:** ADR-013, ADR-018
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 1, 3 · **Relacionados:** ADR-013, ADR-018
 
 ### Contexto
 El cliente descubre capacidades en el service index. Anunciar un recurso sin cumplir su contrato provoca fallos difíciles de diagnosticar.

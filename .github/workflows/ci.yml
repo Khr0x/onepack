@@ -35,19 +35,16 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   dotnet-conformance:
-    name: .NET (fixtures de conformidad)
+    name: .NET (conformidad con clientes reales)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
-      - name: Empaquetar fixtures
-        run: |
-          for proj in tests/conformance-dotnet/fixtures/*/*.csproj; do
-            dotnet pack "$proj" -c Release -o target/nupkgs
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: fixture-nupkgs
-          path: target/nupkgs/*.nupkg
+          global-json-file: tests/conformance-dotnet/global.json
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - name: Corpus de versiones al día con NuGet.Versioning (ADR-008)
+        run: ./scripts/version-corpus.sh --check
+      - name: E2E push / restore con dotnet (ADR-019)
+        run: ./scripts/e2e-dotnet.sh

@@ -74,7 +74,7 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | # | Fase | Estatus | Depende de | Gate de salida (resumen) |
 |---|---|---|---|---|
 | 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
-| 1 | Spike de compatibilidad NuGet | 🔵 `EN DISEÑO` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
+| 1 | Spike de compatibilidad NuGet | 🟣 `EN VALIDACIÓN` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
 | 2 | Núcleo de dominio y persistencia | ⚪ `NO INICIADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
 | 3 | Superficie NuGet V3 completa | ⚪ `NO INICIADA` | 2 | Matriz de clientes comprobados en verde. |
 | 4 | Identidad, autenticación y autorización | ⚪ `NO INICIADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
@@ -131,7 +131,7 @@ Cualquier endpoint funcional.
 
 ## Fase 1 — Spike de compatibilidad NuGet
 
-**Estatus:** 🔵 `EN DISEÑO`
+**Estatus:** 🟣 `EN VALIDACIÓN` — pruebas bloqueantes verdes en local; falta el CI en GitHub.
 **Depende de:** Fase 0
 **ADRs:** [ADR-002](adr-mvp.md#adr-002), [ADR-008](adr-mvp.md#adr-008), [ADR-009](adr-mvp.md#adr-009), [ADR-019](adr-mvp.md#adr-019)
 
@@ -139,15 +139,15 @@ Cualquier endpoint funcional.
 Reducir el mayor riesgo técnico **antes** de invertir en administración, permisos o CLI: demostrar que un servidor Rust mínimo es aceptado por clientes NuGet reales. Esta fase es el punto de decisión para ratificar o revertir Rust frente a C#.
 
 ### Entregables
-- [ ] Servidor Axum mínimo con un feed fijo, sin autenticación, almacenamiento en memoria o disco simple.
-- [ ] `index.json` (service index) con solo los recursos implementados.
-- [ ] `PackagePublish/2.0.0`: `PUT` multipart, lectura de `X-NuGet-ApiKey` (sin validar aún).
-- [ ] `PackageBaseAddress/3.0.0`: lista de versiones, descarga `.nupkg` y `.nuspec`.
-- [ ] Lectura del `.nuspec` desde el ZIP (id, versión, dependencias por framework).
-- [ ] Normalización de id y versión NuGet (4 segmentos, `1.0` ≡ `1.0.0`, metadatos de build, prerelease, case-insensitive).
-- [ ] Suite de conformidad de versiones: tabla de casos generada con `NuGet.Versioning` y comparada contra la implementación Rust.
-- [ ] Prueba E2E: `dotnet pack` → `dotnet nuget push` → `dotnet restore` en un proyecto limpio con caché aislada (`NUGET_PACKAGES` temporal).
-- [ ] Informe de spike: lo que costó, divergencias encontradas, recomendación.
+- [x] Servidor Axum mínimo con un feed fijo (`--feed`), sin autenticación, almacenamiento provisional en disco (`crates/server`).
+- [x] `index.json` (service index) con solo los recursos implementados; URLs construidas desde `--public-url` (ADR-018).
+- [x] `PackagePublish/2.0.0`: `PUT` multipart; `X-NuGet-ApiKey` se acepta sin validar. Acepta `/v2/package` y `/v2/package/` (el cliente añade la barra final).
+- [x] `PackageBaseAddress/3.0.0`: lista de versiones en orden NuGet, descarga de `.nupkg` (bytes originales) y `.nuspec`.
+- [x] Lectura del `.nuspec` desde el ZIP: id, versión y dependencias por framework (`crates/nuget/src/package.rs`).
+- [x] Normalización de id y versión NuGet (`crates/nuget/src/{id,version}.rs`).
+- [x] Suite de conformidad: corpus de 168 casos generado con `NuGet.Versioning` 7.9.0 y verificado en CI (`scripts/version-corpus.sh --check`, `crates/nuget/tests/version_corpus.rs`).
+- [x] Prueba E2E `scripts/e2e-dotnet.sh`: `dotnet pack` → `dotnet nuget push` → `dotnet restore` con caché aislada → `dotnet run`.
+- [x] Informe del spike: [docs/spikes/fase-1-compatibilidad-nuget.md](../docs/spikes/fase-1-compatibilidad-nuget.md).
 
 ### Pruebas bloqueantes
 | Escenario | Resultado esperado |
@@ -160,7 +160,7 @@ Reducir el mayor riesgo técnico **antes** de invertir en administración, permi
 ### Gate de salida
 - E2E verde en CI.
 - Divergencias de normalización = 0 sobre el corpus de casos.
-- ADR-002 pasa de `Propuesto` a `Aceptado` (Rust) **o** se reemplaza por un ADR a favor de C#. Si se cambia de stack, se reescribe este roadmap desde la Fase 2.
+- ADR-002 pasa de `Condicionado` a `Aceptado` (Rust) **o** se reemplaza por un ADR a favor de C#. Si se cambia de stack, se reescribe este roadmap desde la Fase 2.
 
 ---
 
@@ -458,3 +458,5 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-03 | 0 | `EN PROGRESO` | `EN VALIDACIÓN` | Entregables implementados; checks verdes en local. Pendiente: CI en GitHub. |
 | 2026-10-04 | 0 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37174401011](https://github.com/Khr0x/onepack/actions/runs/37174401011). Runner fijado en `ubuntu-24.04` (con `ubuntu-latest` los jobs no recibían runner). |
 | 2026-10-04 | 1 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 0) completada. |
+| 2026-10-04 | 1 | `EN DISEÑO` | `EN PROGRESO` | ADR-008 y ADR-009 aceptados. |
+| 2026-10-04 | 1 | `EN PROGRESO` | `EN VALIDACIÓN` | Corpus sin divergencias y E2E verde en local. Pendiente: CI en GitHub. |
