@@ -1,5 +1,6 @@
 //! Persistencia: metadatos en SQLite y blobs direccionados por SHA-256 (ADR-004, ADR-005).
 
+mod admin;
 pub mod blobs;
 mod catalog;
 mod identity;
@@ -16,6 +17,9 @@ use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sqlx::{Row, SqlitePool};
 
+pub use admin::{
+    AuditQuery, AuditRow, DisableOutcome, FeedDetails, GrantRow, PackageRow, PrincipalRow, TokenRow,
+};
 pub use blobs::{BlobStore, StagedBlob, StagingError, StagingWriter};
 pub use catalog::{MissingMetadata, VersionChange};
 pub use identity::{AuthFailure, AuthOutcome, IssuedToken};

@@ -23,6 +23,12 @@ use crate::AppState;
 use crate::auth::Surface;
 
 pub enum ApiError {
+    /// Sin credencial válida.
+    Unauthenticated,
+    /// La operación requiere el rol Administrator.
+    AdminRequired,
+    /// Error con estado y código propios (validación, conflictos de la API administrativa).
+    Coded(StatusCode, &'static str, String),
     NotFound,
     Forbidden(Denial),
     BadRequest(String),
@@ -50,6 +56,18 @@ impl ApiError {
     /// Estado HTTP, código estable y mensaje.
     fn parts(&self) -> (StatusCode, &'static str, String) {
         match self {
+            Self::Unauthenticated => (
+                StatusCode::UNAUTHORIZED,
+                "AUTH_REQUIRED",
+                "se requiere una credencial válida; puede estar ausente, caducada o revocada"
+                    .to_owned(),
+            ),
+            Self::AdminRequired => (
+                StatusCode::FORBIDDEN,
+                "AUTH_ADMIN_REQUIRED",
+                "la operación requiere el rol Administrator".to_owned(),
+            ),
+            Self::Coded(status, code, message) => (*status, *code, message.clone()),
             Self::NotFound | Self::Forbidden(Denial::NotFound) => (
                 StatusCode::NOT_FOUND,
                 "NOT_FOUND",
@@ -150,16 +168,32 @@ impl ApiError {
             _ => None,
         };
         let blocked = matches!(self, Self::Blocked);
+        let unauthenticated = matches!(self, Self::Unauthenticated);
         let (status, code, message) = self.parts();
         let mut res = match surface {
             Surface::NuGet if status == StatusCode::NOT_FOUND => (status, message).into_response(),
             Surface::NuGet => (status, format!("{code}: {message}")).into_response(),
             Surface::Admin => (
                 status,
-                Json(json!({ "error": { "code": code, "message": message } })),
+                Json(json!({ "error": {
+                    "code": code,
+                    "message": message,
+                    "action": suggested_action(code),
+                    "request_id": crate::request_id::current(),
+                } })),
             )
                 .into_response(),
         };
+        if unauthenticated {
+            let challenge = match surface {
+                Surface::Admin => "Bearer realm=\"onepack\"",
+                Surface::NuGet => "Basic realm=\"onepack\"",
+            };
+            res.headers_mut().insert(
+                header::WWW_AUTHENTICATE,
+                HeaderValue::from_static(challenge),
+            );
+        }
         if let Some(secs) = retry_after {
             res.headers_mut()
                 .insert(header::RETRY_AFTER, HeaderValue::from(secs));
@@ -170,6 +204,47 @@ impl ApiError {
         }
         res
     }
+}
+
+/// Qué puede hacer quien recibe cada código (ADR-015). Nunca incluye datos de la petición.
+pub fn suggested_action(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "AUTH_REQUIRED" => {
+            "inicia sesión con `onepack login` o comprueba que el token no haya caducado ni esté revocado"
+        }
+        "AUTH_SCOPE_MISSING" => {
+            "pide a un administrador un rol suficiente: `onepack grant add --principal <principal> --feed <feed> --role <rol>`"
+        }
+        "AUTH_PREFIX_DENIED" => {
+            "pide a un administrador que amplíe los patrones de publicación del grant (`--publish-pattern`)"
+        }
+        "AUTH_ADMIN_REQUIRED" => "usa una credencial de un principal con rol Administrator",
+        "NOT_FOUND" | "FEED_NOT_FOUND" => {
+            "comprueba el nombre; si existe, tu credencial puede no tener acceso"
+        }
+        "PACKAGE_VERSION_EXISTS" => {
+            "publica una versión nueva: las versiones son inmutables (con el mismo archivo, usa --skip-existing-identical)"
+        }
+        "FEED_QUOTA_VERSIONS" | "FEED_QUOTA_STORAGE" => {
+            "pide a un administrador que amplíe la cuota: `onepack feed configure`"
+        }
+        "PACKAGE_BLOCKED" => "elige otra versión o consulta a quien mantiene el feed",
+        "RATE_LIMITED" | "UPLOADS_BUSY" => "reintenta pasado el tiempo de Retry-After",
+        "PACKAGE_INVALID" | "PACKAGE_UNSAFE_PATH" => {
+            "genera el paquete con `dotnet pack` y revisa su contenido"
+        }
+        "PACKAGE_LIMIT_EXCEEDED" | "PACKAGE_TOO_LARGE" => {
+            "reduce el paquete o pide a un administrador que amplíe los límites del servidor"
+        }
+        "INVALID_REQUEST" | "INVALID_NAME" | "INVALID_CURSOR" => {
+            "revisa los parámetros de la petición"
+        }
+        "LAST_ADMIN" => "crea o reactiva otro administrador antes",
+        "INTERNAL" | "STORAGE_FULL" => {
+            "contacta con quien opera el servidor e indica el request_id"
+        }
+        _ => return None,
+    })
 }
 
 impl IntoResponse for ApiError {
@@ -451,7 +526,7 @@ pub async fn autocomplete(
 
 /// Unlist (`DELETE`) y relist (`POST`) de `PackagePublish`. Requieren poder publicar ese id
 /// (rol Publisher y patrones del grant) y no afectan a la descarga (ADR-013).
-async fn set_listed(
+pub(crate) async fn set_listed(
     state: &AppState,
     auth: &AuthContext,
     feed_name: &str,

@@ -102,6 +102,14 @@ curl -H "Authorization: Bearer $TOKEN" \
   https://packages.example.com/api/v1/feeds/internal/packages/hemia.core/1.0.0
 ```
 
+Con el CLI:
+
+```bash
+onepack package block --feed internal Hemia.Core 1.0.0 --reason "CVE-2026-0001"
+onepack package inspect --feed internal Hemia.Core 1.0.0
+onepack package unblock --feed internal Hemia.Core 1.0.0 --reason "parche publicado"
+```
+
 Sin servidor en marcha, o con acceso solo al directorio de datos:
 
 ```bash

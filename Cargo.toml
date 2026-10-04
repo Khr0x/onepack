@@ -14,6 +14,7 @@ onepack-core = { path = "crates/core" }
 onepack-nuget = { path = "crates/nuget" }
 onepack-storage = { path = "crates/storage" }
 onepack-api-client = { path = "crates/api-client" }
+onepack-server = { path = "crates/server" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

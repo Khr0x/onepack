@@ -14,20 +14,17 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use axum::Json;
 use axum::extract::{Request, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use onepack_storage::AuthOutcome;
-use serde_json::json;
 
 use crate::AppState;
 use crate::nuget_api::ApiError;
 
-const REALM: &str = "onepack";
 /// Frecuencia máxima con la que se escribe `last_used_at` de un token (ADR-010).
 const TOUCH_INTERVAL: Duration = Duration::from_secs(300);
 
@@ -88,34 +85,7 @@ fn credential(surface: Surface, headers: &HeaderMap) -> Option<String> {
 }
 
 pub fn unauthorized(surface: Surface) -> Response {
-    let message = "se requiere una credencial válida; puede estar ausente, caducada o revocada";
-    match surface {
-        Surface::Admin => {
-            let mut res = (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": { "code": "AUTH_REQUIRED", "message": message } })),
-            )
-                .into_response();
-            res.headers_mut().insert(
-                header::WWW_AUTHENTICATE,
-                HeaderValue::from_static("Bearer realm=\"onepack\""),
-            );
-            res
-        }
-        Surface::NuGet => {
-            let mut res = (
-                StatusCode::UNAUTHORIZED,
-                format!("AUTH_REQUIRED: {message}"),
-            )
-                .into_response();
-            res.headers_mut().insert(
-                header::WWW_AUTHENTICATE,
-                HeaderValue::from_str(&format!("Basic realm=\"{REALM}\""))
-                    .expect("cabecera válida"),
-            );
-            res
-        }
-    }
+    ApiError::Unauthenticated.render(surface)
 }
 
 pub async fn require_auth(
@@ -165,6 +135,7 @@ pub async fn require_auth(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::HeaderValue;
 
     fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
         let mut h = HeaderMap::new();
