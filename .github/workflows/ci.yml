@@ -16,7 +16,7 @@ env:
 jobs:
   rust:
     name: Rust (fmt, clippy, test, fronteras)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       # rustup instala la versión fijada en rust-toolchain.toml al invocar cargo.
@@ -29,14 +29,14 @@ jobs:
 
   deny:
     name: cargo-deny (licencias, advisories, fuentes)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   dotnet-conformance:
     name: .NET (fixtures de conformidad)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
