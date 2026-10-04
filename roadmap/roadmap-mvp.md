@@ -77,9 +77,9 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
 | 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
 | 3 | Superficie NuGet V3 completa | 🔵 `EN DISEÑO` | 2 | Matriz de clientes comprobados en verde. |
-| 4 | Identidad, autenticación y autorización | 🟣 `EN VALIDACIÓN` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
+| 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | ⚪ `NO INICIADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
-| 6 | API administrativa y CLI `onepack` | ⚪ `NO INICIADA` | 4 | Operación completa del registro desde terminal. |
+| 6 | API administrativa y CLI `onepack` | 🔵 `EN DISEÑO` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
 | 8 | Piloto y cierre del MVP | ⚪ `NO INICIADA` | 7 | Prueba decisiva ejecutada por un equipo real. |
 
@@ -245,7 +245,7 @@ Matriz de clientes con todas las celdas automatizables en verde en CI y las manu
 
 ## Fase 4 — Identidad, autenticación y autorización
 
-**Estatus:** 🟣 `EN VALIDACIÓN` — verde en local; falta el CI en GitHub.
+**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37182166437](https://github.com/Khr0x/onepack/actions/runs/37182166437).
 **Depende de:** Fase 2 (paralelizable con Fase 3)
 **ADRs:** [ADR-010](adr-mvp.md#adr-010), [ADR-011](adr-mvp.md#adr-011), [ADR-012](adr-mvp.md#adr-012)
 
@@ -323,7 +323,7 @@ Suite `tests/security` verde en CI y revisión manual de seguridad documentada.
 
 ## Fase 6 — API administrativa y CLI `onepack`
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 4 (paralelizable con Fase 5)
 **ADRs:** [ADR-015](adr-mvp.md#adr-015), [ADR-016](adr-mvp.md#adr-016)
 
@@ -472,3 +472,5 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 4 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada; paralelizable con la Fase 3. |
 | 2026-10-04 | 4 | `EN DISEÑO` | `EN PROGRESO` | ADR-010, 011 y 012 aceptados. |
 | 2026-10-04 | 4 | `EN PROGRESO` | `EN VALIDACIÓN` | 66 tests y E2E autenticado con dotnet verdes en local. Pendiente: CI. |
+| 2026-10-04 | 4 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37182166437](https://github.com/Khr0x/onepack/actions/runs/37182166437), con cobertura de rutas, aislamiento entre feeds y E2E autenticado. |
+| 2026-10-04 | 6 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 4) completada; paralelizable con la Fase 5. |
