@@ -78,7 +78,7 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
 | 3 | Superficie NuGet V3 completa | 🟢 `COMPLETADA` | 2 | Matriz de clientes comprobados en verde. |
 | 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
-| 5 | Endurecimiento frente a paquetes y abuso | 🟣 `EN VALIDACIÓN` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
+| 5 | Endurecimiento frente a paquetes y abuso | 🟢 `COMPLETADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | 🔵 `EN DISEÑO` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
 | 8 | Piloto y cierre del MVP | ⚪ `NO INICIADA` | 7 | Prueba decisiva ejecutada por un equipo real. |
@@ -289,7 +289,7 @@ Test de cobertura de rutas: el 100 % de rutas registradas exige autenticación s
 
 ## Fase 5 — Endurecimiento frente a paquetes y abuso
 
-**Estatus:** 🟣 `EN VALIDACIÓN`
+**Estatus:** 🟢 `COMPLETADA`
 **Depende de:** Fases 3 y 4
 **ADRs:** [ADR-013](adr-mvp.md#adr-013), [ADR-014](adr-mvp.md#adr-014), [ADR-018](adr-mvp.md#adr-018)
 
@@ -484,3 +484,4 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 5 | `NO INICIADA` | `EN DISEÑO` | Dependencias (Fases 3 y 4) completadas. |
 | 2026-10-04 | 5 | `EN DISEÑO` | `EN PROGRESO` | ADR-014 y ADR-018 aceptados. Rama `feature/phase-5-hardening` (desde esta fase, ramas git flow en inglés). |
 | 2026-10-04 | 5 | `EN PROGRESO` | `EN VALIDACIÓN` | Suite `tests/security` (16 pruebas) y E2E con bloqueo verdes en local; revisión manual en `docs/security.md`. Pendiente: CI. |
+| 2026-10-04 | 5 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37232454014](https://github.com/Khr0x/onepack/actions/runs/37232454014), con el paso "Security suite" y el E2E de bloqueo en toda la matriz (SDK 8/10, Linux con TLS, macOS, Windows). Revisión manual de seguridad en `docs/security.md`. PR Khr0x/onepack#6. |
