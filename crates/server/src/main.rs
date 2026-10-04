@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use onepack_core::{FeedName, Principal, PrincipalKind, PrincipalName, PublishPattern, Role};
-use onepack_server::{app, gc_loop};
+use onepack_server::{app, backfill_metadata, gc_loop};
 use onepack_storage::{Store, migrate};
 use tracing_subscriber::EnvFilter;
 
@@ -200,6 +200,8 @@ async fn require_feed(store: &Store, name: &str) -> CliResult<onepack_core::Feed
 async fn main() -> CliResult {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        // Sin códigos de color cuando el log va a un archivo o a journald.
+        .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
 
@@ -413,6 +415,10 @@ async fn serve(args: ServeArgs) -> CliResult {
     let store = Arc::new(Store::open(&args.data.data_dir).await?);
     let free = Store::check_data_dir(&args.data.data_dir, args.min_free_space_mib << 20).await?;
     tracing::info!(free_mib = free >> 20, "directorio de datos verificado");
+    let filled = backfill_metadata(&store).await?;
+    if filled > 0 {
+        tracing::info!(versions = filled, "metadatos rellenados");
+    }
     if !store.has_admin().await? {
         tracing::warn!("no hay ningún administrador; ejecuta `onepackd init`");
     }

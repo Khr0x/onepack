@@ -76,9 +76,9 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
 | 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
 | 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
-| 3 | Superficie NuGet V3 completa | 🔵 `EN DISEÑO` | 2 | Matriz de clientes comprobados en verde. |
+| 3 | Superficie NuGet V3 completa | 🟢 `COMPLETADA` | 2 | Matriz de clientes comprobados en verde. |
 | 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
-| 5 | Endurecimiento frente a paquetes y abuso | ⚪ `NO INICIADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
+| 5 | Endurecimiento frente a paquetes y abuso | 🔵 `EN DISEÑO` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | 🔵 `EN DISEÑO` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
 | 8 | Piloto y cierre del MVP | ⚪ `NO INICIADA` | 7 | Prueba decisiva ejecutada por un equipo real. |
@@ -204,7 +204,7 @@ Todas las pruebas bloqueantes automatizadas (tests de los crates y `tests/recove
 
 ## Fase 3 — Superficie NuGet V3 completa
 
-**Estatus:** 🔵 `EN DISEÑO`
+**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Las celdas manuales de IDE quedan diferidas al piloto (Fase 8).
 **Depende de:** Fase 2
 **ADRs:** [ADR-009](adr-mvp.md#adr-009), [ADR-013](adr-mvp.md#adr-013), [ADR-019](adr-mvp.md#adr-019)
 
@@ -212,31 +212,32 @@ Todas las pruebas bloqueantes automatizadas (tests de los crates y `tests/recove
 Implementar todos los recursos anunciados con sus requisitos reales y publicar una matriz de clientes comprobados.
 
 ### Entregables
-- [ ] `RegistrationsBaseUrl/3.6.0`: índice, páginas y hojas; grupos de dependencias por framework; rangos de versión; `listed`.
-- [ ] `SearchQueryService`: `q`, `skip`, `take`, `prerelease`, `semVerLevel`, paginación estable.
-- [ ] `SearchAutocompleteService`: ids y versiones de un id.
-- [ ] `DELETE` (unlist) y relist vía `PackagePublish`.
-- [ ] Versiones no listadas: fuera de búsqueda, presentes en flat container y descargables.
-- [ ] Soporte de SemVer 2.0.0 (`semVerLevel=2.0.0`) correctamente filtrado.
-- [ ] Generación de URLs absolutas a partir de `public_url` (no de la cabecera `Host`).
-- [ ] Corpus de paquetes de prueba creado con herramientas oficiales: multi-target, dependencias, prerelease, SemVer2, metadatos extensos, iconos/readme embebidos.
-- [ ] Matriz de clientes comprobados en `docs/compatibility.md`.
+- [x] `RegistrationsBaseUrl/3.6.0`: índice, páginas (64 versiones; inline hasta 128) y hojas; grupos de dependencias por framework con `registration` de cada dependencia; rangos; `listed` (`crates/nuget/src/v3.rs`).
+- [x] `SearchQueryService`: `q` (términos, `id:`, `packageid:`), `skip`, `take`, `prerelease`, `semVerLevel`, `packageType`; orden estable por relevancia e id.
+- [x] `SearchAutocompleteService`: ids (`q`) y versiones de un id (`id`).
+- [x] `DELETE` (unlist) y `POST` (relist) en `PackagePublish`, con permiso de publicación sobre el id y auditoría.
+- [x] Versiones no listadas: fuera de búsqueda y autocompletado, presentes en flat container y registros (`listed: false`) y descargables.
+- [x] SemVer 2.0.0 filtrado según `semVerLevel` (por defecto, solo SemVer 1.0.0).
+- [x] URLs absolutas solo desde `public_url`; test con `Host` y `X-Forwarded-*` manipulados y E2E detrás de nginx con TLS.
+- [x] Metadatos del `.nuspec` (título, autores, etiquetas, licencia, icono, readme, tipos de paquete…) guardados al publicar (migración 0003) y rellenados al arrancar para versiones anteriores.
+- [x] Corpus de paquetes creado con `dotnet pack`: multi-target con dependencias (`Dependent`), rango de dependencia (`Ranged`), prerelease SemVer 2.0.0 con metadatos extensos, icono y readme (`Rich`), y tres versiones de `Basic`.
+- [x] Matriz de clientes comprobados en [docs/compatibility.md](../docs/compatibility.md): todas las celdas automáticas en verde; las de IDE (manuales) diferidas al piloto.
 
 ### Matriz de clientes objetivo (mínimo)
-| Cliente | Plataforma | Operaciones |
-|---|---|---|
-| `dotnet` CLI (SDK LTS actual y anterior) | Linux, macOS, Windows | push, restore, search, list |
-| `nuget.exe` | Windows | push, restore, search |
-| Visual Studio / Rider | Windows / macOS | navegación y restore (manual, documentado) |
-| CI (GitHub Actions / Azure Pipelines) | Linux | restore y push con credenciales inyectadas |
+| Cliente | Plataforma | Operaciones | Prueba |
+|---|---|---|---|
+| `dotnet` CLI (SDK 10 LTS y 8 LTS anterior) | Linux, macOS, Windows | push, restore, search, list | `scripts/e2e-dotnet.sh` (Linux/macOS, SDK 8 y 10), `e2e-windows.ps1` (SDK 8) |
+| `nuget.exe` | Windows | push, restore, search | `tests/conformance-dotnet/e2e-windows.ps1` |
+| Visual Studio / Rider | Windows / macOS | navegación y restore (manual, documentado) | manual |
+| CI (GitHub Actions / Azure Pipelines) | Linux | restore y push con credenciales inyectadas | jobs de GitHub Actions; Azure Pipelines sin entorno |
 
 ### Pruebas bloqueantes
-| Escenario | Resultado esperado |
-|---|---|
-| Versión no listada | No aparece en búsqueda; sigue restaurable por versión exacta. |
-| Búsqueda paginada con prerelease y SemVer2 | Resultados coherentes con el protocolo. |
-| Dependencia transitiva con rango | `dotnet restore` resuelve la versión correcta. |
-| Detrás de reverse proxy con TLS | URLs del service index correctas. |
+| Escenario | Resultado esperado | Prueba |
+|---|---|---|
+| Versión no listada | No aparece en búsqueda; sigue restaurable por versión exacta. | `server/tests/catalog.rs`, E2E (`dotnet nuget delete`) |
+| Búsqueda paginada con prerelease y SemVer2 | Resultados coherentes con el protocolo. | `server/tests/catalog.rs`, E2E (`dotnet package search`, `nuget.exe search`) |
+| Dependencia transitiva con rango | `dotnet restore` resuelve la versión correcta. | E2E: `Ranged` → `Basic` 1.1.0 entre 1.0.0, 1.1.0 y 2.0.0; `nuget.exe install` |
+| Detrás de reverse proxy con TLS | URLs del service index correctas. | E2E con nginx + TLS (`ONEPACK_E2E_TLS=1`) y test con cabeceras manipuladas |
 
 ### Gate de salida
 Matriz de clientes con todas las celdas automatizables en verde en CI y las manuales documentadas con fecha y versión.
@@ -277,7 +278,7 @@ Autenticación obligatoria y permisos por feed aplicados en **todos** los endpoi
 | Token expirado | `401`; no se renueva implícitamente. | `server/tests/auth.rs`, `storage/tests/identity.rs` |
 | Lectura entre feeds sin permiso | Ninguna filtración vía búsqueda, autocompletado, registros, flat container, `.nuspec` o `HEAD`. | `server/tests/auth.rs` (todas las rutas existentes; búsqueda y registros se cubrirán al añadirlos en la Fase 3) |
 | Publisher fuera de su prefijo | `403` con código `AUTH_PREFIX_DENIED`. | `server/tests/auth.rs` |
-| Reader intenta publicar o hacer unlist | `403`. | `server/tests/auth.rs` (publicar; unlist llega en la Fase 3) |
+| Reader intenta publicar o hacer unlist | `403`. | `server/tests/auth.rs` (publicar y unlist) |
 | Logs tras flujo completo | No contienen ningún token. | `server/tests/recovery.rs` (`RUST_LOG=trace`), E2E con `dotnet` |
 | `dotnet restore` con credenciales por `NuGetPackageSourceCredentials_*` | Éxito. | `scripts/e2e-dotnet.sh` |
 
@@ -288,7 +289,7 @@ Test de cobertura de rutas: el 100 % de rutas registradas exige autenticación s
 
 ## Fase 5 — Endurecimiento frente a paquetes y abuso
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fases 3 y 4
 **ADRs:** [ADR-013](adr-mvp.md#adr-013), [ADR-014](adr-mvp.md#adr-014), [ADR-018](adr-mvp.md#adr-018)
 
@@ -425,6 +426,7 @@ Validar con un equipo real que el producto resuelve el problema y ejecutar la pr
 - [ ] Instalación hecha por el equipo piloto siguiendo solo la documentación.
 - [ ] Uso en builds y publicaciones habituales durante un periodo acordado (p. ej. 2–4 semanas).
 - [ ] Ejercicio de incidente: revocar credencial de CI, bloquear una versión, restaurar desde backup.
+- [ ] Verificación manual con Visual Studio y Rider (diferida desde la Fase 3), anotada en `docs/compatibility.md`.
 - [ ] Registro de fricciones, errores y peticiones; clasificación en "bloqueante MVP" / "post-MVP".
 - [ ] Corrección de todos los bloqueantes MVP.
 - [ ] Retrospectiva y actualización del orden de evolución (credential provider, S3, proxy…).
@@ -474,3 +476,7 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 4 | `EN PROGRESO` | `EN VALIDACIÓN` | 66 tests y E2E autenticado con dotnet verdes en local. Pendiente: CI. |
 | 2026-10-04 | 4 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37182166437](https://github.com/Khr0x/onepack/actions/runs/37182166437), con cobertura de rutas, aislamiento entre feeds y E2E autenticado. |
 | 2026-10-04 | 6 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 4) completada; paralelizable con la Fase 5. |
+| 2026-10-04 | 3 | `EN DISEÑO` | `EN PROGRESO` | ADR-013 aceptado. |
+| 2026-10-04 | 3 | `EN PROGRESO` | `EN VALIDACIÓN` | Tests y E2E con SDK 8 verdes en local. Pendiente: matriz en CI (SDK 8/10, macOS, Windows, TLS) e IDE manuales. |
+| 2026-10-04 | 3 | `EN VALIDACIÓN` | `COMPLETADA` | Matriz automática en verde: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Cerrada por decisión del usuario con las celdas manuales de IDE (Visual Studio, Rider) diferidas al piloto de la Fase 8. |
+| 2026-10-04 | 5 | `NO INICIADA` | `EN DISEÑO` | Dependencias (Fases 3 y 4) completadas. |

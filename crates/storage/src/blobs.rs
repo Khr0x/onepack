@@ -224,8 +224,16 @@ async fn read_dirs(dir: &Path) -> io::Result<Vec<PathBuf>> {
     Ok(dirs)
 }
 
+/// Hace durable la entrada de directorio de un rename. En Windows no se puede abrir un
+/// directorio como archivo; NTFS registra los cambios de metadatos en su journal.
+#[cfg(unix)]
 async fn sync_dir(dir: &Path) -> io::Result<()> {
     fs::File::open(dir).await?.sync_all().await
+}
+
+#[cfg(not(unix))]
+async fn sync_dir(_dir: &Path) -> io::Result<()> {
+    Ok(())
 }
 
 #[cfg(test)]

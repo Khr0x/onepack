@@ -218,6 +218,23 @@ const ROUTES: &[(&str, &str)] = &[
     ),
     ("PUT", "/nuget/internal/v2/package"),
     ("PUT", "/nuget/internal/v2/package/"),
+    ("DELETE", "/nuget/internal/v2/package/hemia.secret/1.0.0"),
+    ("POST", "/nuget/internal/v2/package/hemia.secret/1.0.0"),
+    (
+        "GET",
+        "/nuget/internal/v3/registration/hemia.secret/index.json",
+    ),
+    (
+        "GET",
+        "/nuget/internal/v3/registration/hemia.secret/1.0.0.json",
+    ),
+    (
+        "GET",
+        "/nuget/internal/v3/registration/hemia.secret/page/1.0.0/1.0.0.json",
+    ),
+    ("GET", "/nuget/internal/v3/query?q=hemia"),
+    ("GET", "/nuget/internal/v3/autocomplete?q=hemia"),
+    ("GET", "/nuget/internal/v3/autocomplete?id=hemia.secret"),
     ("GET", "/api/v1/whoami"),
     ("GET", "/api/v1/does-not-exist"),
     ("GET", "/nuget/missing/v3/index.json"),
@@ -507,4 +524,94 @@ async fn publications_and_denials_are_audited_with_the_actor() {
         &format!("reader (token {reader_id})"),
         "denied"
     ));
+}
+
+#[tokio::test]
+async fn unlist_requires_publish_rights_on_the_id() {
+    let env = env().await;
+    let (status, body, _) = env
+        .send(
+            Method::DELETE,
+            "/nuget/internal/v2/package/hemia.secret/1.0.0",
+            Auth::ApiKey(&env.reader),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(String::from_utf8_lossy(&body).starts_with("AUTH_SCOPE_MISSING"));
+
+    let (status, body, _) = env
+        .send(
+            Method::DELETE,
+            "/nuget/internal/v2/package/hemia.secret/1.0.0",
+            Auth::ApiKey(&env.ci),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "fuera de su patrón");
+    assert!(String::from_utf8_lossy(&body).starts_with("AUTH_PREFIX_DENIED"));
+
+    let (status, _) = env
+        .push(
+            "internal",
+            &nupkg("Hemia.Payments.Core", "1.0.0"),
+            Auth::ApiKey(&env.ci),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, _, _) = env
+        .send(
+            Method::DELETE,
+            "/nuget/internal/v2/package/hemia.payments.core/1.0.0",
+            Auth::ApiKey(&env.ci),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let audit = env.audit().await;
+    assert!(
+        audit
+            .iter()
+            .any(|(a, _, o)| a == "package.unlist" && o == "success")
+    );
+    assert!(
+        audit
+            .iter()
+            .any(|(a, _, o)| a == "package.unlist" && o == "denied")
+    );
+}
+
+#[tokio::test]
+async fn search_never_returns_packages_from_other_feeds() {
+    let env = env().await;
+    let (status, _) = env
+        .push(
+            "customer-a",
+            &nupkg("Customer.Only", "1.0.0"),
+            Auth::ApiKey(&env.admin),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    for uri in [
+        "/nuget/internal/v3/query?q=customer",
+        "/nuget/internal/v3/query?q=packageid:customer.only",
+        "/nuget/internal/v3/autocomplete?q=customer",
+        "/nuget/internal/v3/autocomplete?id=customer.only",
+    ] {
+        let (status, body) = env.get(uri, Auth::Basic(&env.reader)).await;
+        assert_eq!(status, StatusCode::OK, "{uri}");
+        assert!(
+            !String::from_utf8_lossy(&body).contains("Customer.Only"),
+            "{uri}"
+        );
+    }
+    assert_eq!(
+        env.get(
+            "/nuget/internal/v3/registration/customer.only/index.json",
+            Auth::Basic(&env.reader)
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
 }

@@ -79,6 +79,10 @@ pub struct NewVersion {
     pub full_version: String,
     pub is_prerelease: bool,
     pub is_semver2: bool,
+    /// Documento JSON de metadatos generado por el adaptador; el dominio no lo interpreta.
+    pub metadata: String,
+    /// Texto en minúsculas sobre el que se busca.
+    pub search_text: String,
 }
 
 impl NewVersion {
@@ -92,11 +96,19 @@ impl NewVersion {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublishedVersion {
     pub package_id: String,
+    pub package_key: String,
     pub version: String,
     pub version_key: String,
+    pub full_version: String,
+    pub is_prerelease: bool,
+    pub is_semver2: bool,
     pub blob_sha256: String,
     pub size: u64,
     pub listed: bool,
+    /// RFC 3339 (UTC).
+    pub published_at: String,
+    pub metadata: Option<String>,
+    pub search_text: Option<String>,
 }
 
 #[derive(Debug)]

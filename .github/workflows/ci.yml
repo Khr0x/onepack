@@ -42,17 +42,45 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   dotnet-conformance:
-    name: .NET (conformance with real clients)
-    runs-on: ubuntu-24.04
+    name: .NET ${{ matrix.sdk }} on ${{ matrix.os }}${{ matrix.tls && ' (TLS proxy)' || '' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, sdk: "8.0", corpus: true }
+          - { os: ubuntu-24.04, sdk: "10.0", tls: true }
+          - { os: macos-15, sdk: "8.0" }
+          - { os: macos-15, sdk: "10.0" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          global-json-file: tests/conformance-dotnet/global.json
+          dotnet-version: ${{ matrix.sdk }}.x
       - name: Show toolchain
         run: rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
       - name: Version corpus up to date with NuGet.Versioning (ADR-008)
+        if: matrix.corpus
         run: ./scripts/version-corpus.sh --check
-      - name: dotnet push / restore E2E (ADR-019)
+      - name: dotnet push / search / restore / unlist E2E (ADR-019)
         run: ./scripts/e2e-dotnet.sh
+        env:
+          ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
+          ONEPACK_E2E_TLS: ${{ matrix.tls && '1' || '0' }}
+
+  windows-conformance:
+    # The script uses tests/conformance-dotnet/global.json (SDK 8); SDK 10 is covered on Linux and macOS.
+    name: nuget.exe and .NET 8.0 on Windows
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Show toolchain
+        run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - name: nuget.exe push / search / install and dotnet restore E2E (ADR-019)
+        shell: pwsh
+        run: ./tests/conformance-dotnet/e2e-windows.ps1

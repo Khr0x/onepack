@@ -1,17 +1,19 @@
-//! Superficie compatible con NuGet V3 (ADR-009). Se anuncian `PackageBaseAddress/3.0.0` y
-//! `PackagePublish/2.0.0`; registros y búsqueda llegan en la Fase 3.
+//! Superficie compatible con NuGet V3 (ADR-009): contenido, registros, búsqueda,
+//! autocompletado y publicación. Los documentos del protocolo los genera `onepack_nuget::v3`.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Json;
 use axum::body::Body;
 use axum::extract::multipart::MultipartError;
-use axum::extract::{Extension, Multipart, Path, State};
+use axum::extract::{Extension, Multipart, Path, Query, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use onepack_core::{Access, AuthContext, Denial, Feed, NewVersion, PublishError};
+use onepack_nuget::v3::{self, FeedUrls, SearchQuery};
 use onepack_nuget::{NuGetVersion, PackageId, read_nuspec_from, read_package_from};
-use onepack_storage::{StagingError, StoreError};
+use onepack_storage::{ListedChange, StagingError, StoreError};
 use serde_json::json;
 use tokio_util::io::ReaderStream;
 
@@ -167,21 +169,239 @@ pub async fn service_index(
 ) -> ApiResult<impl IntoResponse> {
     let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
     let base = format!("{}/nuget/{}", state.public_url, feed.name);
-    Ok(Json(json!({
-        "version": "3.0.0",
-        "resources": [
-            {
-                "@id": format!("{base}/v3/flat/"),
-                "@type": "PackageBaseAddress/3.0.0",
-                "comment": "Contenido de paquetes: versiones, .nupkg y .nuspec."
+    let resource =
+        |id: String, ty: &str, comment: &str| json!({ "@id": id, "@type": ty, "comment": comment });
+    let mut resources = vec![
+        resource(
+            format!("{base}/v3/flat/"),
+            "PackageBaseAddress/3.0.0",
+            "Contenido de paquetes: versiones, .nupkg y .nuspec.",
+        ),
+        resource(
+            format!("{base}/v3/registration/"),
+            "RegistrationsBaseUrl/3.6.0",
+            "Metadatos de paquetes, incluidas versiones SemVer 2.0.0.",
+        ),
+        resource(
+            format!("{base}/v2/package"),
+            "PackagePublish/2.0.0",
+            "Publicación, unlist y relist.",
+        ),
+    ];
+    // Mismo endpoint bajo los tipos que buscan las distintas versiones del cliente; 3.5.0
+    // añade el filtro `packageType`, que también se implementa.
+    for ty in [
+        "SearchQueryService",
+        "SearchQueryService/3.0.0-beta",
+        "SearchQueryService/3.0.0-rc",
+        "SearchQueryService/3.5.0",
+    ] {
+        resources.push(resource(
+            format!("{base}/v3/query"),
+            ty,
+            "Búsqueda de paquetes.",
+        ));
+    }
+    for ty in [
+        "SearchAutocompleteService",
+        "SearchAutocompleteService/3.0.0-beta",
+        "SearchAutocompleteService/3.0.0-rc",
+        "SearchAutocompleteService/3.5.0",
+    ] {
+        resources.push(resource(
+            format!("{base}/v3/autocomplete"),
+            ty,
+            "Autocompletado de ids y versiones.",
+        ));
+    }
+    Ok(Json(json!({ "version": "3.0.0", "resources": resources })))
+}
+
+fn feed_urls(state: &AppState, feed: &Feed) -> FeedUrls {
+    FeedUrls::new(&format!("{}/nuget/{}", state.public_url, feed.name))
+}
+
+pub async fn registration_index(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
+    Path((feed_name, id)): Path<(String, String)>,
+) -> ApiResult<impl IntoResponse> {
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
+    let versions = state.store.versions(&feed, &id_key(&id)?).await?;
+    v3::registration_index(&feed_urls(&state, &feed), &versions)
+        .map(Json)
+        .ok_or(ApiError::NotFound)
+}
+
+pub async fn registration_page(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
+    Path((feed_name, id, lower, upper)): Path<(String, String, String, String)>,
+) -> ApiResult<impl IntoResponse> {
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
+    let upper = upper.strip_suffix(".json").ok_or(ApiError::NotFound)?;
+    let versions = state.store.versions(&feed, &id_key(&id)?).await?;
+    v3::registration_page(&feed_urls(&state, &feed), &versions, &lower, upper)
+        .map(Json)
+        .ok_or(ApiError::NotFound)
+}
+
+pub async fn registration_leaf(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
+    Path((feed_name, id, leaf)): Path<(String, String, String)>,
+) -> ApiResult<impl IntoResponse> {
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
+    let version = leaf.strip_suffix(".json").ok_or(ApiError::NotFound)?;
+    let published = state
+        .store
+        .version(&feed, &id_key(&id)?, &version_key(version)?)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    Ok(Json(v3::registration_leaf(
+        &feed_urls(&state, &feed),
+        &published,
+    )))
+}
+
+/// Parámetros comunes de búsqueda y autocompletado. Valores inválidos se tratan como ausentes.
+struct SearchParams {
+    query: SearchQuery,
+    prerelease: bool,
+    semver2: bool,
+}
+
+impl SearchParams {
+    fn parse(params: &HashMap<String, String>) -> Self {
+        let get = |key: &str| {
+            params
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(key))
+                .map(|(_, v)| v.as_str())
+        };
+        let number =
+            |key: &str, default: usize| get(key).and_then(|v| v.parse().ok()).unwrap_or(default);
+        Self {
+            query: SearchQuery {
+                q: get("q").unwrap_or_default().to_owned(),
+                skip: number("skip", 0),
+                take: number("take", v3::DEFAULT_TAKE),
+                package_type: get("packageType").map(str::to_owned),
             },
-            {
-                "@id": format!("{base}/v2/package"),
-                "@type": "PackagePublish/2.0.0",
-                "comment": "Publicación de paquetes."
-            }
-        ]
-    })))
+            prerelease: get("prerelease").is_some_and(|v| v.eq_ignore_ascii_case("true")),
+            // Sin `semVerLevel`, solo versiones compatibles con SemVer 1.0.0.
+            semver2: get("semVerLevel")
+                .and_then(|v| NuGetVersion::parse(v).ok())
+                .is_some_and(|v| {
+                    v.precedence_cmp(&NuGetVersion::parse("2.0.0").expect("versión válida"))
+                        .is_ge()
+                }),
+        }
+    }
+}
+
+pub async fn search(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
+    Path(feed_name): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
+) -> ApiResult<impl IntoResponse> {
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
+    let p = SearchParams::parse(&params);
+    let versions = state
+        .store
+        .listed_versions(&feed, p.prerelease, p.semver2)
+        .await?;
+    Ok(Json(v3::search(
+        &feed_urls(&state, &feed),
+        versions,
+        &p.query,
+    )))
+}
+
+pub async fn autocomplete(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
+    Path(feed_name): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
+) -> ApiResult<impl IntoResponse> {
+    let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
+    let p = SearchParams::parse(&params);
+    let versions = state
+        .store
+        .listed_versions(&feed, p.prerelease, p.semver2)
+        .await?;
+    match params.get("id") {
+        Some(id) => {
+            let key = PackageId::parse(id)
+                .map(|id| id.identity())
+                .unwrap_or_default();
+            let versions = versions
+                .into_iter()
+                .filter(|v| v.package_key == key)
+                .collect();
+            Ok(Json(v3::autocomplete_versions(versions)))
+        }
+        None => Ok(Json(v3::autocomplete_ids(versions, &p.query))),
+    }
+}
+
+/// Unlist (`DELETE`) y relist (`POST`) de `PackagePublish`. Requieren poder publicar ese id
+/// (rol Publisher y patrones del grant) y no afectan a la descarga (ADR-013).
+async fn set_listed(
+    state: &AppState,
+    auth: &AuthContext,
+    feed_name: &str,
+    id: &str,
+    version: &str,
+    listed: bool,
+) -> ApiResult<()> {
+    let feed = authorized_feed(state, auth, feed_name, Access::Publish).await?;
+    let (id, version) = (id_key(id)?, version_key(version)?);
+    if let Err(denial) = auth.check_publish(feed.id, &id) {
+        let action = if listed {
+            "package.relist"
+        } else {
+            "package.unlist"
+        };
+        state
+            .store
+            .record_denied(
+                action,
+                &auth.actor(),
+                Some(&feed),
+                Some(&format!("{id}@{version}")),
+                denial.code(),
+            )
+            .await;
+        return Err(ApiError::Forbidden(denial));
+    }
+    match state
+        .store
+        .set_listed(&feed, &id, &version, listed, &auth.actor())
+        .await?
+    {
+        ListedChange::NotFound => Err(ApiError::NotFound),
+        ListedChange::Changed | ListedChange::Unchanged => Ok(()),
+    }
+}
+
+pub async fn unlist(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
+    Path((feed_name, id, version)): Path<(String, String, String)>,
+) -> ApiResult<StatusCode> {
+    set_listed(&state, &auth, &feed_name, &id, &version, false).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn relist(
+    State(state): State<Arc<AppState>>,
+    Extension(auth): Extension<Arc<AuthContext>>,
+    Path((feed_name, id, version)): Path<(String, String, String)>,
+) -> ApiResult<StatusCode> {
+    set_listed(&state, &auth, &feed_name, &id, &version, true).await?;
+    Ok(StatusCode::OK)
 }
 
 pub async fn flat_versions(
@@ -292,6 +512,8 @@ pub async fn publish(
         full_version: manifest.version.full(),
         is_prerelease: manifest.version.is_prerelease(),
         is_semver2: manifest.version.is_semver2(),
+        metadata: v3::catalog_metadata(&manifest).to_string(),
+        search_text: v3::search_text(&manifest),
     };
     if let Err(denial) = auth.check_publish(feed.id, &new.package_key) {
         state

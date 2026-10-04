@@ -66,7 +66,7 @@ Señal concreta que justificaría reabrir la decisión.
 | [010](#adr-010) | Tokens opacos con verificador hash, no JWT | ✅ Aceptado | 4 |
 | [011](#adr-011) | Tres contextos de autenticación separados | ✅ Aceptado | 4 |
 | [012](#adr-012) | Roles por feed y restricción opcional por prefijo | ✅ Aceptado | 4 |
-| [013](#adr-013) | `listed` y `availability` como estados independientes | 📝 Propuesto | 3, 5 |
+| [013](#adr-013) | `listed` y `availability` como estados independientes | ✅ Aceptado | 3, 5 |
 | [014](#adr-014) | Paquetes como contenido no confiable con presupuesto de inspección | 📝 Propuesto | 5 |
 | [015](#adr-015) | `onepackd` y `onepack` separados; CLI con contrato estable | 📝 Propuesto | 6 |
 | [016](#adr-016) | Credenciales NuGet vía `onepack exec`; credential provider pospuesto | 📝 Propuesto | 6 |
@@ -334,6 +334,8 @@ El service index anuncia **solo** estos recursos, y únicamente cuando estén co
 
 No se implementa la API V2 (OData). `PackagePublish/2.0.0` es el recurso de publicación de V3, no la API V2.
 
+**Precisión (Fase 3, 2026-10-04).** La búsqueda y el autocompletado se anuncian también bajo `/3.0.0-beta`, `/3.0.0-rc` y `/3.5.0` (mismo endpoint), porque cada versión del cliente busca un tipo distinto; `/3.5.0` exige el filtro `packageType`, que está implementado. `RegistrationsBaseUrl/3.6.0` se sirve sin gzip: los clientes aceptan respuestas sin comprimir.
+
 ### Alternativas consideradas
 - **Implementar V2 OData** — amplía superficie para clientes antiguos sin demanda.
 - **Anunciar todo desde el spike** — confunde a clientes mientras falten recursos.
@@ -438,7 +440,7 @@ Aparezcan requisitos de grupos/equipos o SSO.
 <a id="adr-013"></a>
 ## ADR-013 — `listed` y `availability` como estados independientes
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 3, 5 · **Relacionados:** ADR-007
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 3, 5 · **Relacionados:** ADR-007
 
 ### Contexto
 En NuGet, unlist retira de búsqueda pero el paquete sigue descargable. Eso no sirve para responder a incidentes.
