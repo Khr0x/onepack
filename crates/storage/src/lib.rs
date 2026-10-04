@@ -1,6 +1,7 @@
 //! Persistencia: metadatos en SQLite y blobs direccionados por SHA-256 (ADR-004, ADR-005).
 
 pub mod blobs;
+mod catalog;
 mod identity;
 pub mod tokens;
 
@@ -14,6 +15,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 use sqlx::{Row, SqlitePool};
 
 pub use blobs::{BlobStore, StagedBlob, StagingError, StagingWriter};
+pub use catalog::{ListedChange, MissingMetadata};
 pub use identity::{AuthFailure, AuthOutcome, IssuedToken};
 
 static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
@@ -342,8 +344,8 @@ impl Store {
         .await?;
         sqlx::query(
             "INSERT INTO package_version (feed_id, normalized_package_id, normalized_version, package_id,
-                 version, full_version, is_prerelease, is_semver2, blob_sha256)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 version, full_version, is_prerelease, is_semver2, blob_sha256, metadata, search_text)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(feed.id)
         .bind(&v.package_key)
@@ -354,6 +356,8 @@ impl Store {
         .bind(v.is_prerelease)
         .bind(v.is_semver2)
         .bind(sha256)
+        .bind(&v.metadata)
+        .bind(&v.search_text)
         .execute(&mut *tx)
         .await?;
         sqlx::query(
@@ -428,7 +432,9 @@ impl Store {
         version_key: &str,
     ) -> Result<Option<PublishedVersion>, StoreError> {
         let row = sqlx::query(
-            "SELECT v.package_id, v.version, v.normalized_version, v.blob_sha256, b.size, v.listed
+            "SELECT v.package_id, v.normalized_package_id, v.version, v.normalized_version, v.full_version,
+                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.published_at,
+                    v.metadata, v.search_text
              FROM package_version v JOIN blob b ON b.sha256 = v.blob_sha256
              WHERE v.feed_id = ? AND v.normalized_package_id = ? AND v.normalized_version = ?",
         )
@@ -447,7 +453,9 @@ impl Store {
         package_key: &str,
     ) -> Result<Vec<PublishedVersion>, StoreError> {
         let rows = sqlx::query(
-            "SELECT v.package_id, v.version, v.normalized_version, v.blob_sha256, b.size, v.listed
+            "SELECT v.package_id, v.normalized_package_id, v.version, v.normalized_version, v.full_version,
+                    v.is_prerelease, v.is_semver2, v.blob_sha256, b.size, v.listed, v.published_at,
+                    v.metadata, v.search_text
              FROM package_version v JOIN blob b ON b.sha256 = v.blob_sha256
              WHERE v.feed_id = ? AND v.normalized_package_id = ?",
         )
@@ -503,14 +511,21 @@ impl Store {
     }
 }
 
-fn to_published(r: &sqlx::sqlite::SqliteRow) -> PublishedVersion {
+pub(crate) fn to_published(r: &sqlx::sqlite::SqliteRow) -> PublishedVersion {
     PublishedVersion {
         package_id: r.get("package_id"),
+        package_key: r.get("normalized_package_id"),
         version: r.get("version"),
         version_key: r.get("normalized_version"),
+        full_version: r.get("full_version"),
+        is_prerelease: r.get("is_prerelease"),
+        is_semver2: r.get("is_semver2"),
         blob_sha256: r.get("blob_sha256"),
         size: r.get::<i64, _>("size") as u64,
         listed: r.get("listed"),
+        published_at: r.get("published_at"),
+        metadata: r.get("metadata"),
+        search_text: r.get("search_text"),
     }
 }
 

@@ -1,8 +1,11 @@
-//! Lectura de `.nupkg`: localiza el `.nuspec` en la raíz del ZIP y extrae la identidad y las
-//! dependencias. No extrae nada a disco ni ejecuta contenido del paquete (ADR-014).
+//! Lectura de `.nupkg`: localiza el `.nuspec` en la raíz del ZIP y extrae la identidad, las
+//! dependencias y los metadatos. No extrae nada a disco ni ejecuta contenido del paquete
+//! (ADR-014).
 
+use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
 
+use quick_xml::escape::resolve_xml_entity;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
@@ -16,8 +19,87 @@ pub struct PackageManifest {
     pub id: PackageId,
     pub version: NuGetVersion,
     pub dependency_groups: Vec<DependencyGroup>,
+    pub metadata: Metadata,
     /// Bytes originales del `.nuspec`, para servirlos sin regenerarlos.
     pub nuspec: Vec<u8>,
+}
+
+/// Metadatos descriptivos del `.nuspec` que exponen los registros y la búsqueda.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Metadata {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub summary: Option<String>,
+    /// Lista separada por comas, tal como aparece en el `.nuspec`.
+    pub authors: Option<String>,
+    pub owners: Option<String>,
+    /// Lista separada por espacios, tal como aparece en el `.nuspec`.
+    pub tags: Option<String>,
+    pub project_url: Option<String>,
+    pub icon_url: Option<String>,
+    /// Ruta del icono embebido en el paquete.
+    pub icon: Option<String>,
+    pub license_url: Option<String>,
+    pub license: Option<License>,
+    pub require_license_acceptance: bool,
+    pub release_notes: Option<String>,
+    pub copyright: Option<String>,
+    pub language: Option<String>,
+    pub min_client_version: Option<String>,
+    /// Ruta del readme embebido en el paquete.
+    pub readme: Option<String>,
+    pub repository_url: Option<String>,
+    pub package_types: Vec<PackageType>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct License {
+    /// `expression` o `file`.
+    pub kind: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackageType {
+    pub name: String,
+    pub version: Option<String>,
+}
+
+impl Metadata {
+    pub fn tag_list(&self) -> Vec<&str> {
+        self.tags
+            .as_deref()
+            .map(|t| t.split([' ', ',', ';']).filter(|s| !s.is_empty()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn author_list(&self) -> Vec<&str> {
+        split_list(self.authors.as_deref())
+    }
+
+    pub fn owner_list(&self) -> Vec<&str> {
+        split_list(self.owners.as_deref())
+    }
+
+    /// Tipos de paquete; sin declarar, NuGet asume `Dependency`.
+    pub fn package_type_names(&self) -> Vec<&str> {
+        if self.package_types.is_empty() {
+            vec!["Dependency"]
+        } else {
+            self.package_types.iter().map(|t| t.name.as_str()).collect()
+        }
+    }
+}
+
+fn split_list(value: Option<&str>) -> Vec<&str> {
+    value
+        .map(|v| {
+            v.split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,12 +183,14 @@ pub fn read_nuspec_from<R: Read + Seek>(nupkg: R) -> Result<Vec<u8>, PackageErro
 pub fn parse_nuspec(nuspec: Vec<u8>) -> Result<PackageManifest, PackageError> {
     let invalid = |msg: String| PackageError::InvalidNuspec(msg);
     let mut reader = Reader::from_reader(nuspec.as_slice());
-    reader.config_mut().trim_text(true);
+    // Sin recortar: el texto llega en trozos separados por las entidades (`A &amp; B`) y
+    // recortarlos se comería los espacios. Se recorta el valor final.
+    reader.config_mut().trim_text(false);
 
     let mut path: Vec<String> = Vec::new();
-    let mut id = None;
-    let mut version = None;
+    let mut texts: HashMap<String, String> = HashMap::new();
     let mut groups: Vec<DependencyGroup> = Vec::new();
+    let mut metadata = Metadata::default();
     let mut buf = Vec::new();
 
     loop {
@@ -116,20 +200,46 @@ pub fn parse_nuspec(nuspec: Vec<u8>) -> Result<PackageManifest, PackageError> {
         match event {
             Event::DocType(_) => return Err(invalid("DTD no permitido".into())),
             Event::Start(e) => {
-                on_element(&e, &path, &mut groups)?;
+                on_element(&e, &path, &mut groups, &mut metadata)?;
                 path.push(local_name(&e));
             }
-            Event::Empty(e) => on_element(&e, &path, &mut groups)?,
+            Event::Empty(e) => on_element(&e, &path, &mut groups, &mut metadata)?,
             Event::End(_) => {
                 path.pop();
             }
             Event::Text(t) => {
-                let text = t.xml10_content();
-                match path_str(&path).as_str() {
-                    "package/metadata/id" => id = Some(text.trim().to_owned()),
-                    "package/metadata/version" => version = Some(text.trim().to_owned()),
-                    _ => {}
+                if let Some(field) = metadata_field(&path) {
+                    texts
+                        .entry(field.to_owned())
+                        .or_default()
+                        .push_str(&t.xml10_content());
                 }
+            }
+            Event::CData(t) => {
+                if let Some(field) = metadata_field(&path) {
+                    texts
+                        .entry(field.to_owned())
+                        .or_default()
+                        .push_str(&t.xml10_content());
+                }
+            }
+            Event::GeneralRef(r) => {
+                let Some(field) = metadata_field(&path) else {
+                    continue;
+                };
+                let resolved = if r.is_char_ref() {
+                    r.resolve_char_ref()
+                        .map_err(|e| invalid(e.to_string()))?
+                        .map(String::from)
+                } else {
+                    resolve_xml_entity(&r.xml10_content()).map(str::to_owned)
+                };
+                let resolved =
+                    resolved.ok_or_else(|| invalid("entidad XML no permitida".into()))?;
+                texts
+                    .entry(field.to_owned())
+                    .or_default()
+                    .push_str(&resolved);
             }
             Event::Eof => break,
             _ => {}
@@ -137,23 +247,77 @@ pub fn parse_nuspec(nuspec: Vec<u8>) -> Result<PackageManifest, PackageError> {
         buf.clear();
     }
 
-    let id = id.ok_or_else(|| invalid("falta <id>".into()))?;
-    let version = version.ok_or_else(|| invalid("falta <version>".into()))?;
+    let mut take = |name: &str| {
+        texts
+            .remove(name)
+            .map(|v| v.trim().to_owned())
+            .filter(|v| !v.is_empty())
+    };
+    let id = take("id").ok_or_else(|| invalid("falta <id>".into()))?;
+    let version = take("version").ok_or_else(|| invalid("falta <version>".into()))?;
+    metadata.title = take("title");
+    metadata.description = take("description");
+    metadata.summary = take("summary");
+    metadata.authors = take("authors");
+    metadata.owners = take("owners");
+    metadata.tags = take("tags");
+    metadata.project_url = take("projectUrl");
+    metadata.icon_url = take("iconUrl");
+    metadata.icon = take("icon");
+    metadata.license_url = take("licenseUrl");
+    metadata.require_license_acceptance =
+        take("requireLicenseAcceptance").is_some_and(|v| v.eq_ignore_ascii_case("true"));
+    metadata.release_notes = take("releaseNotes");
+    metadata.copyright = take("copyright");
+    metadata.language = take("language");
+    metadata.readme = take("readme");
+    if let (Some(license), Some(value)) = (metadata.license.as_mut(), take("license")) {
+        license.value = value;
+    } else {
+        metadata.license = None;
+    }
+
     Ok(PackageManifest {
         id: PackageId::parse(&id).map_err(|e| invalid(e.to_string()))?,
         version: NuGetVersion::parse(&version).map_err(|e| invalid(e.to_string()))?,
         dependency_groups: groups,
+        metadata,
         nuspec,
     })
+}
+
+/// Campo de texto de `<metadata>` en el que se está dentro, si lo hay.
+fn metadata_field(path: &[String]) -> Option<&str> {
+    match path {
+        [package, metadata, field] if package == "package" && metadata == "metadata" => Some(field),
+        _ => None,
+    }
 }
 
 fn on_element(
     e: &BytesStart<'_>,
     parent: &[String],
     groups: &mut Vec<DependencyGroup>,
+    metadata: &mut Metadata,
 ) -> Result<(), PackageError> {
     let name = local_name(e);
     match (path_str(parent).as_str(), name.as_str()) {
+        ("package", "metadata") => metadata.min_client_version = attr(e, "minClientVersion")?,
+        ("package/metadata", "license") => {
+            metadata.license = Some(License {
+                kind: attr(e, "type")?.unwrap_or_else(|| "expression".into()),
+                value: String::new(),
+            });
+        }
+        ("package/metadata", "repository") => metadata.repository_url = attr(e, "url")?,
+        ("package/metadata/packageTypes", "packageType") => {
+            if let Some(name) = attr(e, "name")? {
+                metadata.package_types.push(PackageType {
+                    name,
+                    version: attr(e, "version")?,
+                });
+            }
+        }
         ("package/metadata/dependencies", "group") => groups.push(DependencyGroup {
             target_framework: attr(e, "targetFramework")?,
             dependencies: Vec::new(),
@@ -323,6 +487,73 @@ mod tests {
         assert!(matches!(
             read_package(&nupkg(&[("A.nuspec", &huge)])),
             Err(PackageError::NuspecTooLarge)
+        ));
+    }
+
+    #[test]
+    fn reads_descriptive_metadata() {
+        let nuspec = r#"<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata minClientVersion="2.12">
+    <id>Hemia.Rich</id>
+    <version>2.0.0-beta.1+build.5</version>
+    <title>Hemia Rich</title>
+    <authors>Hemia, Cristian</authors>
+    <description>Logs &amp; traces &lt;fast&gt; &#233;xito
+  second line</description>
+    <tags>logging tracing  hemia</tags>
+    <license type="expression">MIT</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <icon>icon.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://example.test/rich</projectUrl>
+    <repository type="git" url="https://example.test/rich.git" commit="abc" />
+    <packageTypes><packageType name="DotnetTool" version="1.0" /></packageTypes>
+    <releaseNotes><![CDATA[Fixed <bugs>]]></releaseNotes>
+  </metadata>
+</package>"#;
+        let m = read_package(&nupkg(&[("Hemia.Rich.nuspec", nuspec)])).unwrap();
+        let md = &m.metadata;
+        assert_eq!(md.title.as_deref(), Some("Hemia Rich"));
+        assert_eq!(
+            md.description.as_deref(),
+            Some("Logs & traces <fast> éxito\n  second line")
+        );
+        assert_eq!(md.author_list(), ["Hemia", "Cristian"]);
+        assert_eq!(md.tag_list(), ["logging", "tracing", "hemia"]);
+        assert_eq!(
+            md.license,
+            Some(License {
+                kind: "expression".into(),
+                value: "MIT".into()
+            })
+        );
+        assert!(md.require_license_acceptance);
+        assert_eq!(md.icon.as_deref(), Some("icon.png"));
+        assert_eq!(md.readme.as_deref(), Some("README.md"));
+        assert_eq!(
+            md.repository_url.as_deref(),
+            Some("https://example.test/rich.git")
+        );
+        assert_eq!(md.min_client_version.as_deref(), Some("2.12"));
+        assert_eq!(md.package_type_names(), ["DotnetTool"]);
+        assert_eq!(md.release_notes.as_deref(), Some("Fixed <bugs>"));
+    }
+
+    #[test]
+    fn missing_package_types_default_to_dependency() {
+        let m = read_package(&nupkg(&[("A.nuspec", NUSPEC)])).unwrap();
+        assert_eq!(m.metadata.package_type_names(), ["Dependency"]);
+        assert_eq!(m.metadata.title, None);
+    }
+
+    #[test]
+    fn unknown_entities_are_rejected() {
+        let nuspec = "<package><metadata><id>A</id><version>1.0</version><title>&custom;</title></metadata></package>";
+        assert!(matches!(
+            read_package(&nupkg(&[("A.nuspec", nuspec)])),
+            Err(PackageError::InvalidNuspec(_))
         ));
     }
 }

@@ -1,13 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Consume Onepack.Fixture.Dependent desde onepackd; Onepack.Fixture.Basic llega como dependencia transitiva. -->
+  <!-- Consume paquetes desde onepackd. Onepack.Fixture.Basic llega solo como dependencia
+       transitiva: Dependent pide >= 1.0.0 y Ranged [1.1.0, 2.0.0), así que debe resolverse 1.1.0.
+       El framework se pasa desde el script para usar el del SDK en ejecución sin descargar
+       paquetes de referencia de nuget.org. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <ConsumerTargetFramework Condition="'$(ConsumerTargetFramework)' == ''">net8.0</ConsumerTargetFramework>
+    <TargetFramework>$(ConsumerTargetFramework)</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Onepack.Fixture.Dependent" Version="1.0.0" />
+    <PackageReference Include="Onepack.Fixture.Ranged" Version="1.0.0" />
+    <PackageReference Include="Onepack.Fixture.Rich" Version="2.0.0-beta.1" />
   </ItemGroup>
 
 </Project>

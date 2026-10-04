@@ -126,11 +126,17 @@ fn json_body(bytes: &[u8]) -> Value {
 #[tokio::test]
 async fn service_index_uses_public_url_and_announces_only_implemented_resources() {
     let (router, _dir) = server().await;
-    let (status, body) = get(&router, "/nuget/internal/v3/index.json").await;
+    let req = Request::get("/nuget/internal/v3/index.json")
+        .header("host", "evil.example")
+        .header("x-forwarded-host", "evil.example")
+        .header("x-forwarded-proto", "http")
+        .body(Body::empty())
+        .unwrap();
+    let (status, body) = send(&router, req).await;
     assert_eq!(status, StatusCode::OK);
     let index = json_body(&body);
     assert_eq!(index["version"], "3.0.0");
-    let resources: Vec<(String, String)> = index["resources"]
+    let mut resources: Vec<(String, String)> = index["resources"]
         .as_array()
         .unwrap()
         .iter()
@@ -141,18 +147,33 @@ async fn service_index_uses_public_url_and_announces_only_implemented_resources(
             )
         })
         .collect();
+    resources.sort();
+    let base = "https://packages.example.test/nuget/internal";
+    let mut expected: Vec<(String, String)> = vec![
+        (
+            "PackageBaseAddress/3.0.0".into(),
+            format!("{base}/v3/flat/"),
+        ),
+        ("PackagePublish/2.0.0".into(), format!("{base}/v2/package")),
+        (
+            "RegistrationsBaseUrl/3.6.0".into(),
+            format!("{base}/v3/registration/"),
+        ),
+    ];
+    for suffix in ["", "/3.0.0-beta", "/3.0.0-rc", "/3.5.0"] {
+        expected.push((
+            format!("SearchQueryService{suffix}"),
+            format!("{base}/v3/query"),
+        ));
+        expected.push((
+            format!("SearchAutocompleteService{suffix}"),
+            format!("{base}/v3/autocomplete"),
+        ));
+    }
+    expected.sort();
     assert_eq!(
-        resources,
-        vec![
-            (
-                "PackageBaseAddress/3.0.0".into(),
-                "https://packages.example.test/nuget/internal/v3/flat/".into()
-            ),
-            (
-                "PackagePublish/2.0.0".into(),
-                "https://packages.example.test/nuget/internal/v2/package".into()
-            ),
-        ]
+        resources, expected,
+        "URLs desde public_url, nunca desde Host/X-Forwarded-*"
     );
 }
 

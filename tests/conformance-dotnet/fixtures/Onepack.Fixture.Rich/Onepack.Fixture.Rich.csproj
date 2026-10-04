@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Prerelease SemVer 2.0.0 (etiqueta con punto) con metadatos extensos, icono y readme. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>Onepack.Fixture.Rich</PackageId>
+    <Version>2.0.0-beta.1</Version>
+    <Title>Onepack Rich Fixture</Title>
+    <Authors>onepack, Hemia</Authors>
+    <Description>Paquete de prueba con metadatos extensos: título, etiquetas, licencia, icono &amp; readme.</Description>
+    <PackageTags>onepack fixture metadata</PackageTags>
+    <PackageProjectUrl>https://github.com/Khr0x/onepack</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Khr0x/onepack.git</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Copyright>onepack</Copyright>
+    <PackageReleaseNotes>Primera beta.</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="icon.png" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

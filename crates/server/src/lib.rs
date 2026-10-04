@@ -43,6 +43,27 @@ pub fn app(store: Arc<Store>, public_url: &str, max_package_bytes: u64) -> Route
         // El cliente NuGet hace el PUT sobre el @id de PackagePublish con barra final.
         .route("/nuget/{feed}/v2/package", put(nuget_api::publish))
         .route("/nuget/{feed}/v2/package/", put(nuget_api::publish))
+        .route(
+            "/nuget/{feed}/v3/registration/{id}/index.json",
+            get(nuget_api::registration_index),
+        )
+        .route(
+            "/nuget/{feed}/v3/registration/{id}/page/{lower}/{upper}",
+            get(nuget_api::registration_page),
+        )
+        .route(
+            "/nuget/{feed}/v3/registration/{id}/{leaf}",
+            get(nuget_api::registration_leaf),
+        )
+        .route("/nuget/{feed}/v3/query", get(nuget_api::search))
+        .route(
+            "/nuget/{feed}/v3/autocomplete",
+            get(nuget_api::autocomplete),
+        )
+        .route(
+            "/nuget/{feed}/v2/package/{id}/{version}",
+            axum::routing::delete(nuget_api::unlist).post(nuget_api::relist),
+        )
         .route("/api/v1/whoami", get(admin_api::whoami))
         // Margen sobre el tamaño del paquete para las cabeceras multipart; el límite exacto
         // del paquete lo aplica el staging.
@@ -78,4 +99,40 @@ pub async fn gc_loop(store: Arc<Store>, interval: Duration, grace: Duration) {
             Err(e) => tracing::error!(error = %e, "fallo en la limpieza"),
         }
     }
+}
+
+/// Rellena los metadatos de versiones publicadas antes de la migración 0003 leyendo el
+/// `.nuspec` de su blob. Es idempotente: sin versiones pendientes no hace nada.
+pub async fn backfill_metadata(store: &Store) -> Result<usize, onepack_storage::StoreError> {
+    let mut filled = 0;
+    for missing in store.versions_missing_metadata().await? {
+        let blob = store
+            .blobs()
+            .open_blob(&missing.blob_sha256)
+            .await?
+            .into_std()
+            .await;
+        let manifest = tokio::task::spawn_blocking(move || onepack_nuget::read_package_from(blob))
+            .await
+            .map_err(|e| onepack_storage::StoreError::Io(std::io::Error::other(e)))?;
+        match manifest {
+            Ok(m) => {
+                let metadata = onepack_nuget::v3::catalog_metadata(&m).to_string();
+                store
+                    .set_metadata(
+                        missing.version_id,
+                        &metadata,
+                        &onepack_nuget::v3::search_text(&m),
+                    )
+                    .await?;
+                filled += 1;
+            }
+            Err(e) => tracing::error!(
+                version_id = missing.version_id,
+                error = %e,
+                "no se pudieron leer los metadatos del paquete"
+            ),
+        }
+    }
+    Ok(filled)
 }

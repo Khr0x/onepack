@@ -33,6 +33,8 @@ fn version(id: &str, v: &str) -> NewVersion {
         full_version: v.into(),
         is_prerelease: v.contains('-'),
         is_semver2: false,
+        metadata: "{}".into(),
+        search_text: id.to_lowercase(),
     }
 }
 
@@ -51,7 +53,7 @@ async fn open_requires_migrated_data_dir() {
     ));
 
     let report = migrate(dir.path()).await.unwrap();
-    assert_eq!(report.applied, 2);
+    assert_eq!(report.applied, 3);
     assert_eq!(report.backup, None, "una base nueva no necesita backup");
     assert_eq!(
         migrate(dir.path()).await.unwrap().applied,
@@ -299,4 +301,137 @@ async fn gc_removes_orphans_after_grace_and_keeps_referenced_blobs() {
         store.blobs().path(&v.blob_sha256).exists(),
         "el blob referenciado se conserva"
     );
+}
+
+#[tokio::test]
+async fn listed_versions_apply_prerelease_and_semver2_filters() {
+    let (store, _dir) = store().await;
+    let feed = feed(&store, "internal").await;
+    let mut semver2 = version("C", "1.0.0-rc.1");
+    semver2.is_semver2 = true;
+    for (v, content) in [
+        (version("A", "1.0.0"), "a"),
+        (version("B", "1.0.0-beta"), "b"),
+        (semver2, "c"),
+    ] {
+        store
+            .publish(&feed, &v, stage(&store, content.as_bytes()).await, None)
+            .await
+            .unwrap();
+    }
+    let ids = |vs: Vec<onepack_core::PublishedVersion>| {
+        vs.into_iter().map(|v| v.package_id).collect::<Vec<_>>()
+    };
+    assert_eq!(
+        ids(store.listed_versions(&feed, false, false).await.unwrap()),
+        ["A"]
+    );
+    assert_eq!(
+        ids(store.listed_versions(&feed, true, false).await.unwrap()),
+        ["A", "B"]
+    );
+    assert_eq!(
+        ids(store.listed_versions(&feed, true, true).await.unwrap()),
+        ["A", "B", "C"]
+    );
+}
+
+#[tokio::test]
+async fn unlist_hides_from_listing_but_keeps_the_version() {
+    use onepack_storage::ListedChange;
+    let (store, _dir) = store().await;
+    let feed = feed(&store, "internal").await;
+    store
+        .publish(
+            &feed,
+            &version("A", "1.0.0"),
+            stage(&store, b"a").await,
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        store
+            .set_listed(&feed, "a", "1.0.0", false, "test")
+            .await
+            .unwrap(),
+        ListedChange::Changed
+    );
+    assert_eq!(
+        store
+            .set_listed(&feed, "a", "1.0.0", false, "test")
+            .await
+            .unwrap(),
+        ListedChange::Unchanged
+    );
+    assert_eq!(
+        store
+            .set_listed(&feed, "a", "9.9.9", false, "test")
+            .await
+            .unwrap(),
+        ListedChange::NotFound
+    );
+    assert!(
+        store
+            .listed_versions(&feed, true, true)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let v = store.version(&feed, "a", "1.0.0").await.unwrap().unwrap();
+    assert!(!v.listed, "sigue existiendo, solo no listada");
+
+    assert_eq!(
+        store
+            .set_listed(&feed, "a", "1.0.0", true, "test")
+            .await
+            .unwrap(),
+        ListedChange::Changed
+    );
+    assert_eq!(
+        store
+            .listed_versions(&feed, true, true)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn missing_metadata_can_be_backfilled_once() {
+    let (store, dir) = store().await;
+    let feed = feed(&store, "internal").await;
+    store
+        .publish(
+            &feed,
+            &version("A", "1.0.0"),
+            stage(&store, b"a").await,
+            None,
+        )
+        .await
+        .unwrap();
+    // Simula una versión publicada antes de la migración 0003.
+    let pool = sqlx::SqlitePool::connect(&format!(
+        "sqlite://{}",
+        dir.path().join("metadata.sqlite").display()
+    ))
+    .await
+    .unwrap();
+    sqlx::query("UPDATE package_version SET metadata = NULL, search_text = NULL")
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+
+    let missing = store.versions_missing_metadata().await.unwrap();
+    assert_eq!(missing.len(), 1);
+    store
+        .set_metadata(missing[0].version_id, r#"{"title":"A"}"#, "a")
+        .await
+        .unwrap();
+    assert!(store.versions_missing_metadata().await.unwrap().is_empty());
+    let v = store.version(&feed, "a", "1.0.0").await.unwrap().unwrap();
+    assert_eq!(v.metadata.as_deref(), Some(r#"{"title":"A"}"#));
 }
