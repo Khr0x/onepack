@@ -79,7 +79,7 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 3 | Superficie NuGet V3 completa | 🟢 `COMPLETADA` | 2 | Matriz de clientes comprobados en verde. |
 | 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | 🟢 `COMPLETADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
-| 6 | API administrativa y CLI `onepack` | 🔵 `EN DISEÑO` | 4 | Operación completa del registro desde terminal. |
+| 6 | API administrativa y CLI `onepack` | 🟣 `EN VALIDACIÓN` | 4 | Operación completa del registro desde terminal. |
 | 7 | Operación, recuperación y distribución | ⚪ `NO INICIADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
 | 8 | Piloto y cierre del MVP | ⚪ `NO INICIADA` | 7 | Prueba decisiva ejecutada por un equipo real. |
 
@@ -326,7 +326,7 @@ Suite `tests/security` verde en CI y revisión manual de seguridad documentada.
 
 ## Fase 6 — API administrativa y CLI `onepack`
 
-**Estatus:** 🔵 `EN DISEÑO`
+**Estatus:** 🟣 `EN VALIDACIÓN`
 **Depende de:** Fase 4 (paralelizable con Fase 5)
 **ADRs:** [ADR-015](adr-mvp.md#adr-015), [ADR-016](adr-mvp.md#adr-016)
 
@@ -334,24 +334,26 @@ Suite `tests/security` verde en CI y revisión manual de seguridad documentada.
 Que el registro se opere por completo desde terminal, tanto por personas como por pipelines.
 
 ### Entregables — API `/api/v1`
-- [ ] Endpoints de feeds, principals, tokens, grants, paquetes (listar, inspeccionar, unlist/relist, block/unblock), auditoría.
-- [ ] Endpoint de capacidades y versión para negociación con el CLI.
-- [ ] Errores con código estable, mensaje, acción sugerida y `request_id`.
-- [ ] Paginación por cursor.
-- [ ] Contrato definido en `api-client` y compartido por servidor y CLI.
+- [x] Endpoints de feeds, principals, tokens, grants, paquetes (listar, inspeccionar, unlist/relist, block/unblock), auditoría.
+- [x] Endpoint de capacidades y versión para negociación con el CLI.
+- [x] Errores con código estable, mensaje, acción sugerida y `request_id`.
+- [x] Paginación por cursor.
+- [x] Contrato definido en `api-client` y compartido por servidor y CLI.
 
 ### Entregables — CLI
-- [ ] `onepack context add|list|use|remove`.
-- [ ] `onepack login|logout` con entrada sin eco o `--token-stdin`; almacenamiento en keychain del SO; error explícito si no hay keychain (sin fallback silencioso a texto plano).
-- [ ] `onepack feed create|list|show|configure`.
-- [ ] `onepack principal create|list|disable`, `onepack token create|list|revoke`, `onepack grant add|remove|list`.
-- [ ] `onepack package list|inspect|push|unlist|relist|block|unblock`, con `--skip-existing-identical`.
-- [ ] `onepack audit list`.
-- [ ] `onepack nuget init --dry-run`: genera/actualiza `NuGet.Config` con `packageSourceMapping`, preserva lo existente, muestra diff, no escribe secretos.
-- [ ] `onepack exec --feed X -- <comando>`: inyecta `NuGetPackageSourceCredentials_*` solo en el entorno del proceso hijo.
-- [ ] `onepack doctor`: DNS, TLS, autenticación, permisos, service index, `NuGet.Config`, source mapping.
-- [ ] Transversal: `--json` estable, códigos de salida documentados, `--no-input`, timeouts, datos a stdout y diagnóstico a stderr, confirmación en operaciones destructivas, autocompletado de shell.
-- [ ] Reintentos solo en operaciones idempotentes.
+- [x] `onepack context add|list|use|remove`.
+- [x] `onepack login|logout` con entrada sin eco o `--token-stdin`; almacenamiento en keychain del SO; error explícito si no hay keychain (sin fallback silencioso a texto plano).
+- [x] `onepack feed create|list|show|configure`.
+- [x] `onepack principal create|list|disable`, `onepack token create|list|revoke`, `onepack grant add|remove|list`.
+- [x] `onepack package list|inspect|push|unlist|relist|block|unblock`, con `--skip-existing-identical`.
+- [x] `onepack audit list`.
+- [x] `onepack nuget init --dry-run`: genera/actualiza `NuGet.Config` con `packageSourceMapping`, preserva lo existente, muestra diff, no escribe secretos.
+- [x] `onepack exec --feed X -- <comando>`: inyecta `NuGetPackageSourceCredentials_*` solo en el entorno del proceso hijo.
+- [x] `onepack doctor`: DNS, TLS, autenticación, permisos, service index, `NuGet.Config`, source mapping.
+- [x] Transversal: `--json` estable, códigos de salida documentados, `--no-input`, timeouts, datos a stdout y diagnóstico a stderr, confirmación en operaciones destructivas, autocompletado de shell.
+- [x] Reintentos solo en operaciones idempotentes.
+
+Evidencia: API en [docs/api.md](../docs/api.md) (contratos en `crates/api-client`), CLI en [docs/cli.md](../docs/cli.md), pruebas `crates/server/tests/admin_api.rs` y `crates/cli/tests/cli.rs` (incluye snapshot del esquema `--json` y servidor N-1), y `scripts/e2e-cli.sh` con `dotnet` real. Guía: [docs/guide-zero-to-ci.md](../docs/guide-zero-to-ci.md).
 
 ### Pruebas bloqueantes
 | Escenario | Resultado esperado |
@@ -485,3 +487,5 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 5 | `EN DISEÑO` | `EN PROGRESO` | ADR-014 y ADR-018 aceptados. Rama `feature/phase-5-hardening` (desde esta fase, ramas git flow en inglés). |
 | 2026-10-04 | 5 | `EN PROGRESO` | `EN VALIDACIÓN` | Suite `tests/security` (16 pruebas) y E2E con bloqueo verdes en local; revisión manual en `docs/security.md`. Pendiente: CI. |
 | 2026-10-04 | 5 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37232454014](https://github.com/Khr0x/onepack/actions/runs/37232454014), con el paso "Security suite" y el E2E de bloqueo en toda la matriz (SDK 8/10, Linux con TLS, macOS, Windows). Revisión manual de seguridad en `docs/security.md`. PR Khr0x/onepack#6. |
+| 2026-10-04 | 6 | `EN DISEÑO` | `EN PROGRESO` | ADR-015 y ADR-016 aceptados. Rama `feature/phase-6-admin-api-cli`. |
+| 2026-10-04 | 6 | `EN PROGRESO` | `EN VALIDACIÓN` | API `/api/v1` y CLI completos; 142 tests, `e2e-cli.sh` y la guía ejecutados en local (SDK 8). Pendiente: CI y que la guía la ejecute literalmente alguien que no escribió el código. |

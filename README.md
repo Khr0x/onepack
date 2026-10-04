@@ -13,6 +13,8 @@ Registro privado de paquetes NuGet, self-hosted y operado desde CLI.
 - [Convenciones](docs/conventions.md)
 - [Clientes comprobados](docs/compatibility.md)
 - [Seguridad: límites, cuotas y bloqueo de versiones](docs/security.md)
+- [Guía: de cero a restore en CI](docs/guide-zero-to-ci.md)
+- [CLI `onepack`](docs/cli.md) y [API `/api/v1`](docs/api.md)
 
 ## Desarrollo
 
@@ -34,15 +36,15 @@ cargo run -p onepack-server -- feed create internal --data-dir ./data
 cargo run -p onepack-server -- serve --data-dir ./data --public-url http://127.0.0.1:8080
 ```
 
-`init` escribe la credencial administrativa inicial en `./data/initial-admin-token`. Para una cuenta de CI:
+`init` escribe la credencial administrativa inicial en `./data/initial-admin-token`. El resto se opera con el CLI:
 
 ```bash
-cargo run -p onepack-server -- principal create ci --kind service --data-dir ./data
-cargo run -p onepack-server -- grant set --principal ci --feed internal --role publisher --data-dir ./data
-cargo run -p onepack-server -- token create --principal ci --data-dir ./data
+cargo run -p onepack-cli -- context add local --url http://127.0.0.1:8080
+cargo run -p onepack-cli -- login --token-stdin < ./data/initial-admin-token
+cargo run -p onepack-cli -- feed list
 ```
 
-El feed queda en `http://127.0.0.1:8080/nuget/internal/v3/index.json`. NuGet se autentica con Basic (token como contraseña) o `X-NuGet-ApiKey`. Usa HTTPS (directo o con reverse proxy) fuera de local.
+La [guía de cero a restore en CI](docs/guide-zero-to-ci.md) recorre el flujo completo: feed, cuenta de CI, token, permisos, publicación, `NuGet.Config` y restore. El feed queda en `http://127.0.0.1:8080/nuget/<feed>/v3/index.json`. Usa HTTPS (directo o con reverse proxy) fuera de local.
 
 Los límites de inspección, las cuotas por feed y el bloqueo de versiones (`onepackd feed quota`, `onepackd package block`) se describen en [docs/security.md](docs/security.md). `onepackd serve --help` lista todos los límites.
 

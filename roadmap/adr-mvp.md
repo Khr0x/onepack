@@ -68,8 +68,8 @@ Señal concreta que justificaría reabrir la decisión.
 | [012](#adr-012) | Roles por feed y restricción opcional por prefijo | ✅ Aceptado | 4 |
 | [013](#adr-013) | `listed` y `availability` como estados independientes | ✅ Aceptado | 3, 5 |
 | [014](#adr-014) | Paquetes como contenido no confiable con presupuesto de inspección | ✅ Aceptado | 5 |
-| [015](#adr-015) | `onepackd` y `onepack` separados; CLI con contrato estable | 📝 Propuesto | 6 |
-| [016](#adr-016) | Credenciales NuGet vía `onepack exec`; credential provider pospuesto | 📝 Propuesto | 6 |
+| [015](#adr-015) | `onepackd` y `onepack` separados; CLI con contrato estable | ✅ Aceptado | 6 |
+| [016](#adr-016) | Credenciales NuGet vía `onepack exec`; credential provider pospuesto | ✅ Aceptado | 6 |
 | [017](#adr-017) | Backup consistente en modo mantenimiento | 📝 Propuesto | 7 |
 | [018](#adr-018) | `public_url` explícito y blobs solo a través del servidor | ✅ Aceptado | 3, 7 |
 | [019](#adr-019) | Conformidad probada con clientes .NET reales, sin .NET en runtime | ✅ Aceptado | 0, 1 |
@@ -505,7 +505,7 @@ Se añada verificación de firmas o integración con escáneres.
 <a id="adr-015"></a>
 ## ADR-015 — `onepackd` y `onepack` separados; CLI con contrato estable
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 6 · **Relacionados:** ADR-003, ADR-016
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 6 · **Relacionados:** ADR-003, ADR-016
 
 ### Contexto
 El CLI es la interfaz principal del producto, usada por personas y por pipelines.
@@ -522,6 +522,8 @@ El CLI es la interfaz principal del producto, usada por personas y por pipelines
 - **Un solo binario con subcomandos de servidor y cliente** — obliga a distribuir el servidor a todas las estaciones.
 - **Script sobre `curl`** — sin manejo de credenciales ni contrato estable.
 
+**Precisión (Fase 6, 2026-10-04).** Los códigos de salida y el contrato de salida están en [docs/cli.md](../docs/cli.md); la forma del `--json` está fijada por un snapshot en las pruebas. `ONEPACK_KEYRING=off` desactiva el keychain de forma explícita (CI, contenedores): `login` falla con `KEYCHAIN_UNAVAILABLE` en lugar de guardar el token en otro sitio. Un servidor sin `/api/v1/capabilities` (anterior a la Fase 6) se trata como uno sin capacidades administrativas. El `request_id` lo genera siempre el servidor y viaja en `X-Request-Id`.
+
 ### Consecuencias
 - Cambios incompatibles en `--json` o códigos de salida exigen versión mayor del CLI.
 - `onepack doctor` se trata como funcionalidad de producto, no como utilidad de depuración.
@@ -534,7 +536,7 @@ Se añada UI web o SDK de terceros sobre `/api/v1`.
 <a id="adr-016"></a>
 ## ADR-016 — Credenciales NuGet vía `onepack exec`; credential provider pospuesto
 
-**Estatus:** 📝 Propuesto · **Fecha:** 2026-10-03 · **Fase:** 6 · **Relacionados:** ADR-011, ADR-015
+**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 6 · **Relacionados:** ADR-011, ADR-015
 
 ### Contexto
 Guardar un token en el CLI no hace que `dotnet restore` lo lea. El cifrado de contraseñas en `NuGet.Config` solo funciona en Windows.
@@ -548,6 +550,8 @@ Guardar un token en el CLI no hace que `dotnet restore` lo lea. El cifrado de co
 ### Alternativas consideradas
 - **Escribir el token en `NuGet.Config`** — texto plano fuera de Windows; riesgo de commit accidental.
 - **Credential provider en el MVP** — mejor experiencia en IDE, pero protocolo de plugin adicional y más superficie.
+
+**Precisión (Fase 6, 2026-10-04).** La clave de fuente es `onepack_<feed>` (con `-` cambiado por `_`), de modo que la variable `NuGetPackageSourceCredentials_onepack_<feed>` es válida en cualquier shell. Si el `NuGet.Config` no tenía `packageSourceMapping`, `nuget init` mapea sus otras fuentes (y `nuget.org` si el archivo hereda fuentes) a `*`, para no romper restores existentes.
 
 ### Consecuencias
 - La experiencia en IDE requiere configuración manual documentada durante el MVP.

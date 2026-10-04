@@ -4,6 +4,7 @@ pub mod admin_api;
 pub mod auth;
 pub mod limits;
 pub mod nuget_api;
+pub mod request_id;
 
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -79,10 +80,53 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
             "/nuget/{feed}/v2/package/{id}/{version}",
             axum::routing::delete(nuget_api::unlist).post(nuget_api::relist),
         )
+        .route("/api/v1/capabilities", get(admin_api::capabilities))
         .route("/api/v1/whoami", get(admin_api::whoami))
+        .route(
+            "/api/v1/feeds",
+            get(admin_api::list_feeds).post(admin_api::create_feed),
+        )
+        .route(
+            "/api/v1/feeds/{feed}",
+            get(admin_api::get_feed).patch(admin_api::configure_feed),
+        )
+        .route(
+            "/api/v1/principals",
+            get(admin_api::list_principals).post(admin_api::create_principal),
+        )
+        .route(
+            "/api/v1/principals/{name}/disable",
+            post(admin_api::disable_principal),
+        )
+        .route(
+            "/api/v1/tokens",
+            get(admin_api::list_tokens).post(admin_api::create_token),
+        )
+        .route("/api/v1/tokens/{id}/revoke", post(admin_api::revoke_token))
+        .route("/api/v1/grants", get(admin_api::list_grants))
+        .route(
+            "/api/v1/feeds/{feed}/grants/{principal}",
+            put(admin_api::set_grant).delete(admin_api::remove_grant),
+        )
+        .route(
+            "/api/v1/feeds/{feed}/packages",
+            get(admin_api::list_packages),
+        )
+        .route(
+            "/api/v1/feeds/{feed}/packages/{id}",
+            get(admin_api::package_versions),
+        )
         .route(
             "/api/v1/feeds/{feed}/packages/{id}/{version}",
             get(admin_api::package_version),
+        )
+        .route(
+            "/api/v1/feeds/{feed}/packages/{id}/{version}/unlist",
+            post(admin_api::unlist),
+        )
+        .route(
+            "/api/v1/feeds/{feed}/packages/{id}/{version}/relist",
+            post(admin_api::relist),
         )
         .route(
             "/api/v1/feeds/{feed}/packages/{id}/{version}/block",
@@ -92,6 +136,7 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
             "/api/v1/feeds/{feed}/packages/{id}/{version}/unblock",
             post(admin_api::unblock),
         )
+        .route("/api/v1/audit", get(admin_api::list_audit))
         // Margen sobre el tamaño del paquete para las cabeceras multipart; el límite exacto
         // del paquete lo aplica el staging.
         .layer(DefaultBodyLimit::max(
@@ -110,6 +155,8 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
         ))
         // Las trazas HTTP registran método y ruta, nunca cabeceras: los tokens no llegan al log.
         .layer(TraceLayer::new_for_http())
+        // La más externa: también los rechazos por límite de IP llevan request_id.
+        .layer(middleware::from_fn(request_id::assign))
         .with_state(state)
 }
 

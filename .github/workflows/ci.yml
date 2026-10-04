@@ -70,6 +70,10 @@ jobs:
         env:
           ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
           ONEPACK_E2E_TLS: ${{ matrix.tls && '1' || '0' }}
+      - name: onepack CLI end to end, no UI (ADR-015, ADR-016)
+        run: ./scripts/e2e-cli.sh
+        env:
+          ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
 
   windows-conformance:
     # The script uses tests/conformance-dotnet/global.json (SDK 8); SDK 10 is covered on Linux and macOS.

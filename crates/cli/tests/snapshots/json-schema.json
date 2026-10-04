@@ -1,0 +1,194 @@
+{
+  "audit list": [
+    {
+      "action": "string",
+      "actor": "string",
+      "detail": "null",
+      "feed": "string",
+      "id": "number",
+      "occurred_at": "string",
+      "outcome": "string",
+      "resource": "string"
+    }
+  ],
+  "context list": [
+    {
+      "current": "bool",
+      "name": "string",
+      "url": "string"
+    }
+  ],
+  "doctor": {
+    "checks": [
+      {
+        "message": "string",
+        "name": "string",
+        "status": "string"
+      }
+    ],
+    "context": "string",
+    "ok": "bool",
+    "url": "string"
+  },
+  "error": {
+    "error": {
+      "action": "string",
+      "code": "string",
+      "message": "string",
+      "request_id": "string"
+    }
+  },
+  "feed configure": {
+    "created_at": "string",
+    "max_storage_bytes": "null",
+    "max_versions": "number",
+    "name": "string",
+    "storage_bytes": "number",
+    "versions": "number"
+  },
+  "feed create": {
+    "created_at": "string",
+    "max_storage_bytes": "null",
+    "max_versions": "null",
+    "name": "string",
+    "storage_bytes": "number",
+    "versions": "number"
+  },
+  "feed list": [
+    {
+      "created_at": "string",
+      "max_storage_bytes": "null",
+      "max_versions": "null",
+      "name": "string",
+      "storage_bytes": "number",
+      "versions": "number"
+    }
+  ],
+  "feed show": {
+    "created_at": "string",
+    "max_storage_bytes": "null",
+    "max_versions": "null",
+    "name": "string",
+    "storage_bytes": "number",
+    "versions": "number"
+  },
+  "grant add": {
+    "feed": "string",
+    "principal": "string",
+    "publish_patterns": [],
+    "role": "string"
+  },
+  "grant list": [
+    {
+      "feed": "string",
+      "principal": "string",
+      "publish_patterns": [],
+      "role": "string"
+    }
+  ],
+  "nuget init": {
+    "changed": "bool",
+    "created": "bool",
+    "diff": "string",
+    "notes": [
+      "string"
+    ],
+    "path": "string",
+    "sources": [
+      {
+        "key": "string",
+        "url": "string"
+      }
+    ],
+    "written": "bool"
+  },
+  "package inspect": [
+    {
+      "availability": "string",
+      "blocked_reason": "null",
+      "feed": "string",
+      "id": "string",
+      "listed": "bool",
+      "published_at": "string",
+      "sha256": "string",
+      "size": "number",
+      "version": "string"
+    }
+  ],
+  "package inspect version": {
+    "availability": "string",
+    "blocked_reason": "null",
+    "feed": "string",
+    "id": "string",
+    "listed": "bool",
+    "published_at": "string",
+    "sha256": "string",
+    "size": "number",
+    "version": "string"
+  },
+  "package list": [
+    {
+      "id": "string",
+      "latest_version": "string",
+      "versions": "number"
+    }
+  ],
+  "package push": [
+    {
+      "file": "string",
+      "id": "string",
+      "sha256": "string",
+      "status": "string",
+      "version": "string"
+    }
+  ],
+  "package unlist": {
+    "availability": "string",
+    "changed": "bool",
+    "feed": "string",
+    "id": "string",
+    "listed": "bool",
+    "version": "string"
+  },
+  "principal create": {
+    "administrator": "bool",
+    "created_at": "string",
+    "disabled": "bool",
+    "kind": "string",
+    "name": "string"
+  },
+  "principal list": [
+    {
+      "administrator": "bool",
+      "created_at": "string",
+      "disabled": "bool",
+      "kind": "string",
+      "name": "string"
+    }
+  ],
+  "token create": {
+    "expires_at": "string",
+    "id": "string",
+    "principal": "string",
+    "token": "string"
+  },
+  "token list": [
+    {
+      "created_at": "string",
+      "expires_at": "string",
+      "id": "string",
+      "last_used_at": "null",
+      "name": "string",
+      "principal": "string",
+      "revoked_at": "null"
+    }
+  ],
+  "whoami": {
+    "administrator": "bool",
+    "grants": [],
+    "kind": "string",
+    "principal": "string",
+    "token_expires_at": "string",
+    "token_id": "string"
+  }
+}
