@@ -528,19 +528,35 @@ fn exec_injects_credentials_only_into_the_child() {
     let s = server();
     let cli = Cli::new();
     context(&cli, &s);
+    // Un administrador accede a cualquier feed: una variable por feed.
     let r = cli.ok(
         &[
             "exec", "--feed", "internal", "--feed", "customer-a", "--", "sh", "-c",
             "printf '%s\\n%s' \"$NuGetPackageSourceCredentials_onepack_internal\" \"$NuGetPackageSourceCredentials_onepack_customer_a\"",
         ],
-        &s.reader,
+        &s.admin,
     );
     let lines: Vec<&str> = r.stdout.lines().collect();
-    let expected = format!("Username=onepack;Password={}", s.reader);
-    assert_eq!(lines, [expected.as_str(), expected.as_str()]);
+    let as_admin = format!("Username=onepack;Password={}", s.admin);
+    assert_eq!(lines, [as_admin.as_str(), as_admin.as_str()]);
     // El proceso padre no recibe nada y no se escribe nada a disco.
     assert!(std::env::var("NuGetPackageSourceCredentials_onepack_internal").is_err());
-    assert!(!cli.files_contain(&s.reader));
+    assert!(!cli.files_contain(&s.admin));
+
+    let r = cli.ok(
+        &[
+            "exec",
+            "--feed",
+            "internal",
+            "--",
+            "sh",
+            "-c",
+            "printf %s \"$NuGetPackageSourceCredentials_onepack_internal\"",
+        ],
+        &s.reader,
+    );
+    let expected = format!("Username=onepack;Password={}", s.reader);
+    assert_eq!(r.stdout, expected);
 
     // El código de salida del hijo se propaga.
     let failing = cli.run(
@@ -563,6 +579,79 @@ fn exec_injects_credentials_only_into_the_child() {
         &s.reader,
     );
     assert_eq!(custom.stdout, expected);
+}
+
+/// Con un token inválido o sin acceso al feed, NuGet solo diría NU1301: `exec` lo detecta antes
+/// de lanzar el comando. Si el servidor no responde, avisa y ejecuta (puede bastar la caché).
+#[cfg(unix)]
+#[test]
+fn exec_checks_the_credential_before_running_the_command() {
+    let s = server();
+    let cli = Cli::new();
+    context(&cli, &s);
+    let marker = cli.cwd.path().join("ran");
+    let touch = format!("touch {}", marker.display());
+
+    let bad = cli.run(
+        &[
+            "--json", "exec", "--feed", "internal", "--", "sh", "-c", &touch,
+        ],
+        "opk_0000000000000000_invalid",
+    );
+    assert_eq!(bad.code, 3, "{}", bad.stderr);
+    assert!(
+        bad.error_json()["error"]["action"]
+            .as_str()
+            .unwrap()
+            .contains("token nuevo")
+    );
+    assert!(!marker.exists(), "no debe ejecutar el comando");
+
+    let scope = cli.run(
+        &[
+            "--json",
+            "exec",
+            "--feed",
+            "customer-a",
+            "--",
+            "sh",
+            "-c",
+            &touch,
+        ],
+        &s.reader,
+    );
+    assert_eq!(scope.code, 4, "{}", scope.stderr);
+    let e = &scope.error_json()["error"];
+    assert_eq!(e["code"], "AUTH_SCOPE_MISSING");
+    assert!(
+        e["action"]
+            .as_str()
+            .unwrap()
+            .contains("--feed customer-a --role reader")
+    );
+    assert!(!marker.exists());
+
+    // Servidor caído: aviso y el comando se ejecuta.
+    let down = cli
+        .command(&[
+            "--url",
+            "http://127.0.0.1:9",
+            "--token-env",
+            "T",
+            "exec",
+            "--feed",
+            "internal",
+            "--",
+            "sh",
+            "-c",
+            &touch,
+        ])
+        .env("T", &s.reader)
+        .output()
+        .unwrap();
+    assert_eq!(down.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&down.stderr).contains("no se pudo comprobar la credencial"));
+    assert!(marker.exists());
 }
 
 #[test]

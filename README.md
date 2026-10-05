@@ -15,7 +15,8 @@ Registro privado de paquetes NuGet, self-hosted y operado desde CLI.
 - [Seguridad: límites, cuotas y bloqueo de versiones](docs/security.md)
 - [Guía: de cero a restore en CI](docs/guide-zero-to-ci.md)
 - [CLI `onepack`](docs/cli.md) y [API `/api/v1`](docs/api.md)
-- Operación: [instalación](docs/runbooks/install.md), [backup y restauración](docs/runbooks/backup-restore.md), [actualización](docs/runbooks/upgrade.md), [observabilidad](docs/operations.md) y [rendimiento](docs/performance.md)
+- Operación: [instalación](docs/runbooks/install.md), [backup y restauración](docs/runbooks/backup-restore.md), [actualización](docs/runbooks/upgrade.md), [ejercicio de incidente](docs/runbooks/incident-drill.md), [release](docs/runbooks/release.md), [observabilidad](docs/operations.md) y [rendimiento](docs/performance.md)
+- [Piloto](docs/pilot/README.md) y [registro de fricciones](docs/pilot/friction-log.md)
 
 ## Desarrollo
 

@@ -82,6 +82,8 @@ onepack nuget init --feed internal --pattern 'Hemia.*' --yes
 
 **`onepack exec`** ejecuta un comando con `NuGetPackageSourceCredentials_<clave>` definida **solo en el entorno del proceso hijo**. El token no se escribe en disco ni queda en el shell. El código de salida es el del comando.
 
+Antes de lanzarlo, `exec` comprueba la credencial (`GET /api/v1/whoami`): sin esa comprobación, NuGet solo diría `NU1301: no se puede cargar el índice de servicio`. Si el token no es válido (revocado, caducado o de un principal desactivado), falla con salida 3; si no tiene acceso a alguno de los feeds, con salida 4 y `AUTH_SCOPE_MISSING`. En ambos casos el comando no se ejecuta. Si el servidor no responde, avisa y ejecuta el comando igualmente: puede bastar la caché local.
+
 ```bash
 onepack exec --feed internal -- dotnet restore
 onepack exec --feed internal --feed customer-a -- dotnet build

@@ -27,6 +27,12 @@ jobs:
           - { os: windows-2025, target: x86_64-pc-windows-msvc }
     steps:
       - uses: actions/checkout@v4
+      - name: Tag matches the crate version
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          crate=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(json.load(sys.stdin)["packages"][0]["version"])')
+          [ "v$crate" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != workspace version $crate"; exit 1; }
       - name: Install musl tools
         if: matrix.musl
         run: sudo apt-get update && sudo apt-get install -y musl-tools
@@ -64,9 +70,34 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  verify:
+    # The decisive test against the release binaries themselves, not a debug build.
+    name: Decisive test with the release binaries (Linux x86-64)
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-x86_64-unknown-linux-musl
+          path: dist
+      - name: Unpack
+        run: |
+          mkdir -p bin
+          for f in dist/*.tar.gz; do tar -xzf "$f" -C dist; done
+          cp dist/*/onepack dist/*/onepackd bin/
+          file bin/*
+      - name: Install, publish, CI restore, revoke, block and recover
+        run: ./scripts/e2e-decisive.sh
+        env:
+          ONEPACK_BIN_DIR: bin
+
   publish:
     name: Checksums, signature and release
-    needs: build
+    needs: [build, verify]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
