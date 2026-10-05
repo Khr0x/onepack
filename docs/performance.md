@@ -54,7 +54,7 @@ La subida se escribe en staging mientras llega y la descarga se transmite desde 
 
 ### Contenedor, 2 vCPU / 1 GiB
 
-Lo mide el job *Benchmark* del CI en `ubuntu-24.04`, con la imagen limitada con `--cpus 2 --memory 1g`. Los resultados de la ejecución que cierra la fase se anotan aquí.
+Lo mide el job *Benchmark* del CI en `ubuntu-24.04`, con la imagen limitada con `--cpus 2 --memory 1g`. El job pasó en la ejecución que cerró la Fase 7 ([CI run 37247176082](https://github.com/Khr0x/onepack/actions/runs/37247176082)); sus cifras están en el resumen del job y en el artefacto `bench-results`, y se transcribirán aquí en la Fase 8.
 
 | Medida | Resultado | Objetivo |
 |---|---|---|
