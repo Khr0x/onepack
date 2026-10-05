@@ -1559,6 +1559,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "onepack-bench"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "onepack-cli"
 version = "0.0.0"
 dependencies = [
@@ -1602,6 +1610,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
+ "fs4",
  "futures-util",
  "getrandom 0.4.3",
  "http-body-util",
@@ -1630,6 +1639,7 @@ dependencies = [
  "fs4",
  "getrandom 0.4.3",
  "onepack-core",
+ "serde",
  "serde_json",
  "sha2 0.11.0",
  "sqlx",
@@ -2704,6 +2714,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-serde"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "704b1aeb7be0d0a84fc9828cae51dab5970fee5088f83d1dd7ee6f6246fc6ff1"
+dependencies = [
+ "serde",
+ "tracing-core",
+]
+
+[[package]]
 name = "tracing-subscriber"
 version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2713,12 +2733,15 @@ dependencies = [
  "nu-ansi-term",
  "once_cell",
  "regex-automata",
+ "serde",
+ "serde_json",
  "sharded-slab",
  "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",
  "tracing-log",
+ "tracing-serde",
 ]
 
 [[package]]

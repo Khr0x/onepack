@@ -1,0 +1,105 @@
+name: Release
+
+# Tag v* -> builds, checksums, keyless signature (Sigstore) and a draft GitHub release.
+# workflow_dispatch -> same build and signature, kept as workflow artifacts (no release).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Server and CLI: static Linux binaries (musl).
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-musl, server: true, musl: true }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, server: true, musl: true }
+          # CLI only.
+          - { os: macos-15, target: aarch64-apple-darwin }
+          - { os: macos-15, target: x86_64-apple-darwin }
+          - { os: windows-2025, target: x86_64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install musl tools
+        if: matrix.musl
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
+      - name: Build
+        shell: bash
+        run: |
+          packages="-p onepack-cli"
+          if [ "${{ matrix.server }}" = "true" ]; then packages="$packages -p onepack-server"; fi
+          cargo build --release --locked --target ${{ matrix.target }} $packages
+      - name: Package
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version=${GITHUB_REF_NAME#v}; else version=0.0.0-dev.${GITHUB_SHA::7}; fi
+          ext=""
+          case "${{ matrix.target }}" in *windows*) ext=.exe ;; esac
+          mkdir -p dist
+          for bin in onepack onepackd; do
+            exe="target/${{ matrix.target }}/release/$bin$ext"
+            [ -f "$exe" ] || continue
+            name="$bin-$version-${{ matrix.target }}"
+            mkdir "$name"
+            cp "$exe" README.md "$name/"
+            if [ -n "$ext" ]; then
+              7z a -tzip "dist/$name.zip" "$name" >/dev/null
+            else
+              tar -czf "dist/$name.tar.gz" "$name"
+            fi
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Checksums, signature and release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - uses: sigstore/cosign-installer@v3
+      - name: Keyless signature of the checksums
+        working-directory: dist
+        run: cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
+      - name: Verify the signature
+        working-directory: dist
+        run: |
+          cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: dist/*
+      - name: Draft GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft \
+            --title "onepack $GITHUB_REF_NAME" \
+            --notes "Binaries, SHA256SUMS and its Sigstore bundle. Verification: docs/runbooks/install.md."

@@ -1,0 +1,26 @@
+# Imagen de onepackd (Fase 7): binario estático (musl) sobre distroless, sin root.
+#   docker build -f packaging/container/Containerfile -t onepackd .
+# Uso: packaging/README.md.
+
+FROM rust:1-alpine AS build
+RUN apk add --no-cache musl-dev
+WORKDIR /src
+COPY . .
+# La versión exacta de Rust la fija rust-toolchain.toml.
+RUN cargo build --release --locked -p onepack-server \
+    && install -D target/release/onepackd /out/onepackd \
+    && mkdir -p /out/data
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/onepackd /usr/local/bin/onepackd
+# El volumen hereda el propietario: el usuario sin privilegios puede escribir en él.
+COPY --from=build --chown=65532:65532 /out/data /data
+ENV ONEPACK_DATA_DIR=/data \
+    ONEPACK_LISTEN=0.0.0.0:8080 \
+    ONEPACK_OPS_LISTEN=0.0.0.0:9464 \
+    ONEPACK_LOG_FORMAT=json
+VOLUME ["/data"]
+EXPOSE 8080 9464
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/onepackd"]
+CMD ["serve"]

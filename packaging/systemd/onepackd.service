@@ -1,0 +1,53 @@
+# Unidad systemd de onepackd (Fase 7). Instalación: packaging/README.md.
+[Unit]
+Description=onepack: registro privado de paquetes NuGet
+Documentation=https://github.com/Khr0x/onepack
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=onepack
+Group=onepack
+EnvironmentFile=/etc/onepack/onepackd.env
+ExecStart=/usr/local/bin/onepackd serve
+Restart=on-failure
+RestartSec=2
+# Al parar, SIGTERM: termina las peticiones en curso.
+TimeoutStopSec=30
+LimitNOFILE=65536
+
+# Datos en /var/lib/onepack, propiedad del usuario del servicio y con permisos 0700.
+StateDirectory=onepack
+StateDirectoryMode=0700
+UMask=0077
+
+# Endurecimiento: el proceso solo puede escribir en su directorio de datos.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+
+[Install]
+WantedBy=multi-user.target

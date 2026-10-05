@@ -80,8 +80,8 @@ Cada entregable dentro de una fase usa una casilla con marcador:
 | 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
 | 5 | Endurecimiento frente a paquetes y abuso | 🟢 `COMPLETADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
 | 6 | API administrativa y CLI `onepack` | 🟢 `COMPLETADA` | 4 | Operación completa del registro desde terminal. |
-| 7 | Operación, recuperación y distribución | 🔵 `EN DISEÑO` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
-| 8 | Piloto y cierre del MVP | ⚪ `NO INICIADA` | 7 | Prueba decisiva ejecutada por un equipo real. |
+| 7 | Operación, recuperación y distribución | 🟢 `COMPLETADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
+| 8 | Piloto y cierre del MVP | 🔵 `EN DISEÑO` | 7 | Prueba decisiva ejecutada por un equipo real. |
 
 ```mermaid
 flowchart LR
@@ -374,7 +374,7 @@ Guía "de cero a restore en CI" en `docs/` ejecutada literalmente por alguien qu
 
 ## Fase 7 — Operación, recuperación y distribución
 
-**Estatus:** 🔵 `EN DISEÑO`
+**Estatus:** 🟢 `COMPLETADA`
 **Depende de:** Fases 5 y 6
 **ADRs:** [ADR-017](adr-mvp.md#adr-017), [ADR-018](adr-mvp.md#adr-018), [ADR-020](adr-mvp.md#adr-020)
 
@@ -382,29 +382,31 @@ Guía "de cero a restore en CI" en `docs/` ejecutada literalmente por alguien qu
 Que el servicio se pueda instalar, actualizar, observar y recuperar de forma predecible.
 
 ### Entregables — Recuperación
-- [ ] Modo mantenimiento: pausa mutaciones y limpieza de blobs.
-- [ ] `onepackd backup`: SQLite Online Backup API + blobs referenciados + configuración + manifiesto con hashes.
-- [ ] `onepackd restore` sobre directorio vacío, con verificación del manifiesto.
-- [ ] `onepackd check`: integridad BD ↔ blobs (faltantes, huérfanos, hashes incorrectos).
-- [ ] Migraciones: versión de esquema, comprobación previa, backup automático antes de migrar, forward-only.
+- [x] Modo mantenimiento: pausa mutaciones y limpieza de blobs.
+- [x] `onepackd backup`: copia consistente de la base (`VACUUM INTO`, ver precisión en ADR-017) + blobs referenciados verificados + manifiesto con hashes. La configuración del servicio no vive en el directorio de datos: se documenta guardarla aparte.
+- [x] `onepackd restore` sobre directorio vacío, con verificación del manifiesto.
+- [x] `onepackd check`: integridad BD ↔ blobs (faltantes, huérfanos, hashes incorrectos).
+- [x] Migraciones: versión de esquema, comprobación previa (`migrate --check`), backup automático antes de migrar, forward-only.
 
 ### Entregables — Observabilidad
-- [ ] Logs estructurados JSON con `request_id`.
-- [ ] Endpoint de métricas (requests, latencias, subidas, rechazos, espacio en disco).
-- [ ] `/healthz` (vivo) y `/readyz` (BD y almacenamiento accesibles).
+- [x] Logs estructurados JSON con `request_id`.
+- [x] Endpoint de métricas (requests, latencias, subidas, rechazos, espacio en disco).
+- [x] `/healthz` (vivo) y `/readyz` (BD y almacenamiento accesibles).
 
 ### Entregables — Distribución
-- [ ] Binarios servidor: Linux x86-64 y ARM64.
-- [ ] Binarios CLI: Linux, macOS (x86-64/ARM64), Windows.
-- [ ] Unidad systemd con hardening (`ProtectSystem`, `NoNewPrivileges`, usuario dedicado).
-- [ ] Imagen de contenedor opcional (no root, volumen de datos).
-- [ ] Ejemplos de reverse proxy (Nginx/Caddy) que **no** sirven blobs directamente.
-- [ ] Checksums y firma de los artefactos de release.
+- [-] Binarios servidor: Linux x86-64 y ARM64 (estáticos, musl). Workflow `release.yml` listo; primera ejecución diferida a la Fase 8.
+- [-] Binarios CLI: Linux, macOS (x86-64/ARM64), Windows. Mismo workflow; primera ejecución diferida a la Fase 8.
+- [x] Unidad systemd con hardening (`ProtectSystem`, `NoNewPrivileges`, usuario dedicado).
+- [x] Imagen de contenedor opcional (no root, volumen de datos).
+- [x] Ejemplos de reverse proxy (Nginx/Caddy) que **no** sirven blobs directamente.
+- [-] Checksums y firma de los artefactos de release (SHA-256 + cosign keyless, verificada en el propio workflow). Primera ejecución diferida a la Fase 8.
 
 ### Entregables — Rendimiento
-- [ ] Benchmark reproducible en 2 vCPU / 1 GB / SSD.
-- [ ] Medición de objetivos: arranque < 2 s, RSS en reposo < 100 MiB, p95 metadatos < 50 ms, memoria acotada en transferencias.
-- [ ] Reporte con resultados reales (los objetivos no cumplidos se documentan, no se ocultan).
+- [x] Benchmark reproducible en 2 vCPU / 1 GB / SSD (`scripts/bench.py --docker`, job *Benchmark* del CI).
+- [x] Medición de objetivos: arranque < 2 s, RSS en reposo < 100 MiB, p95 metadatos < 50 ms, memoria acotada en transferencias.
+- [x] Reporte con resultados reales (los objetivos no cumplidos se documentan, no se ocultan).
+
+Evidencia: `crates/storage/tests/ops.rs`, `crates/server/tests/operations.rs`, `scripts/e2e-recovery.sh` (backup en Linux → restore en macOS en el CI), `tests/ops/` (systemd, contenedor, proxies), [docs/performance.md](../docs/performance.md) y [docs/runbooks/](../docs/runbooks/).
 
 ### Pruebas bloqueantes
 | Escenario | Resultado esperado |
@@ -417,11 +419,13 @@ Que el servicio se pueda instalar, actualizar, observar y recuperar de forma pre
 ### Gate de salida
 Prueba de recuperación ejecutada en infraestructura distinta de la original y documentada en `docs/runbooks/`.
 
+
+> Cierre (2026-10-04): gate superado en CI, con backup en Linux y restore + `dotnet restore` en macOS (otra máquina y otro sistema operativo). Por decisión del usuario, se difieren a la Fase 8 la primera ejecución de `release.yml` y la transcripción a `docs/performance.md` de los resultados del benchmark en contenedor (2 vCPU / 1 GiB), que están en el resumen del job *Benchmark* del CI.
 ---
 
 ## Fase 8 — Piloto y cierre del MVP
 
-**Estatus:** ⚪ `NO INICIADA`
+**Estatus:** 🔵 `EN DISEÑO`
 **Depende de:** Fase 7
 
 ### Objetivo
@@ -434,6 +438,8 @@ Validar con un equipo real que el producto resuelve el problema y ejecutar la pr
 - [ ] Ejercicio de incidente: revocar credencial de CI, bloquear una versión, restaurar desde backup.
 - [ ] Verificación manual con Visual Studio y Rider (diferida desde la Fase 3), anotada en `docs/compatibility.md`.
 - [ ] Ejecución literal de la guía [de cero a restore en CI](../docs/guide-zero-to-ci.md) por alguien que no escribió el código (diferida desde la Fase 6).
+- [ ] Primera ejecución de `release.yml` (binarios, checksums y firma) antes de etiquetar `v0.1.0` (diferida desde la Fase 7).
+- [ ] Resultados del benchmark en contenedor (2 vCPU / 1 GiB) del job *Benchmark* anotados en `docs/performance.md` (diferido desde la Fase 7).
 - [ ] Registro de fricciones, errores y peticiones; clasificación en "bloqueante MVP" / "post-MVP".
 - [ ] Corrección de todos los bloqueantes MVP.
 - [ ] Retrospectiva y actualización del orden de evolución (credential provider, S3, proxy…).
@@ -494,3 +500,6 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 6 | `EN PROGRESO` | `EN VALIDACIÓN` | API `/api/v1` y CLI completos; 142 tests, `e2e-cli.sh` y la guía ejecutados en local (SDK 8). Pendiente: CI y que la guía la ejecute literalmente alguien que no escribió el código. |
 | 2026-10-04 | 6 | `EN VALIDACIÓN` | `COMPLETADA` | CI en verde: [CI run 37236552774](https://github.com/Khr0x/onepack/actions/runs/37236552774), con `e2e-cli.sh` en Linux (SDK 8 y 10) y macOS (SDK 8 y 10). Cerrada por decisión del usuario con la ejecución de la guía por un tercero diferida al piloto de la Fase 8. PR Khr0x/onepack#7. |
 | 2026-10-04 | 7 | `NO INICIADA` | `EN DISEÑO` | Dependencias (Fases 5 y 6) completadas. |
+| 2026-10-04 | 7 | `EN DISEÑO` | `EN PROGRESO` | ADR-017 aceptado. Firma de releases: SHA-256 + cosign keyless. Rama `feature/phase-7-operations`. |
+| 2026-10-04 | 7 | `EN PROGRESO` | `COMPLETADA` | CI en verde: [CI run 37247176082](https://github.com/Khr0x/onepack/actions/runs/37247176082), 11 jobs: recuperación Linux → macOS con `dotnet restore`, systemd con reinicio tras SIGKILL, contenedor, proxies y benchmark. Cerrada por decisión del usuario; se difieren a la Fase 8 la primera ejecución de `release.yml` y los números del benchmark en contenedor. PR Khr0x/onepack#8. |
+| 2026-10-04 | 8 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 7) completada. |

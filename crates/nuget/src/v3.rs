@@ -385,6 +385,29 @@ pub struct SearchQuery {
     pub package_type: Option<String>,
 }
 
+/// Versiones listadas de un feed agrupadas por paquete (claves en orden) y con las versiones
+/// ordenadas por precedencia. Construirlo cuesta; reutilizarlo entre búsquedas es barato, así
+/// que el servidor lo guarda en caché.
+#[derive(Debug, Clone, Default)]
+pub struct SearchIndex {
+    packages: Vec<(String, Vec<PublishedVersion>)>,
+}
+
+impl SearchIndex {
+    pub fn new(versions: Vec<PublishedVersion>) -> Self {
+        Self {
+            packages: by_package(versions).into_iter().collect(),
+        }
+    }
+
+    /// Versiones de un paquete, en orden ascendente.
+    pub fn versions_of(&self, package_key: &str) -> &[PublishedVersion] {
+        self.packages
+            .binary_search_by(|(key, _)| key.as_str().cmp(package_key))
+            .map_or(&[], |i| self.packages[i].1.as_slice())
+    }
+}
+
 /// Agrupa por paquete (claves en orden) con las versiones ordenadas por precedencia.
 fn by_package(versions: Vec<PublishedVersion>) -> BTreeMap<String, Vec<PublishedVersion>> {
     let mut packages: BTreeMap<String, Vec<PublishedVersion>> = BTreeMap::new();
@@ -434,7 +457,7 @@ fn score(package_key: &str, q: &str, terms: &[String]) -> u8 {
 ///
 /// Sintaxis: términos libres (todos deben aparecer en id, título, etiquetas, autores, resumen o
 /// descripción), `id:texto` (el id contiene) y `packageid:Id` (id exacto).
-pub fn search(urls: &FeedUrls, versions: Vec<PublishedVersion>, query: &SearchQuery) -> Value {
+pub fn search(urls: &FeedUrls, index: &SearchIndex, query: &SearchQuery) -> Value {
     let q = query.q.trim().to_lowercase();
     let mut exact_id = None;
     let mut id_terms = Vec::new();
@@ -449,8 +472,9 @@ pub fn search(urls: &FeedUrls, versions: Vec<PublishedVersion>, query: &SearchQu
         }
     }
 
-    let mut matches: Vec<(u8, String, Vec<PublishedVersion>)> = by_package(versions)
-        .into_iter()
+    let mut matches: Vec<(u8, &str, &[PublishedVersion])> = index
+        .packages
+        .iter()
         .filter(|(key, versions)| {
             let latest = versions.last().expect("al menos una versión");
             let text = latest.search_text.as_deref().unwrap_or(key);
@@ -459,9 +483,9 @@ pub fn search(urls: &FeedUrls, versions: Vec<PublishedVersion>, query: &SearchQu
                 && terms.iter().all(|t| text.contains(t.as_str()))
                 && has_package_type(latest, query.package_type.as_deref())
         })
-        .map(|(key, versions)| (score(&key, &q, &terms), key, versions))
+        .map(|(key, versions)| (score(key, &q, &terms), key.as_str(), versions.as_slice()))
         .collect();
-    matches.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    matches.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(b.1)));
 
     let total = matches.len();
     let take = query.take.min(MAX_TAKE);
@@ -469,7 +493,7 @@ pub fn search(urls: &FeedUrls, versions: Vec<PublishedVersion>, query: &SearchQu
         .into_iter()
         .skip(query.skip)
         .take(take)
-        .map(|(_, key, versions)| search_result(urls, &key, &versions))
+        .map(|(_, key, versions)| search_result(urls, key, versions))
         .collect();
     json!({ "totalHits": total, "data": data })
 }
@@ -510,10 +534,11 @@ fn search_result(urls: &FeedUrls, package_key: &str, versions: &[PublishedVersio
 }
 
 /// Ids de paquete que contienen la consulta; primero los que empiezan por ella.
-pub fn autocomplete_ids(versions: Vec<PublishedVersion>, query: &SearchQuery) -> Value {
+pub fn autocomplete_ids(index: &SearchIndex, query: &SearchQuery) -> Value {
     let q = query.q.trim().to_lowercase();
-    let mut ids: Vec<(bool, String, String)> = by_package(versions)
-        .into_iter()
+    let mut ids: Vec<(bool, &str, &str)> = index
+        .packages
+        .iter()
         .filter(|(key, versions)| {
             key.contains(q.as_str())
                 && has_package_type(
@@ -522,13 +547,13 @@ pub fn autocomplete_ids(versions: Vec<PublishedVersion>, query: &SearchQuery) ->
                 )
         })
         .map(|(key, versions)| {
-            let id = versions.last().expect("versión").package_id.clone();
-            (!key.starts_with(q.as_str()), key, id)
+            let id = versions.last().expect("versión").package_id.as_str();
+            (!key.starts_with(q.as_str()), key.as_str(), id)
         })
         .collect();
     ids.sort();
     let total = ids.len();
-    let data: Vec<String> = ids
+    let data: Vec<&str> = ids
         .into_iter()
         .skip(query.skip)
         .take(query.take.min(MAX_TAKE))
@@ -537,9 +562,8 @@ pub fn autocomplete_ids(versions: Vec<PublishedVersion>, query: &SearchQuery) ->
     json!({ "totalHits": total, "data": data })
 }
 
-/// Versiones de un id, en orden ascendente.
-pub fn autocomplete_versions(mut versions: Vec<PublishedVersion>) -> Value {
-    sort_versions(&mut versions);
+/// Versiones de un id, ya en orden ascendente (`SearchIndex::versions_of`).
+pub fn autocomplete_versions(versions: &[PublishedVersion]) -> Value {
     let data: Vec<&str> = versions.iter().map(|v| v.version.as_str()).collect();
     json!({ "totalHits": data.len(), "data": data })
 }
