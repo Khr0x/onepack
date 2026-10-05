@@ -74,8 +74,8 @@ jobs:
         run: ./scripts/e2e-cli.sh
         env:
           ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
-      - name: MVP decisive test (install, publish, CI restore, revoke, block, recover)
-        run: ./scripts/e2e-decisive.sh
+      - name: MVP acceptance test (install, publish, CI restore, revoke, block, recover)
+        run: ./scripts/e2e-acceptance.sh
         env:
           ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
 

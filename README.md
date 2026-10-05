@@ -65,3 +65,7 @@ tests/          integration, conformance-dotnet, security, recovery
 packaging/      systemd, container
 docs/           documentación técnica
 ```
+
+## Licencia
+
+[Apache License 2.0](LICENSE).

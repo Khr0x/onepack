@@ -1,71 +1,71 @@
-# Piloto
+# Pilot
 
-> Fase 8. Plan para validar el MVP con un equipo real antes de etiquetar `v0.1.0`.
-> Última actualización: 2026-10-04
+> Phase 8. Plan to validate the MVP with a real team before tagging `v0.1.0`.
+> Last updated: 2026-10-04
 
-El piloto responde una pregunta: **¿un equipo que no escribió onepack puede instalarlo, usarlo en su trabajo diario y recuperarse de un incidente solo con la documentación?** Todo lo que lo impida es un bloqueante del MVP.
+The pilot answers one question: **can a team that did not write onepack install it, use it in their daily work and recover from an incident using only the documentation?** Anything that prevents this is an MVP blocker.
 
-La [prueba decisiva](../../roadmap/roadmap-mvp.md#prueba-decisiva-del-mvp) ya se ejecuta automáticamente en cada cambio ([`scripts/e2e-decisive.sh`](../../scripts/e2e-decisive.sh)). El piloto comprueba lo que un script no puede: que las personas la completan sin ayuda, en su infraestructura y con sus proyectos.
+The [decisive test](../../roadmap/roadmap-mvp.md#prueba-decisiva-del-mvp) already runs automatically on every change ([`scripts/e2e-acceptance.sh`](../../scripts/e2e-acceptance.sh)). The pilot checks what a script cannot: that people complete it without help, on their own infrastructure and with their own projects.
 
-## Equipo piloto
+## Pilot team
 
-Requisitos:
+Requirements:
 
-- Al menos una librería .NET propia que hoy se comparta por otra vía (carpeta, copia, otro registro).
-- Al menos un pipeline de CI que restaure esa librería.
-- Una persona que opere el servidor (instalar, hacer backups) y que **no** haya escrito el código de onepack.
-- Un servidor Linux o un host de contenedores ([requisitos](../runbooks/install.md)).
+- At least one in-house .NET library that is currently shared some other way (folder, copy, another registry).
+- At least one CI pipeline that restores that library.
+- One person who operates the server (installs it, takes backups) and who did **not** write onepack's code.
+- A Linux server or a container host ([requirements](../runbooks/install.md)).
 
-Anota en [el registro](friction-log.md#datos-del-piloto) quién participa, el periodo acordado y el entorno.
+Record who takes part, the agreed period and the environment in [the log](friction-log.md#pilot-details).
 
-## Calendario
+## Schedule
 
-| Semana | Qué | Salida |
+| Week | What | Outcome |
 |---|---|---|
-| 0 | Preparación: release candidata (ver [release](../runbooks/release.md)), reunión de arranque de 30 min. | Binarios firmados y verificados disponibles. |
-| 1 | **Instalación solo con la documentación**: [instalación](../runbooks/install.md) y [guía de cero a restore en CI](../guide-zero-to-ci.md). Nadie del proyecto ayuda salvo que se bloqueen; si pasa, es una fricción. | Servidor en marcha, feed creado, librería publicada desde CI y restaurada en otro pipeline. |
-| 1 | Verificación con IDE: Visual Studio y Rider ([pasos](../compatibility.md#verificación-manual-ide)). | Filas de IDE completadas en `docs/compatibility.md`. |
-| 1–4 | **Uso habitual**: publicar versiones nuevas desde CI, restaurar en builds y estaciones, rotar algún token. Backup diario programado ([backup](../runbooks/backup-restore.md)). | Fricciones registradas sobre la marcha. |
-| 2–3 | **Ejercicio de incidente** ([runbook](../runbooks/incident-drill.md)): revocar la credencial de CI, bloquear una versión y restaurar desde un backup, con cronómetro. | Tiempos y desviaciones anotados en el registro. |
-| final | Retrospectiva (ver abajo) y clasificación final de las fricciones. | Lista de bloqueantes MVP cerrada o con fecha. |
+| 0 | Preparation: release candidate (see [release](../runbooks/release.md)), 30-minute kickoff meeting. | Signed and verified binaries available. |
+| 1 | **Installation using only the documentation**: [installation](../runbooks/install.md) and the [zero to CI restore guide](../guide-zero-to-ci.md). Nobody from the project helps unless the team is stuck; if that happens, it is a friction. | Server running, feed created, library published from CI and restored in another pipeline. |
+| 1 | IDE check: Visual Studio and Rider ([steps](../compatibility.md#verificación-manual-ide)). | IDE rows filled in `docs/compatibility.md`. |
+| 1–4 | **Regular use**: publish new versions from CI, restore in builds and on workstations, rotate a token. Daily scheduled backup ([backup](../runbooks/backup-restore.md)). | Frictions logged as they happen. |
+| 2–3 | **Incident drill** ([runbook](../runbooks/incident-drill.md)): revoke the CI credential, block a version and restore from a backup, timed. | Times and deviations recorded in the log. |
+| end | Retrospective (see below) and final classification of frictions. | List of MVP blockers closed or scheduled. |
 
-Periodo recomendado: 2–4 semanas. Menos de dos semanas no cubre suficientes ciclos de publicación ni un backup real restaurado.
+Recommended period: 2–4 weeks. Less than two weeks does not cover enough publishing cycles or a real backup being restored.
 
-## Qué registrar
+## What to log
 
-Todo en [friction-log.md](friction-log.md). Una fricción es cualquier momento en que alguien:
+Everything goes in [friction-log.md](friction-log.md). A friction is any moment when someone:
 
-- tuvo que preguntar algo que la documentación debería haber respondido;
-- vio un error que no explicaba qué hacer;
-- tuvo que editar un archivo a mano, abrir la base de datos o leer el código;
-- perdió más de 10 minutos en un paso;
-- encontró un comportamiento distinto al documentado.
+- had to ask something the documentation should have answered;
+- saw an error that did not explain what to do;
+- had to edit a file by hand, open the database or read the code;
+- lost more than 10 minutes on a step;
+- found behaviour different from what is documented.
 
-No hace falta proponer la solución: basta con qué intentaba, qué pasó y cuánto tiempo costó.
+There is no need to propose a fix: what they were trying to do, what happened and how long it took is enough.
 
-## Clasificación
+## Classification
 
-| Clase | Criterio | Qué pasa |
+| Class | Criteria | What happens |
 |---|---|---|
-| **Bloqueante MVP** | Pérdida o corrupción de datos; acceso entre feeds; la prueba decisiva no se puede completar sin ayuda, sin UI o sin tocar la base de datos; un error de seguridad. | Se corrige antes de `v0.1.0`. |
-| **Post-MVP** | Todo lo demás: comodidad, rendimiento dentro de objetivos, funcionalidades nuevas. | Va a la retrospectiva y al orden de evolución. |
+| **MVP blocker** | Data loss or corruption; access across feeds; the decisive test cannot be completed without help, without a UI or without touching the database; a security bug. | Fixed before `v0.1.0`. |
+| **Post-MVP** | Everything else: convenience, performance within targets, new features. | Goes to the retrospective and the evolution order. |
 
-## Criterios de salida
+## Exit criteria
 
-El piloto termina con éxito cuando, además de los [criterios de cierre del MVP](../../roadmap/roadmap-mvp.md#criterios-de-cierre-del-mvp):
+The pilot succeeds when, in addition to the [MVP exit criteria](../../roadmap/roadmap-mvp.md#criterios-de-cierre-del-mvp):
 
-- el equipo instaló y publicó sin ayuda directa (o cada ayuda está registrada y corregida en la documentación);
-- el ejercicio de incidente se completó y los tres incidentes se resolvieron con los runbooks;
-- hubo al menos un backup programado restaurado en otra máquina;
-- no queda ninguna fricción **bloqueante MVP** abierta.
+- the team installed and published without direct help (or every bit of help is logged and fixed in the documentation);
+- the incident drill was completed and all three incidents were resolved with the runbooks;
+- at least one scheduled backup was restored on another machine;
+- no **MVP blocker** friction remains open.
 
-## Retrospectiva
+## Retrospective
 
-Una sesión de 45 minutos al final, con estas preguntas, y las respuestas resumidas en el registro:
+A 45-minute session at the end with these questions, with the answers summarised in the log:
 
-1. ¿Qué haríais distinto si volvierais a instalarlo mañana?
-2. ¿Qué paso de la documentación sobraba o faltaba?
-3. ¿Qué os haría dejar de usarlo?
-4. De la [lista fuera del MVP](../../roadmap/roadmap-mvp.md#fuera-del-mvp-referencia) (credential provider, S3, proxy de nuget.org, npm…), ¿qué echasteis en falta primero?
+1. What would you do differently if you installed it again tomorrow?
+2. Which step in the documentation was unnecessary or missing?
+3. What would make you stop using it?
+4. From the [out-of-MVP list](../../roadmap/roadmap-mvp.md#fuera-del-mvp-referencia) (credential provider, S3, nuget.org proxy, npm…), what did you miss first?
 
-La respuesta a la 4 actualiza el orden de evolución en el roadmap.
+The answer to question 4 updates the evolution order in the roadmap.

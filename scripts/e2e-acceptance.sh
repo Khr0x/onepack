@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prueba decisiva del MVP (Fase 8), de punta a punta y en orden:
+# Prueba de aceptación del MVP (Fase 8): la "prueba decisiva" del roadmap, de punta a punta y en orden:
 #
 #   Un equipo instala el servidor, configura su proyecto, publica una librería y la restaura
 #   desde CI; después revoca una credencial y recupera el servicio desde un backup, sin abrir
@@ -17,7 +17,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 conformance="$root/tests/conformance-dotnet"
-port=${ONEPACK_E2E_DECISIVE_PORT:-5899}
+port=${ONEPACK_E2E_ACCEPTANCE_PORT:-5899}
 base="http://127.0.0.1:$port"
 feed=libs
 
@@ -34,7 +34,7 @@ cleanup() {
 trap cleanup EXIT
 
 fail() {
-  echo "PRUEBA DECISIVA FALLÓ: $*" >&2
+  echo "PRUEBA DE ACEPTACIÓN FALLÓ: $*" >&2
   echo "--- log de onepackd ---" >&2
   cat "$work"/server-*.log >&2 2>/dev/null || true
   exit 1
@@ -224,6 +224,6 @@ for token in "$CI_TOKEN" "$ADMIN_TOKEN"; do
 done
 stop
 
-echo "PRUEBA DECISIVA OK (SDK $sdk_version): instalar, configurar, publicar, restaurar desde CI,"
+echo "PRUEBA DE ACEPTACIÓN OK (SDK $sdk_version): instalar, configurar, publicar, restaurar desde CI,"
 echo "  revocar y rotar la credencial, bloquear una versión y recuperar desde backup;"
 echo "  $checked paquetes idénticos byte a byte, sin UI ni acceso a la base de datos."

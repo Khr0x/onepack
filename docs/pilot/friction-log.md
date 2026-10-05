@@ -1,41 +1,41 @@
-# Registro de fricciones del piloto
+# Pilot friction log
 
-> Fase 8. Ver [el plan del piloto](README.md) para qué registrar y cómo clasificar.
+> Phase 8. See [the pilot plan](README.md) for what to log and how to classify it.
 
-## Datos del piloto
+## Pilot details
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
-| Equipo | _pendiente_ |
-| Persona que opera el servidor | _pendiente_ |
-| Periodo | _pendiente_ (inicio – fin) |
-| Entorno del servidor | _pendiente_ (systemd / contenedor, SO, arquitectura, reverse proxy) |
-| Versión de onepack | _pendiente_ |
-| CI usado | _pendiente_ |
-| Proyectos y librerías | _pendiente_ |
+| Team | _pending_ |
+| Person operating the server | _pending_ |
+| Period | _pending_ (start – end) |
+| Server environment | _pending_ (systemd / container, OS, architecture, reverse proxy) |
+| onepack version | _pending_ |
+| CI used | _pending_ |
+| Projects and libraries | _pending_ |
 
-## Fricciones
+## Frictions
 
-Clases: **B** = bloqueante MVP, **P** = post-MVP. Estado: abierta, corregida (con enlace al cambio), descartada (con motivo).
+Classes: **B** = MVP blocker, **P** = post-MVP. Status: open, fixed (with a link to the change), dismissed (with the reason).
 
-| ID | Fecha | Quién / dónde | Qué intentaba | Qué pasó | Tiempo perdido | Clase | Estado |
+| ID | Date | Who / where | What they were trying to do | What happened | Time lost | Class | Status |
 |---|---|---|---|---|---|---|---|
-| F-001 | 2026-10-04 | Prueba decisiva automatizada | Restaurar desde CI con un token revocado | `dotnet restore` solo decía `NU1301: no se puede cargar el índice de servicio`, sin mencionar la credencial. El servidor sí registraba `reason="revoked"`. | — | B | Corregida: `onepack exec` comprueba la credencial antes de lanzar el comando y falla con salida 3 y una acción clara ([cli](../cli.md#nugetconfig-y-credenciales-de-nuget)). |
+| F-001 | 2026-10-04 | Automated acceptance test | Restore from CI with a revoked token | `dotnet restore` only said `NU1301: unable to load the service index`, without mentioning the credential. The server did log `reason="revoked"`. | — | B | Fixed: `onepack exec` checks the credential before running the command and fails with exit code 3 and a clear action ([cli](../cli.md#nugetconfig-y-credenciales-de-nuget)). |
 
-<!-- Plantilla de fila:
-| F-00N | AAAA-MM-DD | persona, máquina o pipeline | | | | B/P | abierta |
+<!-- Row template:
+| F-00N | YYYY-MM-DD | person, machine or pipeline | | | | B/P | open |
 -->
 
-## Ejercicio de incidente
+## Incident drill
 
-Ver [el runbook](../runbooks/incident-drill.md). Una fila por incidente.
+See [the runbook](../runbooks/incident-drill.md). One row per incident.
 
-| Incidente | Fecha | Tiempo hasta resolverlo | ¿Bastó el runbook? | Desviaciones |
+| Incident | Date | Time to resolve | Was the runbook enough? | Deviations |
 |---|---|---|---|---|
-| 1. Credencial de CI filtrada | | | | |
-| 2. Versión vulnerable | | | | |
-| 3. Pérdida del servidor | | | | |
+| 1. Leaked CI credential | | | | |
+| 2. Vulnerable version | | | | |
+| 3. Server lost | | | | |
 
-## Retrospectiva
+## Retrospective
 
-_Pendiente: respuestas resumidas a las cuatro preguntas del [plan](README.md#retrospectiva)._
+_Pending: summarised answers to the four questions in the [plan](README.md#retrospective)._

@@ -1,72 +1,72 @@
-# Ejercicio de incidente
+# Incident drill
 
-> Fase 8. Tres incidentes en orden, con cronómetro, sobre el servidor del piloto. La versión automatizada de este ejercicio es [`scripts/e2e-decisive.sh`](../../scripts/e2e-decisive.sh) y se ejecuta en cada cambio.
-> Última actualización: 2026-10-04
+> Phase 8. Three incidents, in order and timed, on the pilot server. The automated version of this drill is [`scripts/e2e-acceptance.sh`](../../scripts/e2e-acceptance.sh), which runs on every change.
+> Last updated: 2026-10-04
 
-Reglas: solo `onepack`, `onepackd` y la documentación. Sin interfaz web, sin abrir la base de datos y sin ayuda de quien escribió el código. Anota los tiempos y cualquier desviación en [el registro](../pilot/friction-log.md#ejercicio-de-incidente).
+Rules: only `onepack`, `onepackd` and the documentation. No web UI, no opening the database and no help from whoever wrote the code. Record the times and any deviation in [the log](../pilot/friction-log.md#incident-drill).
 
-Antes de empezar:
+Before starting:
 
-- [ ] Hay un pipeline de CI que restaura desde el feed con la cuenta de servicio (por ejemplo, `ci`).
-- [ ] Hay un backup reciente ([backup](backup-restore.md)) **copiado fuera del servidor**.
-- [ ] Tienes una credencial de administrador en el CLI (`onepack whoami` dice `administrador`).
+- [ ] There is a CI pipeline that restores from the feed with the service account (for example, `ci`).
+- [ ] There is a recent backup ([backup](backup-restore.md)) **copied off the server**.
+- [ ] You have an administrator credential in the CLI (`onepack whoami` says `administrador`).
 
-En los ejemplos, el feed es `internal`, la cuenta de CI es `ci` y la librería es `Hemia.Core`.
+In the examples, the feed is `internal`, the CI account is `ci` and the library is `Hemia.Core`.
 
-## 1. La credencial de CI se ha filtrado
+## 1. The CI credential has leaked
 
-Objetivo: el token filtrado deja de funcionar y el pipeline vuelve a funcionar con uno nuevo.
+Goal: the leaked token stops working and the pipeline works again with a new one.
 
 ```bash
-onepack token list --principal ci                          # identifica el token (columna ID)
-onepack token revoke <ID>                                  # pide confirmación
+onepack token list --principal ci                          # find the token (ID column)
+onepack token revoke <ID>                                  # asks for confirmation
 onepack token create --principal ci --name pipeline --expires-in-days 90
 ```
 
-1. Guarda el token nuevo en el secreto del pipeline ([guía](../guide-zero-to-ci.md)) **antes** de relanzarlo.
-2. Comprueba que el token antiguo ya no sirve: `onepack --token-env OLD whoami` termina con salida 3. Con `onepack exec`, el error dice que la credencial no es válida; con `dotnet restore` directamente, NuGet solo muestra `NU1301` y el servidor registra `autenticación rechazada reason="revoked"`.
-3. Relanza el pipeline: debe restaurar.
-4. Revisa qué hizo el token mientras estuvo filtrado: `onepack audit list --limit 100` (actor `ci`) y la columna *último uso* de `onepack token list`.
+1. Store the new token in the pipeline secret ([guide](../guide-zero-to-ci.md)) **before** re-running it.
+2. Check that the old token no longer works: `onepack --token-env OLD whoami` exits with code 3. With `onepack exec`, the error says the credential is not valid; with `dotnet restore` directly, NuGet only shows `NU1301` and the server logs `autenticación rechazada reason="revoked"`.
+3. Re-run the pipeline: it must restore.
+4. Review what the token did while it was leaked: `onepack audit list --limit 100` (actor `ci`) and the *last used* column (`ÚLTIMO USO`) of `onepack token list`.
 
-**Hecho cuando:** el pipeline restaura con el token nuevo y `token list` muestra el antiguo como revocado.
+**Done when:** the pipeline restores with the new token and `token list` shows the old one as revoked.
 
-## 2. Una versión publicada es vulnerable
+## 2. A published version is vulnerable
 
-Objetivo: nadie puede descargar la versión vulnerable, y quien la tenía ve por qué.
+Goal: nobody can download the vulnerable version, and whoever had it sees why.
 
 ```bash
 onepack package block --feed internal Hemia.Core 1.4.0 --reason "CVE-2026-0001"
 ```
 
-1. En una máquina sin caché (`NUGET_PACKAGES` vacío), un restore que la necesite falla con `410 (PACKAGE_BLOCKED - version blocked by the registry)` ([seguridad](../security.md#bloqueo-de-versiones)). La versión sigue apareciendo como obsoleta en los metadatos.
-2. Publica la versión corregida (por ejemplo, `1.4.1`) desde CI y actualiza la referencia del proyecto.
-3. Cuando ya no haga falta bloquearla, o si fue un error: `onepack package unblock --feed internal Hemia.Core 1.4.0 --reason "..."`.
+1. On a machine with no cache (empty `NUGET_PACKAGES`), a restore that needs it fails with `410 (PACKAGE_BLOCKED - version blocked by the registry)` ([security](../security.md#bloqueo-de-versiones)). The version is still listed as deprecated in the metadata.
+2. Publish the fixed version (for example, `1.4.1`) from CI and update the project reference.
+3. When blocking is no longer needed, or if it was a mistake: `onepack package unblock --feed internal Hemia.Core 1.4.0 --reason "..."`.
 
-Las cachés locales de NuGet que ya tenían la versión **no** se invalidan: el bloqueo impide nuevas descargas. Avisa al equipo para que limpien `~/.nuget/packages/hemia.core/1.4.0` si hace falta.
+Local NuGet caches that already had the version are **not** invalidated: blocking prevents new downloads. Tell the team to clear `~/.nuget/packages/hemia.core/1.4.0` if needed.
 
-**Hecho cuando:** un restore limpio no puede obtener la versión bloqueada y `onepack audit list --action package.block` muestra el bloqueo con su autor.
+**Done when:** a clean restore cannot get the blocked version and `onepack audit list --action package.block` shows the block and who did it.
 
-## 3. Se ha perdido el servidor
+## 3. The server has been lost
 
-Objetivo: el servicio vuelve en otra máquina (o en la misma, con el disco vacío) desde el último backup, con la misma URL pública.
+Goal: the service comes back on another machine (or the same one, with an empty disk) from the latest backup, with the same public URL.
 
-Sigue [backup y restauración](backup-restore.md#restaurar). En resumen, en la máquina nueva:
+Follow [backup and restore](backup-restore.md#restaurar). In short, on the new machine:
 
 ```bash
-onepackd restore --from /ruta/al/backup --data-dir /var/lib/onepack
+onepackd restore --from /path/to/backup --data-dir /var/lib/onepack
 onepackd check --data-dir /var/lib/onepack
-sudo systemctl start onepackd        # o el contenedor, con el mismo volumen
+sudo systemctl start onepackd        # or the container, with the same volume
 curl -fs https://packages.example.com/readyz
 ```
 
-1. Apunta el DNS o el reverse proxy a la máquina nueva si cambió.
-2. Relanza el pipeline de CI **sin cambiar su token**: las credenciales viajan en el backup.
-3. Lo publicado después del backup se ha perdido: vuelve a publicarlo desde CI (`onepack package push --skip-existing-identical` evita conflictos con lo que sí estaba).
-4. Los cambios de seguridad posteriores al backup también se han perdido: **repite las revocaciones y los bloqueos** que hiciste después del backup (consulta tus notas del incidente; la auditoría restaurada no los incluye).
+1. Point DNS or the reverse proxy to the new machine if it changed.
+2. Re-run the CI pipeline **without changing its token**: credentials travel in the backup.
+3. Anything published after the backup is lost: publish it again from CI (`onepack package push --skip-existing-identical` avoids conflicts with what was kept).
+4. Security changes made after the backup are lost too: **repeat the revocations and blocks** you made after the backup (check your incident notes; the restored audit log does not include them).
 
-**Hecho cuando:** `/readyz` responde `ready`, el pipeline restaura y `onepackd check` no informa de errores.
+**Done when:** `/readyz` answers `ready`, the pipeline restores and `onepackd check` reports no errors.
 
-## Después del ejercicio
+## After the drill
 
-- Anota en el registro el tiempo de cada incidente y cada paso en el que la documentación no bastó.
-- Si se usó un token de administrador para el ejercicio, revócalo.
+- Record in the log how long each incident took and every step where the documentation was not enough.
+- If an administrator token was created for the drill, revoke it.

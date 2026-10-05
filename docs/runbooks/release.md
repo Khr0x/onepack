@@ -1,29 +1,29 @@
 # Release
 
-> Fase 8. Cómo se publica una versión de onepack. El workflow es [`release.yml`](../../.github/workflows/release.yml).
-> Última actualización: 2026-10-04
+> Phase 8. How a onepack version is published. The workflow is [`release.yml`](../../.github/workflows/release.yml).
+> Last updated: 2026-10-04
 
-## Qué hace el workflow
+## What the workflow does
 
-1. **Build**: binarios de release del servidor (Linux x86-64 y ARM64, musl estático) y del CLI (Linux, macOS x86-64/ARM64, Windows).
-2. **Verify**: ejecuta la [prueba decisiva](../../scripts/e2e-decisive.sh) con los binarios de Linux x86-64 recién compilados (no con una build de depuración): instalar, publicar, restaurar desde CI, revocar, bloquear y recuperar desde backup.
-3. **Publish**: `SHA256SUMS`, firma *keyless* de Sigstore (`SHA256SUMS.sigstore.json`), verificación de esa firma y, si se lanzó con una etiqueta, una release **en borrador** en GitHub.
+1. **Build**: release binaries for the server (Linux x86-64 and ARM64, static musl) and the CLI (Linux, macOS x86-64/ARM64, Windows). Each archive includes `README.md` and `LICENSE` (Apache-2.0). On a tag, it first checks that the tag matches the workspace version.
+2. **Verify**: runs the [acceptance test](../../scripts/e2e-acceptance.sh) with the freshly built Linux x86-64 binaries (not a debug build): install, publish, restore from CI, revoke, block and recover from a backup.
+3. **Publish**: `SHA256SUMS`, Sigstore *keyless* signature (`SHA256SUMS.sigstore.json`), verification of that signature and, when triggered by a tag, a **draft** release on GitHub.
 
-Si `verify` falla, no se firma ni se publica nada.
+If `verify` fails, nothing is signed or published.
 
-## Ensayo (sin etiqueta)
+## Dry run (no tag)
 
-Antes de la primera etiqueta, y siempre que cambie el workflow:
+Before the first tag, and whenever the workflow changes:
 
-1. GitHub → *Actions* → *Release* → *Run workflow* sobre `main`.
-2. Los binarios llevan la versión `0.0.0-dev.<sha>` y quedan como artefactos del run (`release`), sin release en GitHub.
-3. Descarga el artefacto `release` y comprueba la firma igual que en la [instalación](install.md#1-descargar-y-verificar), con `--certificate-identity "https://github.com/Khr0x/onepack/.github/workflows/release.yml@refs/heads/main"`.
+1. GitHub → *Actions* → *Release* → *Run workflow* on `main`.
+2. The binaries carry version `0.0.0-dev.<sha>` and are kept as run artifacts (`release`), with no GitHub release.
+3. Download the `release` artifact and check the signature as in [installation](install.md#1-descargar-y-verificar), using `--certificate-identity "https://github.com/Khr0x/onepack/.github/workflows/release.yml@refs/heads/main"`.
 
-## Publicar una versión
+## Publishing a version
 
-1. La rama `main` está en verde en CI.
-2. Actualiza `version` en el `Cargo.toml` raíz (por ejemplo, `0.1.0`) y `Cargo.lock` (`cargo check`), en un PR. El workflow rechaza una etiqueta que no coincida con esa versión.
-3. Tras el merge, etiqueta y sube:
+1. `main` is green in CI.
+2. Update `version` in the root `Cargo.toml` (for example, `0.1.0`) and `Cargo.lock` (`cargo check`) in a PR. The workflow rejects a tag that does not match that version.
+3. After the merge, tag and push:
 
    ```bash
    git switch main && git pull
@@ -31,12 +31,11 @@ Antes de la primera etiqueta, y siempre que cambie el workflow:
    git push origin v0.1.0
    ```
 
-4. Cuando el workflow termine, revisa la release en borrador (archivos, `SHA256SUMS`, bundle de firma), escribe las notas y publícala.
-5. Comprueba la instalación desde la release publicada siguiendo [instalación](install.md) en una máquina limpia.
+4. When the workflow finishes, review the draft release (files, `SHA256SUMS`, signature bundle), write the notes and publish it.
+5. Check the installation from the published release by following [installation](install.md) on a clean machine.
 
-Para repetir la prueba decisiva con binarios descargados: descomprime `onepack` y `onepackd` en un directorio y ejecuta `ONEPACK_BIN_DIR=<dir> ./scripts/e2e-decisive.sh` desde el repositorio (necesita el SDK .NET 8).
+To repeat the acceptance test with downloaded binaries: unpack `onepack` and `onepackd` into a directory and run `ONEPACK_BIN_DIR=<dir> ./scripts/e2e-acceptance.sh` from the repository (requires the .NET 8 SDK).
 
-## Requisitos antes de `v0.1.0`
+## Before `v0.1.0`
 
-- Licencia del proyecto decidida y en `LICENSE` (el workflow empaqueta `README.md`; añade `LICENSE` al paso *Package* cuando exista).
-- Un ensayo sin etiqueta en verde.
+- A green dry run.

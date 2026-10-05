@@ -432,9 +432,9 @@ Prueba de recuperación ejecutada en infraestructura distinta de la original y d
 Validar con un equipo real que el producto resuelve el problema y ejecutar la prueba decisiva.
 
 ### Entregables
-- [x] Prueba decisiva automatizada de punta a punta ([`scripts/e2e-decisive.sh`](../scripts/e2e-decisive.sh)): instalar, configurar, publicar, restaurar desde CI, revocar y rotar la credencial, bloquear una versión y recuperar desde backup, sin UI ni acceso a la base de datos. En CI (SDK 8 y 10, Linux y macOS) y en `release.yml` contra los binarios de release.
+- [x] Prueba decisiva automatizada de punta a punta ([`scripts/e2e-acceptance.sh`](../scripts/e2e-acceptance.sh)): instalar, configurar, publicar, restaurar desde CI, revocar y rotar la credencial, bloquear una versión y recuperar desde backup, sin UI ni acceso a la base de datos. En CI (SDK 8 y 10, Linux y macOS) y en `release.yml` contra los binarios de release.
 - [x] Material del piloto: [plan](../docs/pilot/README.md), [registro de fricciones](../docs/pilot/friction-log.md), [ejercicio de incidente](../docs/runbooks/incident-drill.md) y [procedimiento de release](../docs/runbooks/release.md).
-- [ ] Licencia del proyecto decidida y añadida (`LICENSE`), requisito para `v0.1.0`. Decisión del usuario.
+- [x] Licencia del proyecto: [Apache License 2.0](../LICENSE), declarada en los crates (`license = "Apache-2.0"`), incluida en los archivos de release y en la imagen de contenedor.
 - [ ] Equipo piloto identificado (p. ej., un equipo de Hemia) con al menos una librería y un pipeline de CI.
 - [ ] Instalación hecha por el equipo piloto siguiendo solo la documentación.
 - [ ] Uso en builds y publicaciones habituales durante un periodo acordado (p. ej. 2–4 semanas).
@@ -506,4 +506,4 @@ Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión r
 | 2026-10-04 | 7 | `EN DISEÑO` | `EN PROGRESO` | ADR-017 aceptado. Firma de releases: SHA-256 + cosign keyless. Rama `feature/phase-7-operations`. |
 | 2026-10-04 | 7 | `EN PROGRESO` | `COMPLETADA` | CI en verde: [CI run 37247176082](https://github.com/Khr0x/onepack/actions/runs/37247176082), 11 jobs: recuperación Linux → macOS con `dotnet restore`, systemd con reinicio tras SIGKILL, contenedor, proxies y benchmark. Cerrada por decisión del usuario; se difieren a la Fase 8 la primera ejecución de `release.yml` y los números del benchmark en contenedor. PR Khr0x/onepack#8. |
 | 2026-10-04 | 8 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 7) completada. |
-| 2026-10-04 | 8 | `EN DISEÑO` | `EN PROGRESO` | Sin ADRs nuevos. Rama `feature/phase-8-pilot`: prueba decisiva automatizada y material del piloto. Primera fricción (F-001, bloqueante) corregida: `onepack exec` comprueba la credencial antes de lanzar `dotnet`. |
+| 2026-10-04 | 8 | `EN DISEÑO` | `EN PROGRESO` | Sin ADRs nuevos. Rama `feature/phase-8-pilot`: prueba decisiva automatizada y material del piloto. Primera fricción (F-001, bloqueante) corregida: `onepack exec` comprueba la credencial antes de lanzar `dotnet`. Licencia Apache-2.0 por decisión del usuario. |
