@@ -4,9 +4,10 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use onepack_api_client::WhoAmI;
 use serde::Serialize;
 
-use crate::app::App;
+use crate::app::{App, DEFAULT_TIMEOUT, Target};
 use crate::error::{CliError, CliResult, exit};
 use crate::nuget_config::{Document, diff, source_key};
 use crate::{ExecArgs, NugetCommand};
@@ -151,6 +152,49 @@ pub fn credential_var(source: &str) -> String {
     format!("NuGetPackageSourceCredentials_{source}")
 }
 
+/// Comprueba la credencial antes de lanzar el comando. Con un token revocado o caducado, o sin
+/// acceso al feed, NuGet solo dice que no puede cargar el índice de servicio (NU1301).
+/// Si el servidor no responde, se avisa y se sigue: el comando puede tirar de la caché.
+fn check_access(app: &App, target: &Target, token: &str, feeds: &[String]) -> CliResult<()> {
+    let me: WhoAmI = match app
+        .client_for(target, Some(token.to_owned()), DEFAULT_TIMEOUT)?
+        .get("/whoami")
+    {
+        Ok(me) => me,
+        Err(e) => {
+            let e = CliError::from(e);
+            if e.exit == exit::AUTH {
+                return Err(e.with_action(
+                    "la credencial no es válida (revocada, caducada o de un principal desactivado); \
+                     pide un token nuevo a un administrador",
+                ));
+            }
+            app.out.note(format!(
+                "aviso: no se pudo comprobar la credencial ({}); se ejecuta igualmente",
+                e.code
+            ));
+            return Ok(());
+        }
+    };
+    if me.administrator {
+        return Ok(());
+    }
+    for feed in feeds {
+        if !me.grants.iter().any(|g| &g.feed == feed) {
+            return Err(CliError::new(
+                exit::FORBIDDEN,
+                "AUTH_SCOPE_MISSING",
+                format!("{} no tiene acceso al feed {feed} (o el feed no existe)", me.principal),
+            )
+            .with_action(format!(
+                "pide a un administrador `onepack grant add --principal {} --feed {feed} --role reader`",
+                me.principal
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn exec(app: &App, args: ExecArgs) -> CliResult<i32> {
     if args.source_name.is_some() && args.feeds.len() > 1 {
         return Err(CliError::usage("--source-name solo admite un --feed"));
@@ -168,6 +212,7 @@ pub fn exec(app: &App, args: ExecArgs) -> CliResult<i32> {
         .command
         .split_first()
         .ok_or_else(|| CliError::usage("falta el comando a ejecutar"))?;
+    check_access(app, &target, &credential.token, &args.feeds)?;
 
     let mut child = Command::new(program);
     child.args(rest);

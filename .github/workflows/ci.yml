@@ -74,6 +74,10 @@ jobs:
         run: ./scripts/e2e-cli.sh
         env:
           ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
+      - name: MVP acceptance test (install, publish, CI restore, revoke, block, recover)
+        run: ./scripts/e2e-acceptance.sh
+        env:
+          ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
 
   windows-conformance:
     # The script uses tests/conformance-dotnet/global.json (SDK 8); SDK 10 is covered on Linux and macOS.

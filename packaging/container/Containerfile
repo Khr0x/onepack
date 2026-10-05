@@ -12,7 +12,10 @@ RUN cargo build --release --locked -p onepack-server \
     && mkdir -p /out/data
 
 FROM gcr.io/distroless/static-debian12:nonroot
+LABEL org.opencontainers.image.source="https://github.com/Khr0x/onepack" \
+      org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=build /out/onepackd /usr/local/bin/onepackd
+COPY --from=build /src/LICENSE /usr/share/doc/onepack/LICENSE
 # El volumen hereda el propietario: el usuario sin privilegios puede escribir en él.
 COPY --from=build --chown=65532:65532 /out/data /data
 ENV ONEPACK_DATA_DIR=/data \
