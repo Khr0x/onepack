@@ -50,7 +50,7 @@ pub struct TouchTracker(Mutex<HashMap<String, Instant>>);
 
 impl TouchTracker {
     fn should_touch(&self, token_id: &str) -> bool {
-        let mut seen = self.0.lock().expect("mutex no envenenado");
+        let mut seen = self.0.lock().expect("mutex not poisoned");
         let now = Instant::now();
         match seen.get(token_id) {
             Some(last) if now.duration_since(*last) < TOUCH_INTERVAL => false,
@@ -105,7 +105,7 @@ pub async fn require_auth(
     match state.store.authenticate(&token).await {
         Ok(AuthOutcome::Valid(ctx)) => {
             if let Err(retry_after) = state.principal_limiter.check(ctx.principal.id) {
-                tracing::warn!(principal = %ctx.principal.name, "límite de peticiones por principal alcanzado");
+                tracing::warn!(principal = %ctx.principal.name, "per-principal rate limit reached");
                 return ApiError::RateLimited(retry_after).render(surface);
             }
             if state.touched.should_touch(&ctx.token_id) {
@@ -113,7 +113,7 @@ pub async fn require_auth(
                 let id = ctx.token_id.clone();
                 tokio::spawn(async move {
                     if let Err(e) = store.touch_token(&id).await {
-                        tracing::warn!(error = %e, "no se pudo registrar el uso del token");
+                        tracing::warn!(error = %e, "could not record token usage");
                     }
                 });
             }
@@ -124,13 +124,13 @@ pub async fn require_auth(
             tracing::info!(
                 reason = failure.reason(),
                 token_id = failure.token_id(),
-                "autenticación rechazada"
+                "authentication rejected"
             );
             state.store.record_auth_failure(&failure).await;
             unauthorized(surface)
         }
         Err(e) => {
-            tracing::error!(error = %e, "error al autenticar");
+            tracing::error!(error = %e, "authentication error");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }

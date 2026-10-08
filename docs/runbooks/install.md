@@ -46,7 +46,7 @@ sudo systemctl enable --now onepackd
 curl -fs http://127.0.0.1:8080/readyz
 ```
 
-La credencial administrativa inicial queda en `/var/lib/onepack/initial-admin-token`. Guárdala en un gestor de secretos y borra el archivo ([guía](../guide-zero-to-ci.md#3-configurar-el-cli-como-administrador)).
+La credencial administrativa inicial queda en `/var/lib/onepack/initial-admin-token`. Guárdala en un gestor de secretos y borra el archivo ([guía](../guide-zero-to-ci.md#3-set-up-the-cli-as-administrator)).
 
 La unidad:
 

@@ -102,27 +102,27 @@ impl From<ClientError> for CliError {
                 let (code, action) = match kind {
                     TransportKind::Dns => (
                         "DNS_FAILED",
-                        "comprueba la URL del contexto y la resolución DNS (`onepack doctor`)",
+                        "check the context URL and DNS resolution (`onepack doctor`)",
                     ),
                     TransportKind::Connect => (
                         "CONNECT_FAILED",
-                        "comprueba que el servidor esté en marcha y accesible (`onepack doctor`)",
+                        "check that the server is running and reachable (`onepack doctor`)",
                     ),
                     TransportKind::Tls => (
                         "TLS_FAILED",
-                        "comprueba el certificado del servidor; con una CA propia usa --ca-cert",
+                        "check the server certificate; with a private CA use --ca-cert",
                     ),
-                    TransportKind::Timeout => ("TIMEOUT", "reintenta o amplía --timeout"),
-                    TransportKind::Other => ("NETWORK_ERROR", "reintenta (`onepack doctor`)"),
+                    TransportKind::Timeout => ("TIMEOUT", "retry or increase --timeout"),
+                    TransportKind::Other => ("NETWORK_ERROR", "retry (`onepack doctor`)"),
                 };
                 Self::new(exit::UNAVAILABLE, code, message).with_action(action)
             }
             ClientError::InvalidResponse(m) => Self::new(
                 exit::INCOMPATIBLE,
                 "INVALID_RESPONSE",
-                format!("respuesta inesperada del servidor: {m}"),
+                format!("unexpected response from the server: {m}"),
             )
-            .with_action("comprueba que la URL apunta a un servidor onepack compatible"),
+            .with_action("check that the URL points to a compatible onepack server"),
             ClientError::Config(m) => Self::new(exit::USAGE, "INVALID_CONFIG", m),
         }
     }

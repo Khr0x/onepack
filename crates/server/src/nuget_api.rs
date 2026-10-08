@@ -61,39 +61,36 @@ impl ApiError {
             Self::Unauthenticated => (
                 StatusCode::UNAUTHORIZED,
                 "AUTH_REQUIRED",
-                "se requiere una credencial válida; puede estar ausente, caducada o revocada"
-                    .to_owned(),
+                "a valid credential is required; it may be missing, expired or revoked".to_owned(),
             ),
             Self::AdminRequired => (
                 StatusCode::FORBIDDEN,
                 "AUTH_ADMIN_REQUIRED",
-                "la operación requiere el rol Administrator".to_owned(),
+                "the operation requires the Administrator role".to_owned(),
             ),
             Self::Coded(status, code, message) => (*status, *code, message.clone()),
-            Self::NotFound | Self::Forbidden(Denial::NotFound) => (
-                StatusCode::NOT_FOUND,
-                "NOT_FOUND",
-                "no encontrado".to_owned(),
-            ),
+            Self::NotFound | Self::Forbidden(Denial::NotFound) => {
+                (StatusCode::NOT_FOUND, "NOT_FOUND", "not found".to_owned())
+            }
             Self::Forbidden(d @ Denial::MissingScope(access)) => (
                 StatusCode::FORBIDDEN,
                 d.code(),
                 format!(
-                    "la credencial es válida, pero no tiene el permiso {} en este feed",
+                    "the credential is valid, but lacks the {} permission on this feed",
                     access.scope()
                 ),
             ),
             Self::Forbidden(d @ Denial::PrefixDenied) => (
                 StatusCode::FORBIDDEN,
                 d.code(),
-                "la credencial no puede publicar este id de paquete en este feed".to_owned(),
+                "the credential cannot publish this package id on this feed".to_owned(),
             ),
             Self::BadRequest(m) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", m.clone()),
             Self::Conflict(m) => (StatusCode::CONFLICT, "PACKAGE_VERSION_EXISTS", m.clone()),
             Self::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "PACKAGE_TOO_LARGE",
-                "el paquete supera el tamaño máximo permitido".to_owned(),
+                "the package exceeds the maximum allowed size".to_owned(),
             ),
             Self::Package(e) => {
                 let status = if e.code() == "PACKAGE_LIMIT_EXCEEDED" {
@@ -110,58 +107,57 @@ impl ApiError {
             }
             Self::Quota(kind) => {
                 let (status, what) = match kind {
-                    QuotaKind::Versions => (StatusCode::FORBIDDEN, "número de versiones"),
-                    QuotaKind::Storage => (StatusCode::PAYLOAD_TOO_LARGE, "almacenamiento"),
+                    QuotaKind::Versions => (StatusCode::FORBIDDEN, "number of versions"),
+                    QuotaKind::Storage => (StatusCode::PAYLOAD_TOO_LARGE, "storage"),
                 };
                 (
                     status,
                     kind.code(),
-                    format!("el feed alcanzó su cuota de {what}; el paquete no se publicó"),
+                    format!("the feed reached its {what} quota; the package was not published"),
                 )
             }
             Self::Blocked => (
                 StatusCode::GONE,
                 "PACKAGE_BLOCKED",
-                "esta versión está bloqueada por el registro y no se puede descargar; \
-                 elige otra versión o consulta a quien mantiene el feed"
+                "this version is blocked by the registry and cannot be downloaded; \
+                 pick another version or ask whoever maintains the feed"
                     .to_owned(),
             ),
             Self::UploadTimeout => (
                 StatusCode::REQUEST_TIMEOUT,
                 "UPLOAD_TIMEOUT",
-                "la subida superó el tiempo máximo".to_owned(),
+                "the upload exceeded the maximum time".to_owned(),
             ),
             Self::Busy => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "UPLOADS_BUSY",
-                "el servidor está procesando el máximo de subidas simultáneas; reintenta"
-                    .to_owned(),
+                "the server is handling the maximum number of concurrent uploads; retry".to_owned(),
             ),
             Self::RateLimited(_) => (
                 StatusCode::TOO_MANY_REQUESTS,
                 "RATE_LIMITED",
-                "demasiadas peticiones; reintenta más tarde".to_owned(),
+                "too many requests; retry later".to_owned(),
             ),
             Self::Maintenance => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "MAINTENANCE",
-                "el registro está en mantenimiento (p. ej. un backup); las lecturas siguen disponibles"
+                "the registry is under maintenance (e.g. a backup); reads are still available"
                     .to_owned(),
             ),
             Self::InsufficientStorage => {
-                tracing::error!("almacenamiento lleno");
+                tracing::error!("storage full");
                 (
                     StatusCode::INSUFFICIENT_STORAGE,
                     "STORAGE_FULL",
-                    "no queda espacio en el servidor; el paquete no se publicó".to_owned(),
+                    "the server is out of space; the package was not published".to_owned(),
                 )
             }
             Self::Internal(m) => {
-                tracing::error!(error = %m, "error interno");
+                tracing::error!(error = %m, "internal error");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "INTERNAL",
-                    "error interno".to_owned(),
+                    "internal error".to_owned(),
                 )
             }
         }
@@ -220,40 +216,36 @@ impl ApiError {
 pub fn suggested_action(code: &str) -> Option<&'static str> {
     Some(match code {
         "AUTH_REQUIRED" => {
-            "inicia sesión con `onepack login` o comprueba que el token no haya caducado ni esté revocado"
+            "log in with `onepack login` or check that the token has not expired or been revoked"
         }
         "AUTH_SCOPE_MISSING" => {
-            "pide a un administrador un rol suficiente: `onepack grant add --principal <principal> --feed <feed> --role <rol>`"
+            "ask an administrator for a sufficient role: `onepack grant add --principal <principal> --feed <feed> --role <role>`"
         }
         "AUTH_PREFIX_DENIED" => {
-            "pide a un administrador que amplíe los patrones de publicación del grant (`--publish-pattern`)"
+            "ask an administrator to extend the grant's publish patterns (`--publish-pattern`)"
         }
-        "AUTH_ADMIN_REQUIRED" => "usa una credencial de un principal con rol Administrator",
+        "AUTH_ADMIN_REQUIRED" => "use a credential of a principal with the Administrator role",
         "NOT_FOUND" | "FEED_NOT_FOUND" => {
-            "comprueba el nombre; si existe, tu credencial puede no tener acceso"
+            "check the name; if it exists, your credential may not have access"
         }
         "PACKAGE_VERSION_EXISTS" => {
-            "publica una versión nueva: las versiones son inmutables (con el mismo archivo, usa --skip-existing-identical)"
+            "publish a new version: versions are immutable (for the same file, use --skip-existing-identical)"
         }
         "FEED_QUOTA_VERSIONS" | "FEED_QUOTA_STORAGE" => {
-            "pide a un administrador que amplíe la cuota: `onepack feed configure`"
+            "ask an administrator to raise the quota: `onepack feed configure`"
         }
-        "PACKAGE_BLOCKED" => "elige otra versión o consulta a quien mantiene el feed",
-        "RATE_LIMITED" | "UPLOADS_BUSY" | "MAINTENANCE" => {
-            "reintenta pasado el tiempo de Retry-After"
-        }
+        "PACKAGE_BLOCKED" => "pick another version or ask whoever maintains the feed",
+        "RATE_LIMITED" | "UPLOADS_BUSY" | "MAINTENANCE" => "retry after the Retry-After time",
         "PACKAGE_INVALID" | "PACKAGE_UNSAFE_PATH" => {
-            "genera el paquete con `dotnet pack` y revisa su contenido"
+            "build the package with `dotnet pack` and check its contents"
         }
         "PACKAGE_LIMIT_EXCEEDED" | "PACKAGE_TOO_LARGE" => {
-            "reduce el paquete o pide a un administrador que amplíe los límites del servidor"
+            "shrink the package or ask an administrator to raise the server limits"
         }
-        "INVALID_REQUEST" | "INVALID_NAME" | "INVALID_CURSOR" => {
-            "revisa los parámetros de la petición"
-        }
-        "LAST_ADMIN" => "crea o reactiva otro administrador antes",
+        "INVALID_REQUEST" | "INVALID_NAME" | "INVALID_CURSOR" => "check the request parameters",
+        "LAST_ADMIN" => "create another administrator first",
         "INTERNAL" | "STORAGE_FULL" => {
-            "contacta con quien opera el servidor e indica el request_id"
+            "contact whoever operates the server and give them the request_id"
         }
         _ => return None,
     })
@@ -298,7 +290,7 @@ impl From<MultipartError> for ApiError {
         if e.status() == StatusCode::PAYLOAD_TOO_LARGE {
             Self::PayloadTooLarge
         } else {
-            Self::BadRequest(format!("multipart inválido: {e}"))
+            Self::BadRequest(format!("invalid multipart: {e}"))
         }
     }
 }
@@ -365,17 +357,17 @@ pub async fn service_index(
         resource(
             format!("{base}/v3/flat/"),
             "PackageBaseAddress/3.0.0",
-            "Contenido de paquetes: versiones, .nupkg y .nuspec.",
+            "Package content: versions, .nupkg and .nuspec.",
         ),
         resource(
             format!("{base}/v3/registration/"),
             "RegistrationsBaseUrl/3.6.0",
-            "Metadatos de paquetes, incluidas versiones SemVer 2.0.0.",
+            "Package metadata, including SemVer 2.0.0 versions.",
         ),
         resource(
             format!("{base}/v2/package"),
             "PackagePublish/2.0.0",
-            "Publicación, unlist y relist.",
+            "Publish, unlist and relist.",
         ),
     ];
     // Mismo endpoint bajo los tipos que buscan las distintas versiones del cliente; 3.5.0
@@ -386,11 +378,7 @@ pub async fn service_index(
         "SearchQueryService/3.0.0-rc",
         "SearchQueryService/3.5.0",
     ] {
-        resources.push(resource(
-            format!("{base}/v3/query"),
-            ty,
-            "Búsqueda de paquetes.",
-        ));
+        resources.push(resource(format!("{base}/v3/query"), ty, "Package search."));
     }
     for ty in [
         "SearchAutocompleteService",
@@ -401,7 +389,7 @@ pub async fn service_index(
         resources.push(resource(
             format!("{base}/v3/autocomplete"),
             ty,
-            "Autocompletado de ids y versiones.",
+            "Id and version autocomplete.",
         ));
     }
     Ok(Json(json!({ "version": "3.0.0", "resources": resources })))
@@ -483,7 +471,7 @@ impl SearchParams {
             semver2: get("semVerLevel")
                 .and_then(|v| NuGetVersion::parse(v).ok())
                 .is_some_and(|v| {
-                    v.precedence_cmp(&NuGetVersion::parse("2.0.0").expect("versión válida"))
+                    v.precedence_cmp(&NuGetVersion::parse("2.0.0").expect("valid version"))
                         .is_ge()
                 }),
         }
@@ -631,7 +619,7 @@ pub async fn flat_file(
         .ok_or(ApiError::NotFound)?;
     // Sigue apareciendo en los metadatos, pero ni el .nupkg ni el .nuspec se sirven (ADR-013).
     if published.blocked {
-        tracing::info!(feed = %feed.name, package = %format!("{id}@{version}"), "descarga de una versión bloqueada rechazada");
+        tracing::info!(feed = %feed.name, package = %format!("{id}@{version}"), "download of a blocked version rejected");
         return Err(ApiError::Blocked);
     }
 
@@ -702,10 +690,9 @@ async fn publish_inner(
 
     // Streaming a staging con hash incremental; nada de la subida queda en memoria (ADR-006).
     let receive = async {
-        let mut field = multipart
-            .next_field()
-            .await?
-            .ok_or_else(|| ApiError::BadRequest("la solicitud no contiene el paquete".into()))?;
+        let mut field = multipart.next_field().await?.ok_or_else(|| {
+            ApiError::BadRequest("the request does not contain the package".into())
+        })?;
         let mut writer = state
             .store
             .blobs()
@@ -737,7 +724,7 @@ async fn publish_inner(
     let manifest = match manifest {
         Ok(m) => m,
         Err(e) => {
-            tracing::warn!(feed = %feed.name, code = e.code(), error = %e, "paquete rechazado en la inspección");
+            tracing::warn!(feed = %feed.name, code = e.code(), error = %e, "package rejected by inspection");
             state
                 .store
                 .record_denied(
@@ -781,21 +768,21 @@ async fn publish_inner(
     match state.store.publish(&feed, &new, staged, Some(&actor)).await {
         Ok(()) => {
             state.search.invalidate();
-            tracing::info!(feed = %feed.name, package = %new.resource(), "paquete publicado");
+            tracing::info!(feed = %feed.name, package = %new.resource(), "package published");
             Ok(StatusCode::CREATED)
         }
         Err(PublishError::Conflict { identical }) => Err(ApiError::Conflict(format!(
-            "{} ya existe en el feed {} {}; las versiones publicadas son inmutables",
+            "{} already exists in feed {} {}; published versions are immutable",
             new.resource(),
             feed.name,
             if identical {
-                "con el mismo contenido"
+                "with the same content"
             } else {
-                "con contenido distinto"
+                "with different content"
             }
         ))),
         Err(PublishError::QuotaExceeded(kind)) => {
-            tracing::warn!(feed = %feed.name, package = %new.resource(), code = kind.code(), "cuota del feed superada");
+            tracing::warn!(feed = %feed.name, package = %new.resource(), code = kind.code(), "feed quota exceeded");
             Err(ApiError::Quota(kind))
         }
         Err(PublishError::StorageFull) => Err(ApiError::InsufficientStorage),

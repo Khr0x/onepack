@@ -111,16 +111,16 @@ impl std::fmt::Display for OpsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Store(e) => e.fmt(f),
-            Self::NotEmpty(p) => write!(f, "{} existe y no está vacío", p.display()),
+            Self::NotEmpty(p) => write!(f, "{} exists and is not empty", p.display()),
             Self::MaintenanceActive(m) => write!(
                 f,
-                "ya hay un mantenimiento en curso ({}, desde {}, caduca {}); si quedó de un backup interrumpido, termínalo con `onepackd maintenance off`",
+                "maintenance is already in progress ({}, since {}, expires {}); if an interrupted backup left it, end it with `onepackd maintenance off`",
                 m.reason, m.started_at, m.expires_at
             ),
-            Self::InvalidBackup(m) => write!(f, "backup inválido: {m}"),
+            Self::InvalidBackup(m) => write!(f, "invalid backup: {m}"),
             Self::CorruptSource { sha256, detail } => write!(
                 f,
-                "el blob {sha256} está dañado ({detail}); ejecuta `onepackd check` antes de hacer backup"
+                "blob {sha256} is corrupt ({detail}); run `onepackd check` before taking a backup"
             ),
         }
     }
@@ -392,7 +392,7 @@ async fn copy_backup(
                 .await
                 .map_err(|e| OpsError::CorruptSource {
                     sha256: sha256.clone(),
-                    detail: format!("no se pudo leer: {e}"),
+                    detail: format!("could not read: {e}"),
                 })?;
         if actual != sha256 || actual_size != size as u64 {
             return Err(OpsError::CorruptSource {
@@ -454,42 +454,42 @@ pub async fn verify_backup(backup: &Path) -> Result<BackupManifest, OpsError> {
         .await
         .map_err(|e| invalid(format!("{}: {e}", manifest_path.display())))?;
     let manifest: BackupManifest =
-        serde_json::from_slice(&bytes).map_err(|e| invalid(format!("manifiesto ilegible: {e}")))?;
+        serde_json::from_slice(&bytes).map_err(|e| invalid(format!("unreadable manifest: {e}")))?;
     if manifest.format != BACKUP_FORMAT {
         return Err(invalid(format!(
-            "formato {} no soportado (esta versión lee el {BACKUP_FORMAT})",
+            "unsupported format {} (this version reads {BACKUP_FORMAT})",
             manifest.format
         )));
     }
     if !MIGRATOR.version_exists(manifest.schema_version) {
         return Err(invalid(format!(
-            "el esquema {} es más nuevo que esta versión de onepackd ({})",
+            "schema {} is newer than this onepackd version ({})",
             manifest.schema_version, manifest.onepackd_version
         )));
     }
     if manifest.database.path != DB_FILE {
-        return Err(invalid("ruta de base inesperada en el manifiesto".into()));
+        return Err(invalid("unexpected database path in the manifest".into()));
     }
     let db = backup.join(DB_FILE);
     let (sha, size) = blocking(move || hash_file(&db))
         .await
         .map_err(|e| invalid(format!("{DB_FILE}: {e}")))?;
     if sha != manifest.database.sha256 || size != manifest.database.size {
-        return Err(invalid(format!("{DB_FILE} no coincide con el manifiesto")));
+        return Err(invalid(format!("{DB_FILE} does not match the manifest")));
     }
     for blob in &manifest.blobs {
         if !is_sha256_hex(&blob.sha256) {
             return Err(invalid(format!(
-                "hash inválido en el manifiesto: {}",
+                "invalid hash in the manifest: {}",
                 blob.sha256
             )));
         }
         let path = backup.join(blob_rel(&blob.sha256));
         let (sha, size) = blocking(move || hash_file(&path))
             .await
-            .map_err(|e| invalid(format!("falta el blob {}: {e}", blob.sha256)))?;
+            .map_err(|e| invalid(format!("blob {} is missing: {e}", blob.sha256)))?;
         if sha != blob.sha256 || size != blob.size {
-            return Err(invalid(format!("el blob {} está dañado", blob.sha256)));
+            return Err(invalid(format!("blob {} is corrupt", blob.sha256)));
         }
     }
     Ok(manifest)
@@ -509,7 +509,7 @@ pub async fn restore(backup: &Path, data_dir: &Path) -> Result<RestoreReport, Op
             let (sha, _) = blocking(move || copy_hashed(&src, &dst)).await?;
             if sha != blob.sha256 {
                 return Err(OpsError::InvalidBackup(format!(
-                    "el blob {} cambió durante la copia",
+                    "blob {} changed during the copy",
                     blob.sha256
                 )));
             }
@@ -519,7 +519,7 @@ pub async fn restore(backup: &Path, data_dir: &Path) -> Result<RestoreReport, Op
         let report = check(data_dir, false).await?;
         if !report.ok() {
             return Err(OpsError::InvalidBackup(format!(
-                "tras restaurar faltan {} blob(s) o están dañados",
+                "after restoring, {} blob(s) are missing or corrupt",
                 report.missing.len() + report.corrupt.len()
             )));
         }
@@ -610,7 +610,7 @@ pub async fn check(data_dir: &Path, verify_hashes: bool) -> Result<CheckReport, 
             if actual != sha {
                 report.corrupt.push(BlobProblem {
                     sha256: sha,
-                    detail: format!("el contenido tiene hash {actual}"),
+                    detail: format!("the content has hash {actual}"),
                     versions,
                 });
             }

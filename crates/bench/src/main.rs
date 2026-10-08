@@ -48,7 +48,7 @@ fn main() {
             .map(|r| r.status().as_u16())
             .unwrap_or(0);
         if status != 200 {
-            eprintln!("{name}: HTTP {status} en {path}");
+            eprintln!("{name}: HTTP {status} on {path}");
             std::process::exit(1);
         }
     }
@@ -89,7 +89,7 @@ fn main() {
         })
         .collect();
     for w in workers {
-        w.join().expect("hilo del benchmark");
+        w.join().expect("benchmark thread");
     }
     let elapsed = started.elapsed().as_secs_f64();
     let samples = samples.lock().unwrap();

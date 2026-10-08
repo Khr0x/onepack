@@ -162,12 +162,9 @@ impl Document {
                 None => top.push(node),
             };
         loop {
-            let event = reader.read_event().map_err(|e| {
-                format!(
-                    "XML inválido en la posición {}: {e}",
-                    reader.error_position()
-                )
-            })?;
+            let event = reader
+                .read_event()
+                .map_err(|e| format!("invalid XML at position {}: {e}", reader.error_position()))?;
             match event {
                 Event::Start(e) => stack.push(element_from(&e, false)?),
                 Event::Empty(e) => {
@@ -175,7 +172,7 @@ impl Document {
                     push(&mut stack, &mut top, Node::Element(el));
                 }
                 Event::End(_) => {
-                    let el = stack.pop().ok_or("cierre sin apertura")?;
+                    let el = stack.pop().ok_or("closing tag without an opening tag")?;
                     push(&mut stack, &mut top, Node::Element(el));
                 }
                 Event::Text(t) => {
@@ -210,7 +207,7 @@ impl Document {
             }
         }
         if !stack.is_empty() {
-            return Err("elementos sin cerrar".into());
+            return Err("unclosed elements".into());
         }
         Ok(Self { nodes: top })
     }
@@ -219,7 +216,7 @@ impl Document {
         Self::parse(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<configuration>\n</configuration>\n",
         )
-        .expect("plantilla válida")
+        .expect("valid template")
     }
 
     pub fn root(&self) -> Option<&Element> {
@@ -337,11 +334,11 @@ impl Document {
             .filter(|k| k != key)
             .collect();
 
-        let root = self.root_mut().expect("el documento tiene <configuration>");
+        let root = self.root_mut().expect("the document has <configuration>");
         if root.child("packageSources").is_none() {
             root.append(Element::new("packageSources", &[]), 0, &indent);
         }
-        let sources = root.child_mut("packageSources").expect("creado arriba");
+        let sources = root.child_mut("packageSources").expect("created above");
         let exists = sources
             .elements()
             .any(|e| e.name == "add" && e.attr("key").as_deref() == Some(key));
@@ -349,7 +346,7 @@ impl Document {
             let existing = sources
                 .elements_mut()
                 .find(|e| e.name == "add" && e.attr("key").as_deref() == Some(key))
-                .expect("comprobado arriba");
+                .expect("checked above");
             existing.set_attr("value", url);
             existing.set_attr("protocolVersion", "3");
             if allow_insecure {
@@ -368,7 +365,7 @@ impl Document {
         }
         let mapping = root
             .child_mut("packageSourceMapping")
-            .expect("creado arriba");
+            .expect("created above");
         if !had_mapping {
             // Con mapeo, NuGet solo usa para cada paquete las fuentes que lo mapean. Para no
             // romper lo que ya restauraba, el resto de fuentes conserva `*`; los patrones de
@@ -377,8 +374,8 @@ impl Document {
             if !clears && !inherited.iter().any(|k| k == "nuget.org") {
                 inherited.push("nuget.org".to_owned());
                 notes.push(
-                    "este NuGet.Config hereda fuentes de otros archivos: se mapea nuget.org a `*`; \
-                     mapea a mano cualquier otra fuente heredada"
+                    "this NuGet.Config inherits sources from other files: nuget.org is mapped to `*`; \
+                     map any other inherited source by hand"
                         .to_owned(),
                 );
             }
@@ -397,7 +394,7 @@ impl Document {
         let ours = mapping
             .elements_mut()
             .find(|e| e.name == "packageSource" && e.attr("key").as_deref() == Some(key))
-            .expect("creado arriba");
+            .expect("created above");
         for pattern in patterns {
             if !ours
                 .elements()
@@ -512,7 +509,7 @@ mod tests {
 
     const EXISTING: &str = r#"<?xml version="1.0" encoding="utf-8"?>
 <configuration>
-    <!-- fuentes del equipo -->
+    <!-- team sources -->
     <packageSources>
         <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
         <add key="legacy" value="https://legacy.example/nuget?a=1&amp;b=2" />
@@ -544,7 +541,7 @@ mod tests {
             false,
         );
         let out = doc.render();
-        assert!(out.contains("<!-- fuentes del equipo -->"));
+        assert!(out.contains("<!-- team sources -->"));
         assert!(out.contains("a=1&amp;b=2"));
         assert!(out.contains(r#"<add key="globalPackagesFolder" value="packages" />"#));
         assert!(out.contains(
@@ -559,7 +556,7 @@ mod tests {
                 ("onepack_internal".to_owned(), vec!["Hemia.*".to_owned()]),
             ]
         );
-        assert_eq!(notes.len(), 0, "nuget.org ya estaba declarado");
+        assert_eq!(notes.len(), 0, "nuget.org was already declared");
         assert!(!out.contains("Password"));
         // Sigue siendo XML válido y con la sangría del archivo.
         assert!(Document::parse(&out).is_ok());

@@ -257,7 +257,7 @@ fn catalog_entry(urls: &FeedUrls, v: &PublishedVersion) -> Value {
             json!({
                 "@id": format!("{}#deprecation", urls.leaf(v)),
                 "reasons": ["Other"],
-                "message": "Versión bloqueada por el registro: no se puede descargar.",
+                "message": "Version blocked by the registry: it cannot be downloaded.",
             }),
         );
     }
@@ -311,8 +311,8 @@ fn page_leaf(urls: &FeedUrls, v: &PublishedVersion) -> Value {
 }
 
 fn page(urls: &FeedUrls, chunk: &[PublishedVersion], inline: bool) -> Value {
-    let first = chunk.first().expect("página no vacía");
-    let last = chunk.last().expect("página no vacía");
+    let first = chunk.first().expect("non-empty page");
+    let last = chunk.last().expect("non-empty page");
     let mut page = json!({
         "@id": urls.page(&first.package_key, &first.version_key, &last.version_key),
         "@type": "catalog:CatalogPage",
@@ -476,7 +476,7 @@ pub fn search(urls: &FeedUrls, index: &SearchIndex, query: &SearchQuery) -> Valu
         .packages
         .iter()
         .filter(|(key, versions)| {
-            let latest = versions.last().expect("al menos una versión");
+            let latest = versions.last().expect("at least one version");
             let text = latest.search_text.as_deref().unwrap_or(key);
             exact_id.as_ref().is_none_or(|id| id == key)
                 && id_terms.iter().all(|t| key.contains(t.as_str()))
@@ -499,7 +499,7 @@ pub fn search(urls: &FeedUrls, index: &SearchIndex, query: &SearchQuery) -> Valu
 }
 
 fn search_result(urls: &FeedUrls, package_key: &str, versions: &[PublishedVersion]) -> Value {
-    let latest = versions.last().expect("al menos una versión");
+    let latest = versions.last().expect("at least one version");
     let md = metadata(latest);
     let registration = urls.registration_index(package_key);
     let types: Vec<Value> = md
@@ -542,12 +542,12 @@ pub fn autocomplete_ids(index: &SearchIndex, query: &SearchQuery) -> Value {
         .filter(|(key, versions)| {
             key.contains(q.as_str())
                 && has_package_type(
-                    versions.last().expect("versión"),
+                    versions.last().expect("version"),
                     query.package_type.as_deref(),
                 )
         })
         .map(|(key, versions)| {
-            let id = versions.last().expect("versión").package_id.as_str();
+            let id = versions.last().expect("version").package_id.as_str();
             (!key.starts_with(q.as_str()), key.as_str(), id)
         })
         .collect();

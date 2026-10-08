@@ -199,30 +199,30 @@ impl std::fmt::Display for PackageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: ", self.code())?;
         match self {
-            Self::NotAZip(e) => write!(f, "el paquete no es un ZIP válido: {e}"),
-            Self::NuspecMissing => f.write_str("el paquete no contiene un .nuspec en la raíz"),
+            Self::NotAZip(e) => write!(f, "the package is not a valid ZIP: {e}"),
+            Self::NuspecMissing => f.write_str("the package has no .nuspec at its root"),
             Self::MultipleNuspecs => {
-                f.write_str("el paquete contiene más de un .nuspec en la raíz")
+                f.write_str("the package has more than one .nuspec at its root")
             }
-            Self::InvalidNuspec(msg) => write!(f, ".nuspec inválido: {msg}"),
-            Self::NuspecTooLarge { limit } => write!(f, "el .nuspec supera {limit} bytes"),
+            Self::InvalidNuspec(msg) => write!(f, "invalid .nuspec: {msg}"),
+            Self::NuspecTooLarge { limit } => write!(f, "the .nuspec exceeds {limit} bytes"),
             Self::TooManyEntries { limit } => {
-                write!(f, "el paquete tiene más de {limit} entradas")
+                write!(f, "the package has more than {limit} entries")
             }
             Self::EntryTooLarge { name, limit } => {
-                write!(f, "la entrada {name:?} supera {limit} bytes descomprimida")
+                write!(f, "entry {name:?} exceeds {limit} bytes uncompressed")
             }
             Self::TooLargeUncompressed { limit } => {
-                write!(f, "el paquete supera {limit} bytes descomprimido")
+                write!(f, "the package exceeds {limit} bytes uncompressed")
             }
             Self::XmlTooDeep { limit } => {
-                write!(f, "el .nuspec supera {limit} niveles de anidamiento")
+                write!(f, "the .nuspec exceeds {limit} nesting levels")
             }
-            Self::Timeout => f.write_str("la inspección del paquete superó el tiempo máximo"),
-            Self::UnsafePath(name) => write!(f, "ruta no permitida en el paquete: {name:?}"),
-            Self::DuplicateEntry(name) => write!(f, "entrada duplicada en el paquete: {name:?}"),
+            Self::Timeout => f.write_str("package inspection exceeded the maximum time"),
+            Self::UnsafePath(name) => write!(f, "path not allowed in the package: {name:?}"),
+            Self::DuplicateEntry(name) => write!(f, "duplicate entry in the package: {name:?}"),
             Self::UnsupportedEntry { name, reason } => {
-                write!(f, "entrada no admitida ({reason}): {name:?}")
+                write!(f, "unsupported entry ({reason}): {name:?}")
             }
         }
     }
@@ -317,13 +317,13 @@ fn read_nuspec_within<R: Read + Seek>(
         if entry.is_symlink() {
             return Err(PackageError::UnsupportedEntry {
                 name,
-                reason: "enlace simbólico",
+                reason: "symbolic link",
             });
         }
         if entry.encrypted() {
             return Err(PackageError::UnsupportedEntry {
                 name,
-                reason: "cifrada",
+                reason: "encrypted",
             });
         }
         if entry.size() > limits.max_entry_bytes {
@@ -435,7 +435,7 @@ fn is_safe_path(name: &str) -> bool {
     let segments: Vec<&str> = path.split('/').collect();
     let (last, rest) = segments
         .split_last()
-        .expect("split devuelve al menos un segmento");
+        .expect("split returns at least one segment");
     rest.iter().all(|s| is_safe_segment(s)) && (last.is_empty() || is_safe_segment(last))
 }
 
@@ -508,7 +508,7 @@ fn parse_nuspec_within(
         match event {
             // Sin DTD no hay entidades definidas por el documento ni externas: descarta las
             // XML bombs (billion laughs) y XXE.
-            Event::DocType(_) => return Err(invalid("DTD no permitido".into())),
+            Event::DocType(_) => return Err(invalid("DTD not allowed".into())),
             Event::Start(e) => {
                 if path.len() >= limits.max_xml_depth {
                     return Err(PackageError::XmlTooDeep {
@@ -549,8 +549,7 @@ fn parse_nuspec_within(
                 } else {
                     resolve_xml_entity(&r.xml10_content()).map(str::to_owned)
                 };
-                let resolved =
-                    resolved.ok_or_else(|| invalid("entidad XML no permitida".into()))?;
+                let resolved = resolved.ok_or_else(|| invalid("XML entity not allowed".into()))?;
                 texts
                     .entry(field.to_owned())
                     .or_default()
@@ -568,8 +567,8 @@ fn parse_nuspec_within(
             .map(|v| v.trim().to_owned())
             .filter(|v| !v.is_empty())
     };
-    let id = take("id").ok_or_else(|| invalid("falta <id>".into()))?;
-    let version = take("version").ok_or_else(|| invalid("falta <version>".into()))?;
+    let id = take("id").ok_or_else(|| invalid("missing <id>".into()))?;
+    let version = take("version").ok_or_else(|| invalid("missing <version>".into()))?;
     metadata.title = take("title");
     metadata.description = take("description");
     metadata.summary = take("summary");
@@ -663,7 +662,7 @@ fn on_element(
 fn dependency(e: &BytesStart<'_>) -> Result<Dependency, PackageError> {
     Ok(Dependency {
         id: attr(e, "id")?
-            .ok_or_else(|| PackageError::InvalidNuspec("<dependency> sin id".into()))?,
+            .ok_or_else(|| PackageError::InvalidNuspec("<dependency> without id".into()))?,
         range: attr(e, "version")?,
     })
 }

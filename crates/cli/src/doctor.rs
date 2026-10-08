@@ -144,7 +144,7 @@ pub fn run(app: &App, args: DoctorArgs) -> CliResult<i32> {
             checks.ok(
                 "context",
                 match &t.name {
-                    Some(n) => format!("contexto {n} -> {}", t.url),
+                    Some(n) => format!("context {n} -> {}", t.url),
                     None => format!("--url {}", t.url),
                 },
             );
@@ -182,15 +182,15 @@ pub fn run(app: &App, args: DoctorArgs) -> CliResult<i32> {
                     line.push_str(&format!(" ({code})"));
                 }
                 if let Some(action) = &c.action {
-                    line.push_str(&format!("\n       acción: {action}"));
+                    line.push_str(&format!("\n       action: {action}"));
                 }
                 line
             })
             .collect();
         lines.push(if ok {
-            "Sin fallos.".to_owned()
+            "No failures.".to_owned()
         } else {
-            "Hay fallos.".to_owned()
+            "There are failures.".to_owned()
         });
         lines.join("\n")
     });
@@ -203,8 +203,8 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
         checks.fail(
             "url",
             "INVALID_URL",
-            format!("URL inválida: {}", target.url),
-            "corrige la URL del contexto con `onepack context add`",
+            format!("invalid URL: {}", target.url),
+            "fix the context URL with `onepack context add`",
         );
         return;
     };
@@ -214,13 +214,13 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
             checks.fail(
                 "dns",
                 "DNS_FAILED",
-                format!("no se pudo resolver {host}: {e}"),
-                "comprueba el nombre del servidor y la configuración DNS",
+                format!("could not resolve {host}: {e}"),
+                "check the server name and the DNS configuration",
             );
             return;
         }
     };
-    checks.ok("dns", format!("{host} -> {} dirección(es)", addrs.len()));
+    checks.ok("dns", format!("{host} -> {} address(es)", addrs.len()));
     let timeout = app
         .global
         .timeout
@@ -229,13 +229,13 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
         .iter()
         .find_map(|a| TcpStream::connect_timeout(a, timeout.min(Duration::from_secs(10))).ok())
     {
-        Some(_) => checks.ok("tcp", format!("conexión a {host}:{port}")),
+        Some(_) => checks.ok("tcp", format!("connected to {host}:{port}")),
         None => {
             checks.fail(
                 "tcp",
                 "CONNECT_FAILED",
-                format!("no se pudo conectar a {host}:{port}"),
-                "comprueba que onepackd esté en marcha y que no lo bloquee un firewall",
+                format!("could not connect to {host}:{port}"),
+                "check that onepackd is running and not blocked by a firewall",
             );
             return;
         }
@@ -260,7 +260,7 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
                     "tls",
                     "TLS_FAILED",
                     message.clone(),
-                    "revisa el certificado del servidor; con una CA propia usa --ca-cert",
+                    "check the server certificate; with a private CA use --ca-cert",
                 );
                 return;
             }
@@ -268,16 +268,16 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
                 checks.fail_with("tls", CliError::from(clone_err(e)));
                 return;
             }
-            Ok(_) => checks.ok("tls", "certificado válido"),
+            Ok(_) => checks.ok("tls", "valid certificate"),
         }
     } else if is_loopback(&host) {
-        checks.ok("tls", "HTTP sin TLS en loopback");
+        checks.ok("tls", "HTTP without TLS on loopback");
     } else {
         checks.warn(
             "tls",
             "PLAINTEXT_HTTP",
-            "HTTP sin TLS: el token viaja en claro",
-            "usa https:// (TLS directo o detrás de un reverse proxy)",
+            "HTTP without TLS: the token travels in clear text",
+            "use https:// (direct TLS or behind a reverse proxy)",
         );
     }
 
@@ -287,7 +287,7 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
             checks.ok(
                 "credentials",
                 format!(
-                    "token opk_{}_… desde {}",
+                    "token opk_{}_… from {}",
                     token_id(&c.token).unwrap_or("?"),
                     c.source.describe()
                 ),
@@ -298,8 +298,8 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
             checks.fail(
                 "credentials",
                 "AUTH_REQUIRED",
-                "no hay token para este contexto",
-                "ejecuta `onepack login` o usa --token-env <VAR>",
+                "there is no token for this context",
+                "run `onepack login` or use --token-env <VAR>",
             );
             return;
         }
@@ -326,11 +326,11 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
     checks.ok(
         "auth",
         format!(
-            "{} ({}{}); el token caduca {expires}",
+            "{} ({}{}); the token expires {expires}",
             me.principal,
             me.kind,
             if me.administrator {
-                ", administrador"
+                ", administrator"
             } else {
                 ""
             }
@@ -347,14 +347,14 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
             "server",
             "CAPABILITY_MISSING",
             format!(
-                "onepackd {server_version} (API v{api_version}) sin API administrativa completa"
+                "onepackd {server_version} (API v{api_version}) without the full administrative API"
             ),
-            "actualiza onepackd para usar todos los comandos del CLI",
+            "upgrade onepackd to use every CLI command",
         ),
         Ok(caps) => checks.ok(
             "server",
             format!(
-                "onepackd {} (API v{}, {} capacidades)",
+                "onepackd {} (API v{}, {} capabilities)",
                 caps.server_version,
                 caps.api_version,
                 caps.capabilities.len()
@@ -364,9 +364,9 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
     }
 
     let Some(feed) = &args.feed else {
-        checks.skip("permissions", "sin --feed");
-        checks.skip("service-index", "sin --feed");
-        checks.skip("nuget-config", "sin --feed");
+        checks.skip("permissions", "no --feed");
+        checks.skip("service-index", "no --feed");
+        checks.skip("nuget-config", "no --feed");
         return;
     };
 
@@ -398,11 +398,11 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
             "permissions",
             "FEED_NOT_FOUND",
             format!(
-                "{} no tiene acceso al feed {feed} (o no existe)",
+                "{} has no access to feed {feed} (or it does not exist)",
                 me.principal
             ),
             &format!(
-                "pide a un administrador: onepack grant add --principal {} --feed {feed} --role {}",
+                "ask an administrator to run: onepack grant add --principal {} --feed {feed} --role {}",
                 me.principal,
                 role_for(args.require)
             ),
@@ -411,18 +411,18 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
             "permissions",
             "AUTH_SCOPE_MISSING",
             format!(
-                "{} tiene {} en {feed}, pero falta {}",
+                "{} has {} on {feed}, but lacks {}",
                 me.principal,
                 scope_name(have),
                 scope_name(args.require)
             ),
             &format!(
-                "pide a un administrador: onepack grant add --principal {} --feed {feed} --role {}",
+                "ask an administrator to run: onepack grant add --principal {} --feed {feed} --role {}",
                 me.principal,
                 role_for(args.require)
             ),
         ),
-        Some(have) => checks.ok("permissions", format!("{} en {feed}", scope_name(have))),
+        Some(have) => checks.ok("permissions", format!("{} on {feed}", scope_name(have))),
     }
 
     // --- Service index ---
@@ -446,20 +446,20 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
                 checks.fail(
                     "service-index",
                     "INVALID_SERVICE_INDEX",
-                    "el service index no anuncia recursos",
-                    "comprueba que la URL apunta a onepackd",
+                    "the service index advertises no resources",
+                    "check that the URL points to onepackd",
                 );
             } else if let Some(first) = foreign.first() {
                 checks.fail(
                     "service-index",
                     "PUBLIC_URL_MISMATCH",
-                    format!("el servidor anuncia URLs con otra base ({first})"),
-                    "haz que --public-url de onepackd coincida con la URL del contexto",
+                    format!("the server advertises URLs with a different base ({first})"),
+                    "make onepackd's --public-url match the context URL",
                 );
             } else {
                 checks.ok(
                     "service-index",
-                    format!("{} recursos en {index_url}", ids.len()),
+                    format!("{} resources at {index_url}", ids.len()),
                 );
             }
         }
@@ -475,12 +475,12 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
 }
 
 fn nuget_config_checks(explicit: Option<PathBuf>, feed: &str, url: &str, checks: &mut Checks) {
-    let init = format!("onepack nuget init --feed {feed} --pattern '<Prefijo>.*'");
+    let init = format!("onepack nuget init --feed {feed} --pattern '<Prefix>.*'");
     let Some(path) = locate_config(explicit) else {
         checks.warn(
             "nuget-config",
             "NUGET_CONFIG_MISSING",
-            "no hay NuGet.Config en este directorio ni en sus padres",
+            "there is no NuGet.Config in this directory or its parents",
             &init,
         );
         return;
@@ -492,7 +492,7 @@ fn nuget_config_checks(explicit: Option<PathBuf>, feed: &str, url: &str, checks:
                 "nuget-config",
                 "INVALID_NUGET_CONFIG",
                 message,
-                "corrige el XML del archivo",
+                "fix the file's XML",
             );
             return;
         }
@@ -501,14 +501,14 @@ fn nuget_config_checks(explicit: Option<PathBuf>, feed: &str, url: &str, checks:
         checks.warn(
             "nuget-config",
             "SOURCE_MISSING",
-            format!("{} no declara {url}", path.display()),
+            format!("{} does not declare {url}", path.display()),
             &init,
         );
         return;
     };
     checks.ok(
         "nuget-config",
-        format!("fuente {key} en {}", path.display()),
+        format!("source {key} in {}", path.display()),
     );
     if doc
         .cleartext_credentials()
@@ -519,17 +519,17 @@ fn nuget_config_checks(explicit: Option<PathBuf>, feed: &str, url: &str, checks:
             "credentials-file",
             "CLEARTEXT_CREDENTIALS",
             format!(
-                "{} guarda la contraseña de {key} en texto plano",
+                "{} stores the password for {key} in plain text",
                 path.display()
             ),
-            "bórrala y usa `onepack exec` o NuGetPackageSourceCredentials_* en CI",
+            "delete it and use `onepack exec`, or NuGetPackageSourceCredentials_* in CI",
         );
     }
     match doc.mapping() {
         None => checks.warn(
             "source-mapping",
             "SOURCE_MAPPING_MISSING",
-            "sin packageSourceMapping: un paquete interno podría resolverse desde otra fuente",
+            "no packageSourceMapping: an internal package could be resolved from another source",
             &init,
         ),
         Some(mapping) => match mapping.iter().find(|(k, _)| k == &key) {
@@ -539,7 +539,7 @@ fn nuget_config_checks(explicit: Option<PathBuf>, feed: &str, url: &str, checks:
             _ => checks.warn(
                 "source-mapping",
                 "SOURCE_MAPPING_MISSING",
-                format!("packageSourceMapping no asigna ningún patrón a {key}"),
+                format!("packageSourceMapping assigns no pattern to {key}"),
                 &init,
             ),
         },
@@ -581,6 +581,6 @@ mod tests {
             Some(("127.0.0.1".into(), 8080))
         );
         assert_eq!(host_port("http://[::1]:9000/"), Some(("::1".into(), 9000)));
-        assert_eq!(host_port("nada"), None);
+        assert_eq!(host_port("nothing"), None);
     }
 }

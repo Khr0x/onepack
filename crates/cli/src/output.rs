@@ -18,7 +18,7 @@ impl Out {
     pub fn data<T: Serialize>(&self, value: &T, human: impl FnOnce() -> String) {
         let mut stdout = std::io::stdout().lock();
         if self.json {
-            let text = serde_json::to_string_pretty(value).expect("los datos son serializables");
+            let text = serde_json::to_string_pretty(value).expect("the data is serializable");
             let _ = writeln!(stdout, "{text}");
         } else {
             let text = human();
@@ -44,7 +44,7 @@ impl Out {
         }
         eprintln!("error: {}: {}", e.code, e.message);
         if let Some(action) = &e.action {
-            eprintln!("  acción: {action}");
+            eprintln!("  action: {action}");
         }
         if let Some(id) = &e.request_id {
             eprintln!("  request_id: {id}");
@@ -61,26 +61,23 @@ impl Out {
             return Err(CliError::new(
                 exit::USAGE,
                 "CONFIRMATION_REQUIRED",
-                format!("{question}: se necesita confirmación"),
+                format!("{question}: confirmation required"),
             )
-            .with_action("repite el comando con --yes"));
+            .with_action("run the command again with --yes"));
         }
-        eprint!("{question} [s/N]: ");
+        eprint!("{question} [y/N]: ");
         let _ = std::io::stderr().flush();
         let mut answer = String::new();
         std::io::stdin()
             .read_line(&mut answer)
             .map_err(|e| CliError::io("stdin", &e))?;
-        if matches!(
-            answer.trim().to_lowercase().as_str(),
-            "s" | "si" | "sí" | "y" | "yes"
-        ) {
+        if matches!(answer.trim().to_lowercase().as_str(), "y" | "yes") {
             Ok(())
         } else {
             Err(CliError::new(
                 exit::ERROR,
                 "CANCELLED",
-                "operación cancelada",
+                "operation cancelled",
             ))
         }
     }
@@ -95,14 +92,16 @@ impl Out {
             s
         } else {
             if self.no_input || !std::io::stdin().is_terminal() {
-                return Err(CliError::usage("no se puede pedir el token sin terminal")
-                    .with_action("pásalo por stdin con --token-stdin"));
+                return Err(
+                    CliError::usage("cannot prompt for the token without a terminal")
+                        .with_action("pass it on stdin with --token-stdin"),
+                );
             }
             rpassword::prompt_password(prompt).map_err(|e| CliError::io("terminal", &e))?
         };
         let secret = secret.trim().to_owned();
         if secret.is_empty() {
-            return Err(CliError::usage("el token está vacío"));
+            return Err(CliError::usage("the token is empty"));
         }
         Ok(secret)
     }
@@ -111,7 +110,7 @@ impl Out {
 /// Tabla de texto con columnas alineadas.
 pub fn table(headers: &[&str], rows: Vec<Vec<String>>) -> String {
     if rows.is_empty() {
-        return "(sin resultados)".to_owned();
+        return "(no results)".to_owned();
     }
     let mut widths: Vec<usize> = headers.iter().map(|h| h.chars().count()).collect();
     for row in &rows {
@@ -167,7 +166,7 @@ mod tests {
             ],
         );
         assert_eq!(t, "NAME   ROLE\nci     publisher\nalice  reader");
-        assert_eq!(table(&["X"], vec![]), "(sin resultados)");
+        assert_eq!(table(&["X"], vec![]), "(no results)");
     }
 
     #[test]

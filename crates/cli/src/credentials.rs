@@ -23,8 +23,8 @@ pub enum Source {
 impl Source {
     pub fn describe(&self) -> String {
         match self {
-            Self::Env(var) => format!("variable {var}"),
-            Self::Keychain => "keychain del sistema".to_owned(),
+            Self::Env(var) => format!("environment variable {var}"),
+            Self::Keychain => "system keychain".to_owned(),
         }
     }
 }
@@ -57,10 +57,10 @@ fn keychain_unavailable(detail: impl std::fmt::Display) -> CliError {
     CliError::new(
         exit::KEYCHAIN,
         "KEYCHAIN_UNAVAILABLE",
-        format!("no hay un keychain del sistema disponible: {detail}"),
+        format!("no system keychain is available: {detail}"),
     )
     .with_action(
-        "en CI o contenedores pasa el token por una variable de entorno: --token-env <VAR> o ONEPACK_TOKEN",
+        "in CI or containers, pass the token in an environment variable: --token-env <VAR> or ONEPACK_TOKEN",
     )
 }
 
@@ -70,7 +70,7 @@ fn keyring_disabled() -> bool {
 
 fn entry(context: &str) -> CliResult<keyring::Entry> {
     if keyring_disabled() {
-        return Err(keychain_unavailable("desactivado con ONEPACK_KEYRING=off"));
+        return Err(keychain_unavailable("disabled with ONEPACK_KEYRING=off"));
     }
     keyring::Entry::new(SERVICE, context).map_err(keychain_unavailable)
 }
@@ -86,11 +86,9 @@ pub fn resolve(context: Option<&str>, token_env: Option<&str>) -> CliResult<Opti
             _ => Err(CliError::new(
                 exit::AUTH,
                 "AUTH_REQUIRED",
-                format!("la variable {var} no está definida o está vacía"),
+                format!("the variable {var} is not set or is empty"),
             )
-            .with_action(format!(
-                "define {var} con el token antes de ejecutar el comando"
-            ))),
+            .with_action(format!("set {var} to the token before running the command"))),
         };
     }
     if let Ok(token) = std::env::var(TOKEN_ENV)

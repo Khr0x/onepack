@@ -53,7 +53,7 @@ pub fn init(app: &App, cmd: NugetCommand) -> CliResult<i32> {
         yes,
     } = cmd;
     let target = app.target()?;
-    let cwd = std::env::current_dir().map_err(|e| CliError::io("directorio actual", &e))?;
+    let cwd = std::env::current_dir().map_err(|e| CliError::io("current directory", &e))?;
     let path = config
         .or_else(|| find_config_in(&cwd))
         .unwrap_or_else(|| cwd.join(CONFIG_NAMES[0]));
@@ -78,7 +78,7 @@ pub fn init(app: &App, cmd: NugetCommand) -> CliResult<i32> {
         return Err(CliError::new(
             exit::USAGE,
             "INVALID_NUGET_CONFIG",
-            format!("{} no tiene un elemento <configuration>", path.display()),
+            format!("{} has no <configuration> element", path.display()),
         ));
     }
 
@@ -91,14 +91,14 @@ pub fn init(app: &App, cmd: NugetCommand) -> CliResult<i32> {
         notes.extend(doc.upsert_source(&key, &url, &patterns, insecure));
         if insecure {
             notes.push(format!(
-                "{key} usa HTTP sin TLS (allowInsecureConnections): úsalo solo en local"
+                "{key} uses HTTP without TLS (allowInsecureConnections): use it only locally"
             ));
         }
         sources.push(SourceView { key, url });
     }
     for key in doc.cleartext_credentials() {
         notes.push(format!(
-            "{} contiene una contraseña en texto plano para {key}; bórrala y usa `onepack exec` o variables de entorno",
+            "{} contains a plain-text password for {key}; delete it and use `onepack exec` or environment variables",
             path.display()
         ));
     }
@@ -108,23 +108,24 @@ pub fn init(app: &App, cmd: NugetCommand) -> CliResult<i32> {
 
     if !app.out.json {
         for note in &notes {
-            app.out.note(format!("aviso: {note}"));
+            app.out.note(format!("warning: {note}"));
         }
         if changed {
             println!("--- {}\n{changes}", path.display());
         } else {
-            app.out.note(format!("{} ya está al día", path.display()));
+            app.out
+                .note(format!("{} is already up to date", path.display()));
         }
     }
     let mut written = false;
     if changed && !dry_run {
         app.out
-            .confirm(&format!("¿Escribir {}?", path.display()), yes)?;
+            .confirm(&format!("Write {}?", path.display()), yes)?;
         std::fs::write(&path, &new).map_err(|e| CliError::io(&path.display().to_string(), &e))?;
         written = true;
         if !app.out.json {
             app.out.note(format!(
-                "{} actualizado. Restaura con: onepack exec --feed {} -- dotnet restore",
+                "{} updated. Restore with: onepack exec --feed {} -- dotnet restore",
                 path.display(),
                 feeds.join(" --feed ")
             ));
@@ -165,12 +166,12 @@ fn check_access(app: &App, target: &Target, token: &str, feeds: &[String]) -> Cl
             let e = CliError::from(e);
             if e.exit == exit::AUTH {
                 return Err(e.with_action(
-                    "la credencial no es válida (revocada, caducada o de un principal desactivado); \
-                     pide un token nuevo a un administrador",
+                    "the credential is not valid (revoked, expired, or belonging to a disabled principal); \
+                     ask an administrator for a new token",
                 ));
             }
             app.out.note(format!(
-                "aviso: no se pudo comprobar la credencial ({}); se ejecuta igualmente",
+                "warning: could not check the credential ({}); running anyway",
                 e.code
             ));
             return Ok(());
@@ -184,10 +185,10 @@ fn check_access(app: &App, target: &Target, token: &str, feeds: &[String]) -> Cl
             return Err(CliError::new(
                 exit::FORBIDDEN,
                 "AUTH_SCOPE_MISSING",
-                format!("{} no tiene acceso al feed {feed} (o el feed no existe)", me.principal),
+                format!("{} has no access to feed {feed} (or the feed does not exist)", me.principal),
             )
             .with_action(format!(
-                "pide a un administrador `onepack grant add --principal {} --feed {feed} --role reader`",
+                "ask an administrator to run `onepack grant add --principal {} --feed {feed} --role reader`",
                 me.principal
             )));
         }
@@ -197,21 +198,21 @@ fn check_access(app: &App, target: &Target, token: &str, feeds: &[String]) -> Cl
 
 pub fn exec(app: &App, args: ExecArgs) -> CliResult<i32> {
     if args.source_name.is_some() && args.feeds.len() > 1 {
-        return Err(CliError::usage("--source-name solo admite un --feed"));
+        return Err(CliError::usage("--source-name accepts only one --feed"));
     }
     let target = app.target()?;
     let credential = app.credential(&target)?.ok_or_else(|| {
         CliError::new(
             exit::AUTH,
             "AUTH_REQUIRED",
-            "no hay credencial para este contexto",
+            "there is no credential for this context",
         )
-        .with_action("ejecuta `onepack login` o usa --token-env <VAR>")
+        .with_action("run `onepack login` or use --token-env <VAR>")
     })?;
     let (program, rest) = args
         .command
         .split_first()
-        .ok_or_else(|| CliError::usage("falta el comando a ejecutar"))?;
+        .ok_or_else(|| CliError::usage("missing the command to run"))?;
     check_access(app, &target, &credential.token, &args.feeds)?;
 
     let mut child = Command::new(program);
@@ -228,7 +229,7 @@ pub fn exec(app: &App, args: ExecArgs) -> CliResult<i32> {
         CliError::new(
             exit::ERROR,
             "EXEC_FAILED",
-            format!("no se pudo ejecutar {program:?}: {e}"),
+            format!("could not run {program:?}: {e}"),
         )
     })?;
     Ok(status.code().unwrap_or_else(|| {

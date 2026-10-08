@@ -13,7 +13,7 @@ pub struct InvalidPackageId(pub String);
 
 impl fmt::Display for InvalidPackageId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "id de paquete inválido: {:?}", self.0)
+        write!(f, "invalid package id: {:?}", self.0)
     }
 }
 

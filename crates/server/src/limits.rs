@@ -99,7 +99,7 @@ impl<K: Eq + Hash> RateLimiter<K> {
         }
         let rate = f64::from(self.limit.per_second);
         let burst = f64::from(self.limit.burst.max(1));
-        let mut buckets = self.buckets.lock().expect("mutex no envenenado");
+        let mut buckets = self.buckets.lock().expect("mutex not poisoned");
         if buckets.len() >= MAX_KEYS && !buckets.contains_key(&key) {
             buckets.retain(|_, b| {
                 b.tokens + now.duration_since(b.updated).as_secs_f64() * rate < burst
@@ -138,7 +138,7 @@ pub async fn limit_by_ip(State(state): State<Arc<AppState>>, req: Request, next:
     if let Some(ip) = ip
         && let Err(retry_after) = state.ip_limiter.check(ip)
     {
-        tracing::warn!(%ip, "límite de peticiones por IP alcanzado");
+        tracing::warn!(%ip, "per-IP rate limit reached");
         let surface = Surface::of(req.uri().path());
         return ApiError::RateLimited(retry_after).render(surface);
     }

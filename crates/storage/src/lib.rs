@@ -53,20 +53,20 @@ impl std::fmt::Display for StoreError {
         match self {
             Self::NotInitialized(p) => write!(
                 f,
-                "no existe {}; ejecuta `onepackd migrate` para inicializar el directorio de datos",
+                "{} does not exist; run `onepackd migrate` to initialize the data directory",
                 p.display()
             ),
             Self::PendingMigrations(n) => write!(
                 f,
-                "hay {n} migración(es) pendiente(s); ejecuta `onepackd migrate` (se hará un backup previo)"
+                "there are {n} pending migration(s); run `onepackd migrate` (it takes a backup first)"
             ),
             Self::SchemaTooNew { version } => write!(
                 f,
-                "la base de datos tiene la migración {version}, más nueva que esta versión de onepackd"
+                "the database has migration {version}, newer than this onepackd version"
             ),
-            Self::Io(e) => write!(f, "error de E/S: {e}"),
-            Self::Database(e) => write!(f, "error de base de datos: {e}"),
-            Self::Migrate(e) => write!(f, "error de migración: {e}"),
+            Self::Io(e) => write!(f, "I/O error: {e}"),
+            Self::Database(e) => write!(f, "database error: {e}"),
+            Self::Migrate(e) => write!(f, "migration error: {e}"),
         }
     }
 }
@@ -482,7 +482,7 @@ impl Store {
         .execute(&self.writer)
         .await;
         if let Err(e) = result {
-            tracing::error!(error = %e, "no se pudo auditar la cuota superada");
+            tracing::error!(error = %e, "could not audit the exceeded quota");
         }
     }
 
@@ -555,7 +555,7 @@ impl Store {
         .execute(&self.writer)
         .await;
         if let Err(e) = result {
-            tracing::error!(error = %e, "no se pudo auditar el conflicto de publicación");
+            tracing::error!(error = %e, "could not audit the publish conflict");
         }
     }
 
@@ -584,7 +584,7 @@ impl Store {
         }
         .await;
         if let Err(e) = result {
-            tracing::error!(error = %e, "no se pudo auditar la denegación");
+            tracing::error!(error = %e, "could not audit the denial");
         }
     }
 
@@ -651,7 +651,7 @@ impl Store {
                 .execute(&self.writer)
                 .await?;
             self.blobs.remove(&sha256).await?;
-            tracing::info!(sha256, "blob huérfano eliminado");
+            tracing::info!(sha256, "orphaned blob deleted");
             report.orphan_blobs_removed += 1;
         }
         Ok(report)
@@ -667,7 +667,7 @@ impl Store {
             tracing::warn!(
                 free_bytes = free,
                 min_free_bytes,
-                "poco espacio libre en el directorio de datos"
+                "low free space in the data directory"
             );
         }
         Ok(free)
@@ -757,7 +757,7 @@ mod tests {
 
         let report = migrate(dir.path()).await.unwrap();
         assert_eq!(report.applied, MIGRATOR.iter().count() - 1);
-        let backup = report.backup.expect("debe existir un backup previo");
+        let backup = report.backup.expect("a pre-migration backup must exist");
 
         let old = SqlitePoolOptions::new()
             .connect_with(SqliteConnectOptions::new().filename(&backup))
@@ -767,12 +767,12 @@ mod tests {
             .fetch_all(&old)
             .await
             .unwrap();
-        assert_eq!(versions, [1], "el backup conserva el esquema anterior");
+        assert_eq!(versions, [1], "the backup keeps the previous schema");
         let feeds: i64 = sqlx::query_scalar("SELECT count(*) FROM feed")
             .fetch_one(&old)
             .await
             .unwrap();
-        assert_eq!(feeds, 1, "el backup conserva los datos");
+        assert_eq!(feeds, 1, "the backup keeps the data");
 
         assert!(
             Store::open(dir.path())

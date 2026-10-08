@@ -321,7 +321,7 @@ async fn zip_bomb_with_real_compression_is_rejected() {
         "PACKAGE_LIMIT_EXCEEDED",
     )
     .await;
-    assert!(reply.body.contains("descomprimido"), "{}", reply.body);
+    assert!(reply.body.contains("uncompressed"), "{}", reply.body);
 }
 
 #[tokio::test]

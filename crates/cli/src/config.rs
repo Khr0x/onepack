@@ -44,9 +44,9 @@ pub fn dir() -> CliResult<PathBuf> {
             CliError::new(
                 exit::ERROR,
                 "CONFIG_DIR_UNKNOWN",
-                "no se pudo determinar el directorio de configuración",
+                "could not determine the configuration directory",
             )
-            .with_action("define ONEPACK_CONFIG_DIR")
+            .with_action("set ONEPACK_CONFIG_DIR")
         })
 }
 
@@ -65,7 +65,7 @@ pub fn validate_name(name: &str) -> CliResult<()> {
         Ok(())
     } else {
         Err(CliError::usage(format!(
-            "nombre de contexto inválido {name:?}: usa letras, dígitos, '-', '_' o '.'"
+            "invalid context name {name:?}: use letters, digits, '-', '_' or '.'"
         )))
     }
 }
@@ -78,7 +78,7 @@ impl Config {
                 CliError::new(
                     exit::ERROR,
                     "INVALID_CONFIG",
-                    format!("{} no es válido: {e}", path.display()),
+                    format!("{} is not valid: {e}", path.display()),
                 )
             }),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
@@ -88,11 +88,9 @@ impl Config {
 
     pub fn save(&self) -> CliResult<()> {
         let path = path()?;
-        let dir = path
-            .parent()
-            .expect("el archivo está dentro de un directorio");
+        let dir = path.parent().expect("the file is inside a directory");
         std::fs::create_dir_all(dir).map_err(|e| CliError::io(&dir.display().to_string(), &e))?;
-        let json = serde_json::to_vec_pretty(self).expect("la configuración es serializable");
+        let json = serde_json::to_vec_pretty(self).expect("the configuration is serializable");
         // Escritura atómica: un corte a mitad no deja el archivo truncado.
         let tmp = dir.join("config.json.tmp");
         std::fs::write(&tmp, json).map_err(|e| CliError::io(&tmp.display().to_string(), &e))?;
@@ -102,20 +100,16 @@ impl Config {
     /// Contexto que se usa: el indicado o el actual.
     pub fn resolve(&self, name: Option<&str>) -> CliResult<(String, Context)> {
         let name = name.or(self.current.as_deref()).ok_or_else(|| {
-            CliError::new(
-                exit::USAGE,
-                "CONTEXT_MISSING",
-                "no hay ningún contexto configurado",
-            )
-            .with_action("crea uno con `onepack context add <nombre> --url <url>`")
+            CliError::new(exit::USAGE, "CONTEXT_MISSING", "no context is configured")
+                .with_action("create one with `onepack context add <name> --url <url>`")
         })?;
         let context = self.contexts.get(name).cloned().ok_or_else(|| {
             CliError::new(
                 exit::USAGE,
                 "CONTEXT_MISSING",
-                format!("no existe el contexto {name:?}"),
+                format!("context {name:?} does not exist"),
             )
-            .with_action("lista los contextos con `onepack context list`")
+            .with_action("list the contexts with `onepack context list`")
         })?;
         Ok((name.to_owned(), context))
     }

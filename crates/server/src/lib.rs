@@ -197,12 +197,12 @@ pub async fn gc_loop(store: Arc<Store>, interval: Duration, grace: Duration) {
         // Durante un backup (ADR-017) no se borra nada.
         match store.maintenance().await {
             Ok(Some(_)) => {
-                tracing::info!("limpieza pospuesta: mantenimiento en curso");
+                tracing::info!("cleanup postponed: maintenance in progress");
                 continue;
             }
             Ok(None) => {}
             Err(e) => {
-                tracing::error!(error = %e, "no se pudo consultar el modo mantenimiento");
+                tracing::error!(error = %e, "could not query maintenance mode");
                 continue;
             }
         }
@@ -215,7 +215,7 @@ pub async fn gc_loop(store: Arc<Store>, interval: Duration, grace: Duration) {
                 );
             }
             Ok(_) => {}
-            Err(e) => tracing::error!(error = %e, "fallo en la limpieza"),
+            Err(e) => tracing::error!(error = %e, "cleanup failed"),
         }
     }
 }
@@ -254,7 +254,7 @@ pub async fn backfill_metadata(
             Err(e) => tracing::error!(
                 version_id = missing.version_id,
                 error = %e,
-                "no se pudieron leer los metadatos del paquete"
+                "could not read the package metadata"
             ),
         }
     }

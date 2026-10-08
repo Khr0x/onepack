@@ -1,83 +1,77 @@
-# Convenciones del proyecto
+# Project conventions
 
-## Binarios y crates
+## Binaries and crates
 
-| Binario | Crate | Función |
+| Binary | Crate | Role |
 |---|---|---|
-| `onepackd` | `onepack-server` | Servidor del registro. |
-| `onepack` | `onepack-cli` | CLI administrativo. |
+| `onepackd` | `onepack-server` | Registry server. |
+| `onepack` | `onepack-cli` | Administrative CLI. |
 
-Librerías: `onepack-core`, `onepack-nuget`, `onepack-storage`, `onepack-api-client`. Las dependencias permitidas entre ellas están en [ADR-003](../roadmap/adr-mvp.md#adr-003) y las verifica `scripts/check-crate-deps.sh` en CI.
+Libraries: `onepack-core`, `onepack-nuget`, `onepack-storage`, `onepack-api-client`. The allowed dependencies between them are in [ADR-003](../roadmap/adr-mvp.md#adr-003) and are checked by `scripts/check-crate-deps.sh` in CI.
 
 ## Toolchain
 
-- Versión fijada en `rust-toolchain.toml`. Ese valor es también el MSRV (`rust-version` del workspace).
-- Para subir la versión se cambian ambos valores en el mismo PR.
-- `unsafe` está prohibido en todo el workspace (`unsafe_code = "forbid"`).
+- Version pinned in `rust-toolchain.toml`. That value is also the MSRV (the workspace `rust-version`).
+- To bump the version, change both values in the same PR.
+- `unsafe` is forbidden across the workspace (`unsafe_code = "forbid"`).
 
-## Errores
+## Language
 
-Todo error que llegue a un usuario (API `/api/v1`, CLI o log de operación) tiene:
+- Everything users see is in English: CLI and server messages, `--help` texts, logs and metrics descriptions.
+- Documentation, commits and pull requests are written in English. A document still in Spanish is translated in full the next time it is edited, rather than mixing languages.
 
-| Campo | Ejemplo | Regla |
+## Errors
+
+Every error that reaches a user (API `/api/v1`, CLI or operations log) has:
+
+| Field | Example | Rule |
 |---|---|---|
-| `code` | `AUTH_SCOPE_MISSING` | `SCREAMING_SNAKE_CASE`, prefijo por área, **estable**: no se renombra una vez publicado. |
-| `message` | `La credencial es válida, pero no permite publicar en "internal".` | Legible y sin secretos. |
-| `action` | `Requiere el permiso packages:publish.` | Opcional. Indica qué hacer. |
-| `request_id` | `req_01J…` | Presente en toda respuesta HTTP. |
+| `code` | `AUTH_SCOPE_MISSING` | `SCREAMING_SNAKE_CASE`, prefixed by area, **stable**: never renamed once published. |
+| `message` | `the credential is valid, but lacks the packages:publish permission on this feed` | Readable and free of secrets. |
+| `action` | `ask an administrator for a sufficient role: …` | Optional. Says what to do. |
+| `request_id` | `3f9c0a1b2c3d4e5f` | Present in every HTTP response. |
 
-Formato JSON en `/api/v1`:
+JSON format in `/api/v1`:
 
 ```json
 {
   "error": {
     "code": "AUTH_SCOPE_MISSING",
-    "message": "La credencial es válida, pero no permite publicar en \"internal\".",
-    "action": "Requiere el permiso packages:publish.",
-    "request_id": "req_01J..."
+    "message": "the credential is valid, but lacks the packages:publish permission on this feed",
+    "action": "ask an administrator for a sufficient role: `onepack grant add --principal <principal> --feed <feed> --role <role>`",
+    "request_id": "3f9c0a1b2c3d4e5f"
   }
 }
 ```
 
-Los endpoints del protocolo NuGet responden con el código HTTP que exige el protocolo. Incluyen además `X-Request-Id`.
+The NuGet protocol endpoints respond with the HTTP status the protocol requires. They also include `X-Request-Id`.
 
-### Prefijos de código
+### Code prefixes
 
-| Prefijo | Área |
+| Prefix | Area |
 |---|---|
-| `AUTH_` | Autenticación y autorización. |
+| `AUTH_` | Authentication and authorization. |
 | `FEED_` | Feeds. |
-| `PKG_` | Paquetes y versiones (validación, duplicados, estados). |
-| `LIMIT_` | Cuotas, límites de tamaño y de tasa. |
-| `STORAGE_` | Base de datos y blobs. |
-| `MAINT_` | Modo mantenimiento, backup, migraciones. |
-| `CLI_` | Errores locales del CLI (configuración, keychain, entrada). |
+| `PKG_` | Packages and versions (validation, duplicates, states). |
+| `LIMIT_` | Quotas, size limits and rate limits. |
+| `STORAGE_` | Database and blobs. |
+| `MAINT_` | Maintenance mode, backup, migrations. |
+| `CLI_` | Local CLI errors (configuration, keychain, input). |
 
-Los secretos nunca aparecen en mensajes, logs ni salidas de diagnóstico.
+Secrets never appear in messages, logs or diagnostic output.
 
-## Códigos de salida del CLI
+## CLI exit codes
 
-| Código | Significado |
-|---|---|
-| `0` | Éxito. |
-| `1` | Error genérico o inesperado. |
-| `2` | Uso incorrecto (argumentos o flags inválidos). |
-| `3` | Autenticación fallida o credencial ausente. |
-| `4` | Permiso denegado. |
-| `5` | Recurso no encontrado. |
-| `6` | Conflicto (p. ej. versión ya existente con contenido distinto). |
-| `7` | Servidor no disponible, timeout o modo mantenimiento. |
+The table is fixed since Phase 6 closed; changing it requires a major CLI version ([ADR-015](../roadmap/adr-mvp.md#adr-015)). The full table, with codes 0 to 10, is in [docs/cli.md](cli.md#exit-codes).
 
-La tabla es definitiva cuando se cierra la Fase 6. Después, cambiarla exige una versión mayor del CLI ([ADR-015](../roadmap/adr-mvp.md#adr-015)).
+## Commits and branches
 
-## Commits y ramas
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/): `feat(nuget): …`, `fix(storage): …`, `docs(adr): …`, `ci: …`, `chore: …`.
+- Scope = the crate's short name (`core`, `nuget`, `storage`, `api-client`, `server`, `cli`) or an area (`adr`, `roadmap`, `ci`).
+- Branches: `feature/phase-N-<short-description>` for roadmap work and `fix/<description>` for fixes.
+- Every PR goes through green CI before it is merged into `main`.
 
-- Commits con [Conventional Commits](https://www.conventionalcommits.org/): `feat(nuget): …`, `fix(storage): …`, `docs(adr): …`, `ci: …`, `chore: …`.
-- Scope = nombre corto del crate (`core`, `nuget`, `storage`, `api-client`, `server`, `cli`) o área (`adr`, `roadmap`, `ci`).
-- Ramas: `fase-N/<descripcion-corta>` para trabajo del roadmap y `fix/<descripcion>` para correcciones.
-- Todo PR pasa por CI en verde antes de fusionarse en `main`.
+## Decisions
 
-## Decisiones
-
-- Las decisiones de arquitectura van en [roadmap/adr-mvp.md](../roadmap/adr-mvp.md). Su ciclo de vida está descrito en ese documento.
-- Un PR que contradiga un ADR `Aceptado` debe incluir el ADR que lo reemplaza.
+- Architecture decisions go in [roadmap/adr-mvp.md](../roadmap/adr-mvp.md). Their life cycle is described in that document.
+- A PR that contradicts an `Accepted` ADR must include the ADR that replaces it.

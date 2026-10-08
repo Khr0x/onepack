@@ -23,10 +23,10 @@ use crate::output::Out;
 #[command(
     name = "onepack",
     version,
-    about = "CLI del registro privado onepack",
-    after_help = "Códigos de salida: 0 ok, 1 error, 2 uso, 3 sin credencial, 4 sin permiso, \
-                  5 no encontrado, 6 conflicto, 7 no disponible, 8 servidor incompatible, \
-                  9 sin keychain, 10 doctor con fallos."
+    about = "CLI for the onepack private registry",
+    after_help = "Exit codes: 0 ok, 1 error, 2 usage, 3 no credential, 4 no permission, \
+                  5 not found, 6 conflict, 7 unavailable, 8 incompatible server, \
+                  9 no keychain, 10 doctor found failures."
 )]
 struct Cli {
     #[command(flatten)]
@@ -37,19 +37,19 @@ struct Cli {
 
 #[derive(Args)]
 struct GlobalArgs {
-    /// Contexto a usar (por defecto, el actual).
+    /// Context to use (defaults to the current one).
     #[arg(long, global = true, env = "ONEPACK_CONTEXT")]
     context: Option<String>,
-    /// URL del servidor; tiene prioridad sobre el contexto.
+    /// Server URL; takes precedence over the context.
     #[arg(long, global = true, env = "ONEPACK_URL")]
     url: Option<String>,
-    /// Variable de entorno que contiene el token (p. ej. en pipelines).
+    /// Environment variable that holds the token (e.g. in pipelines).
     #[arg(long, global = true, value_name = "VAR")]
     token_env: Option<String>,
-    /// Salida en JSON (esquema estable).
+    /// JSON output (stable schema).
     #[arg(long, global = true)]
     json: bool,
-    /// No pedir nada por terminal: lo que requiera confirmación falla sin --yes.
+    /// Never prompt: anything that needs confirmation fails without --yes.
     #[arg(
         long,
         global = true,
@@ -57,55 +57,55 @@ struct GlobalArgs {
         value_parser = clap::builder::FalseyValueParser::new()
     )]
     no_input: bool,
-    /// Tiempo máximo por petición, en segundos (30 por defecto; 600 en push).
+    /// Maximum time per request, in seconds (30 by default; 600 for push).
     #[arg(long, global = true, env = "ONEPACK_TIMEOUT", value_name = "SECS")]
     timeout: Option<u64>,
-    /// CA adicional (PEM) para servidores con certificados de una CA propia.
+    /// Extra CA (PEM) for servers with certificates from a private CA.
     #[arg(long, global = true, env = "ONEPACK_CA_CERT", value_name = "PEM")]
     ca_cert: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    /// Servidores configurados.
+    /// Configured servers.
     #[command(subcommand)]
     Context(ContextCommand),
-    /// Guarda el token del contexto en el keychain del sistema.
+    /// Stores the context token in the system keychain.
     Login {
-        /// Lee el token de stdin en lugar de pedirlo por terminal.
+        /// Reads the token from stdin instead of prompting.
         #[arg(long)]
         token_stdin: bool,
     },
-    /// Borra el token del contexto del keychain.
+    /// Removes the context token from the keychain.
     Logout,
-    /// Identidad y permisos de la credencial en uso.
+    /// Identity and permissions of the credential in use.
     Whoami,
-    /// Feeds.
+    /// Feeds and quotas.
     #[command(subcommand)]
     Feed(FeedCommand),
-    /// Usuarios y cuentas de servicio (administración).
+    /// Users and service accounts (admin).
     #[command(subcommand)]
     Principal(PrincipalCommand),
-    /// Tokens (administración).
+    /// Tokens (admin).
     #[command(subcommand)]
     Token(TokenCommand),
-    /// Permisos por feed (administración).
+    /// Per-feed permissions (admin).
     #[command(subcommand)]
     Grant(GrantCommand),
-    /// Paquetes y versiones.
+    /// Packages and versions.
     #[command(subcommand)]
     Package(PackageCommand),
-    /// Registro de auditoría (administración).
+    /// Audit log (admin).
     #[command(subcommand)]
     Audit(AuditCommand),
-    /// Configuración de clientes NuGet.
+    /// NuGet client configuration.
     #[command(subcommand)]
     Nuget(NugetCommand),
-    /// Ejecuta un comando con las credenciales NuGet del feed solo en su entorno.
+    /// Runs a command with the feed's NuGet credentials set only in its environment.
     Exec(ExecArgs),
-    /// Diagnostica conexión, TLS, credencial, permisos y configuración NuGet.
+    /// Diagnoses connection, TLS, credential, permissions and NuGet configuration.
     Doctor(DoctorArgs),
-    /// Script de autocompletado para la shell.
+    /// Shell completion script.
     Completion {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
@@ -114,26 +114,26 @@ enum Command {
 
 #[derive(Subcommand)]
 pub enum ContextCommand {
-    /// Añade o actualiza un contexto.
+    /// Adds or updates a context.
     Add {
         name: String,
         #[arg(long)]
         url: String,
-        /// CA adicional (PEM) para este servidor.
+        /// Extra CA (PEM) for this server.
         #[arg(long, value_name = "PEM")]
         ca_cert: Option<PathBuf>,
-        /// Lo convierte en el contexto actual.
+        /// Makes it the current context.
         #[arg(long = "use")]
         make_current: bool,
     },
+    /// Lists contexts.
     List,
-    /// Cambia el contexto actual.
-    Use {
-        name: String,
-    },
-    /// Elimina un contexto y su token del keychain.
+    /// Switches the current context.
+    Use { name: String },
+    /// Removes a context and its token from the keychain.
     Remove {
         name: String,
+        /// Skips the confirmation prompt.
         #[arg(long)]
         yes: bool,
     },
@@ -141,14 +141,13 @@ pub enum ContextCommand {
 
 #[derive(Subcommand)]
 pub enum FeedCommand {
-    Create {
-        name: String,
-    },
+    /// Creates a feed.
+    Create { name: String },
+    /// Lists the feeds visible to the credential.
     List,
-    Show {
-        name: String,
-    },
-    /// Cuotas del feed. Lo que no se indique se mantiene; 0 es sin límite.
+    /// Shows a feed with its usage and quotas.
+    Show { name: String },
+    /// Feed quotas. Anything not given is kept; 0 means no limit.
     Configure {
         name: String,
         #[arg(long)]
@@ -166,18 +165,21 @@ pub enum KindArg {
 
 #[derive(Subcommand)]
 pub enum PrincipalCommand {
+    /// Creates a user or a service account.
     Create {
         name: String,
         #[arg(long, value_enum, default_value = "user")]
         kind: KindArg,
-        /// Rol Administrator.
+        /// Global administrator role.
         #[arg(long)]
         admin: bool,
     },
+    /// Lists principals.
     List,
-    /// Desactiva un principal: sus tokens dejan de funcionar.
+    /// Disables a principal permanently: its tokens stop working.
     Disable {
         name: String,
+        /// Skips the confirmation prompt.
         #[arg(long)]
         yes: bool,
     },
@@ -185,7 +187,7 @@ pub enum PrincipalCommand {
 
 #[derive(Subcommand)]
 pub enum TokenCommand {
-    /// Emite un token. Se muestra una sola vez.
+    /// Issues a token. It is shown only once.
     Create {
         #[arg(long)]
         principal: String,
@@ -194,12 +196,15 @@ pub enum TokenCommand {
         #[arg(long, default_value_t = 90, value_parser = clap::value_parser!(u32).range(1..=3650))]
         expires_in_days: u32,
     },
+    /// Lists active tokens, without secrets.
     List {
         #[arg(long)]
         principal: Option<String>,
     },
+    /// Revokes a token (ID: the 16 characters after `opk_`).
     Revoke {
         id: String,
+        /// Skips the confirmation prompt.
         #[arg(long)]
         yes: bool,
     },
@@ -214,7 +219,7 @@ pub enum RoleArg {
 
 #[derive(Subcommand)]
 pub enum GrantCommand {
-    /// Asigna (o reemplaza) el rol de un principal en un feed.
+    /// Assigns (or replaces) a principal's role on a feed.
     Add {
         #[arg(long)]
         principal: String,
@@ -222,18 +227,21 @@ pub enum GrantCommand {
         feed: String,
         #[arg(long, value_enum)]
         role: RoleArg,
-        /// Restringe la publicación a ids que coincidan (p. ej. "Hemia.*"). Repetible.
+        /// Restricts publishing to matching ids (e.g. "Hemia.*"). Repeatable.
         #[arg(long = "publish-pattern")]
         publish_patterns: Vec<String>,
     },
+    /// Removes a principal's access to a feed.
     Remove {
         #[arg(long)]
         principal: String,
         #[arg(long)]
         feed: String,
+        /// Skips the confirmation prompt.
         #[arg(long)]
         yes: bool,
     },
+    /// Lists grants.
     List {
         #[arg(long)]
         principal: Option<String>,
@@ -244,39 +252,43 @@ pub enum GrantCommand {
 
 #[derive(Subcommand)]
 pub enum PackageCommand {
+    /// Lists the packages in a feed.
     List {
         #[arg(long)]
         feed: String,
     },
-    /// Versiones de un paquete, o el detalle de una versión.
+    /// A package's versions, or the details of one version.
     Inspect {
         #[arg(long)]
         feed: String,
         id: String,
         version: Option<String>,
     },
-    /// Publica uno o varios .nupkg.
+    /// Publishes one or more .nupkg files.
     Push {
         #[arg(long)]
         feed: String,
         #[arg(required = true)]
         files: Vec<PathBuf>,
-        /// Si la versión ya existe con el mismo contenido, no es un error.
+        /// An existing version with the same content is not an error.
         #[arg(long)]
         skip_existing_identical: bool,
     },
-    /// Oculta una versión de la búsqueda (sigue descargable).
+    /// Hides a version from search (it can still be downloaded).
     Unlist(VersionArgs),
+    /// Shows an unlisted version in search again.
     Relist(VersionArgs),
-    /// Impide descargar una versión.
+    /// Prevents a version from being downloaded.
     Block {
         #[command(flatten)]
         version: VersionArgs,
         #[arg(long)]
         reason: String,
+        /// Skips the confirmation prompt.
         #[arg(long)]
         yes: bool,
     },
+    /// Allows a blocked version to be downloaded again.
     Unblock {
         #[command(flatten)]
         version: VersionArgs,
@@ -295,11 +307,11 @@ pub struct VersionArgs {
 
 #[derive(Subcommand)]
 pub enum AuditCommand {
-    /// Eventos del más reciente al más antiguo.
+    /// Events, newest first.
     List {
         #[arg(long)]
         feed: Option<String>,
-        /// Prefijo de la acción (p. ej. "package." o "token.create").
+        /// Action prefix (e.g. "package." or "token.create").
         #[arg(long)]
         action: Option<String>,
         #[arg(long, default_value_t = 50)]
@@ -309,20 +321,21 @@ pub enum AuditCommand {
 
 #[derive(Subcommand)]
 pub enum NugetCommand {
-    /// Añade los feeds a NuGet.Config con packageSourceMapping, sin secretos.
+    /// Adds the feeds to NuGet.Config with packageSourceMapping, without secrets.
     Init {
-        /// Feed a añadir. Repetible.
+        /// Feed to add. Repeatable.
         #[arg(long = "feed", required = true)]
         feeds: Vec<String>,
-        /// Ids que se resuelven desde onepack (p. ej. "Hemia.*"). Repetible.
+        /// Ids resolved from onepack (e.g. "Hemia.*"). Repeatable.
         #[arg(long = "pattern", required = true)]
         patterns: Vec<String>,
-        /// Archivo a modificar (por defecto, el NuGet.Config del directorio actual).
+        /// File to modify (defaults to NuGet.Config in the current directory).
         #[arg(long)]
         config: Option<PathBuf>,
-        /// Muestra el diff sin escribir.
+        /// Shows the diff without writing.
         #[arg(long)]
         dry_run: bool,
+        /// Skips the confirmation prompt.
         #[arg(long)]
         yes: bool,
     },
@@ -330,13 +343,13 @@ pub enum NugetCommand {
 
 #[derive(Args)]
 pub struct ExecArgs {
-    /// Feed cuyas credenciales se inyectan. Repetible.
+    /// Feed whose credentials are injected. Repeatable.
     #[arg(long = "feed", required = true)]
     pub feeds: Vec<String>,
-    /// Clave de la fuente en NuGet.Config (por defecto `onepack_<feed>`). Solo con un feed.
+    /// Source key in NuGet.Config (defaults to `onepack_<feed>`). Only with a single feed.
     #[arg(long)]
     pub source_name: Option<String>,
-    /// Comando y argumentos.
+    /// Command and arguments.
     #[arg(last = true, required = true)]
     pub command: Vec<String>,
 }
@@ -350,13 +363,13 @@ pub enum ScopeArg {
 
 #[derive(Args)]
 pub struct DoctorArgs {
-    /// Feed a comprobar (permisos, service index, NuGet.Config).
+    /// Feed to check (permissions, service index, NuGet.Config).
     #[arg(long)]
     pub feed: Option<String>,
-    /// Permiso que debe tener la credencial en el feed.
+    /// Permission the credential must have on the feed.
     #[arg(long, value_enum, default_value = "read")]
     pub require: ScopeArg,
-    /// NuGet.Config a revisar (por defecto, el del directorio actual o superiores).
+    /// NuGet.Config to check (defaults to the one in the current directory or its parents).
     #[arg(long)]
     pub config: Option<PathBuf>,
 }
@@ -411,6 +424,6 @@ fn run(command: Command, global: Global, out: Out) -> error::CliResult<i32> {
         Command::Nuget(cmd) => nuget::init(&app, cmd),
         Command::Exec(args) => nuget::exec(&app, args),
         Command::Doctor(args) => doctor::run(&app, args),
-        Command::Completion { .. } => unreachable!("atendido arriba"),
+        Command::Completion { .. } => unreachable!("handled above"),
     }
 }

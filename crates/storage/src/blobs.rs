@@ -140,8 +140,8 @@ impl BlobStore {
     /// Si ya existe un blob con el mismo hash se reutiliza (deduplicación).
     pub async fn persist(&self, mut staged: StagedBlob) -> io::Result<()> {
         let target = self.path(&staged.sha256);
-        let shard2 = target.parent().expect("blob con directorio");
-        let shard1 = shard2.parent().expect("blob con directorio");
+        let shard2 = target.parent().expect("blob with a directory");
+        let shard1 = shard2.parent().expect("blob with a directory");
 
         if fs::try_exists(&target).await? {
             // Renueva la fecha para que la limpieza de huérfanos no lo borre mientras
