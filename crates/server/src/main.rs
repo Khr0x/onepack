@@ -24,10 +24,10 @@ const INITIAL_TOKEN_TTL_DAYS: i64 = 30;
 #[command(
     name = "onepackd",
     version,
-    about = "Servidor del registro privado onepack"
+    about = "Server for the onepack private registry"
 )]
 struct Cli {
-    /// Formato de los logs (stderr): texto para personas o JSON para agregadores.
+    /// Log format (stderr): text for people or JSON for aggregators.
     #[arg(
         long,
         global = true,
@@ -48,102 +48,102 @@ enum LogFormat {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Inicializa un directorio de datos: migra el esquema y genera la credencial
-    /// administrativa inicial.
+    /// Initializes a data directory: migrates the schema and generates the initial
+    /// administrative credential.
     Init(DataDir),
-    /// Crea o actualiza el esquema del directorio de datos (hace backup si ya había datos).
+    /// Creates or updates the data directory schema (takes a backup if there was data).
     Migrate {
-        /// Solo informa de la versión del esquema y de las migraciones pendientes.
+        /// Only reports the schema version and pending migrations.
         #[arg(long)]
         check: bool,
         #[command(flatten)]
         data: DataDir,
     },
-    /// Copia consistente de la base y los blobs, con manifiesto (ADR-017). Activa el modo
-    /// mantenimiento mientras dura: el servidor rechaza mutaciones, las lecturas siguen.
+    /// Consistent copy of the database and blobs, with a manifest (ADR-017). Enables
+    /// maintenance mode while it runs: the server rejects mutations, reads keep working.
     Backup {
         #[command(flatten)]
         data: DataDir,
-        /// Directorio de destino (vacío o inexistente).
+        /// Destination directory (empty or nonexistent).
         #[arg(long)]
         output: PathBuf,
-        /// Duración máxima del mantenimiento si el backup se interrumpe.
+        /// Maximum maintenance duration if the backup is interrupted.
         #[arg(long, default_value_t = 3600)]
         maintenance_timeout_secs: u64,
     },
-    /// Restaura un backup en un directorio de datos vacío, tras verificar el manifiesto.
+    /// Restores a backup into an empty data directory, after verifying the manifest.
     Restore {
-        /// Directorio del backup.
+        /// Backup directory.
         #[arg(long)]
         from: PathBuf,
         #[command(flatten)]
         data: DataDir,
     },
-    /// Integridad entre la base y los blobs: faltantes, dañados y huérfanos.
+    /// Integrity between the database and the blobs: missing, corrupt and orphaned.
     Check {
         #[command(flatten)]
         data: DataDir,
-        /// No lee cada blob: solo existencia y tamaño.
+        /// Does not read every blob: only existence and size.
         #[arg(long)]
         quick: bool,
         #[arg(long)]
         json: bool,
     },
-    /// Modo mantenimiento manual.
+    /// Manual maintenance mode.
     #[command(subcommand)]
     Maintenance(MaintenanceCommand),
-    /// Gestión local de feeds.
+    /// Local feed management.
     #[command(subcommand)]
     Feed(FeedCommand),
-    /// Gestión local de principals (usuarios y cuentas de servicio).
+    /// Local principal management (users and service accounts).
     #[command(subcommand)]
     Principal(PrincipalCommand),
-    /// Gestión local de tokens.
+    /// Local token management.
     #[command(subcommand)]
     Token(TokenCommand),
-    /// Gestión local de permisos por feed.
+    /// Local per-feed permission management.
     #[command(subcommand)]
     Grant(GrantCommand),
-    /// Gestión local de versiones publicadas.
+    /// Local management of published versions.
     #[command(subcommand)]
     Package(PackageCommand),
-    /// Inicia el servidor.
+    /// Starts the server.
     Serve(ServeArgs),
 }
 
 #[derive(Args)]
 struct DataDir {
-    /// Directorio de datos.
+    /// Data directory.
     #[arg(long, env = "ONEPACK_DATA_DIR")]
     data_dir: PathBuf,
 }
 
 #[derive(Subcommand)]
 enum FeedCommand {
-    /// Crea un feed NuGet.
+    /// Creates a NuGet feed.
     Create {
         name: String,
         #[command(flatten)]
         data: DataDir,
     },
-    /// Lista los feeds.
+    /// Lists the feeds.
     List {
         #[command(flatten)]
         data: DataDir,
     },
-    /// Muestra el uso y las cuotas de un feed.
+    /// Shows a feed's usage and quotas.
     Show {
         name: String,
         #[command(flatten)]
         data: DataDir,
     },
-    /// Fija las cuotas de un feed (0 = sin límite). No afecta a lo ya publicado.
+    /// Sets a feed's quotas (0 = no limit). Does not affect what is already published.
     Quota {
         name: String,
-        /// Almacenamiento máximo, en MiB (suma de los tamaños de todas las versiones).
+        /// Maximum storage, in MiB (sum of the sizes of all versions).
         #[arg(long)]
         max_storage_mib: u64,
-        /// Número máximo de versiones.
+        /// Maximum number of versions.
         #[arg(long)]
         max_versions: u64,
         #[command(flatten)]
@@ -153,21 +153,22 @@ enum FeedCommand {
 
 #[derive(Subcommand)]
 enum MaintenanceCommand {
-    /// Activa el mantenimiento: el servidor rechaza mutaciones con 503.
+    /// Enables maintenance: the server rejects mutations with 503.
     On {
         #[arg(long)]
         reason: String,
-        /// Se desactiva solo pasado este tiempo.
+        /// Turns itself off after this time.
         #[arg(long, default_value_t = 3600)]
         duration_secs: u64,
         #[command(flatten)]
         data: DataDir,
     },
-    /// Termina el mantenimiento (también uno que dejó un backup interrumpido).
+    /// Ends maintenance (including one left by an interrupted backup).
     Off {
         #[command(flatten)]
         data: DataDir,
     },
+    /// Shows whether maintenance is active.
     Status {
         #[command(flatten)]
         data: DataDir,
@@ -176,9 +177,9 @@ enum MaintenanceCommand {
 
 #[derive(Subcommand)]
 enum PackageCommand {
-    /// Bloquea la descarga de una versión (sigue visible en los metadatos).
+    /// Blocks downloads of a version (it stays visible in the metadata).
     Block(AvailabilityArgs),
-    /// Desbloquea una versión.
+    /// Unblocks a version.
     Unblock(AvailabilityArgs),
 }
 
@@ -190,7 +191,7 @@ struct AvailabilityArgs {
     id: String,
     #[arg(long)]
     version: String,
-    /// Motivo; queda en la auditoría.
+    /// Reason; recorded in the audit log.
     #[arg(long)]
     reason: String,
     #[command(flatten)]
@@ -205,12 +206,12 @@ enum KindArg {
 
 #[derive(Subcommand)]
 enum PrincipalCommand {
-    /// Crea un usuario o una cuenta de servicio.
+    /// Creates a user or a service account.
     Create {
         name: String,
         #[arg(long, value_enum, default_value = "user")]
         kind: KindArg,
-        /// Rol Administrator: gestiona identidades, permisos y todos los feeds.
+        /// Administrator role: manages identities, permissions and every feed.
         #[arg(long)]
         admin: bool,
         #[command(flatten)]
@@ -220,11 +221,11 @@ enum PrincipalCommand {
 
 #[derive(Subcommand)]
 enum TokenCommand {
-    /// Emite un token. El token se escribe en stdout y no se puede recuperar después.
+    /// Issues a token. The token is written to stdout and cannot be retrieved later.
     Create {
         #[arg(long)]
         principal: String,
-        /// Nombre descriptivo (p. ej. "pipeline de pagos").
+        /// Descriptive name (e.g. "payments pipeline").
         #[arg(long)]
         name: Option<String>,
         #[arg(long, default_value_t = 90, value_parser = clap::value_parser!(i64).range(1..=3650))]
@@ -232,7 +233,7 @@ enum TokenCommand {
         #[command(flatten)]
         data: DataDir,
     },
-    /// Revoca un token por su id (los 16 caracteres que siguen a `opk_`).
+    /// Revokes a token by its id (the 16 characters after `opk_`).
     Revoke {
         id: String,
         #[command(flatten)]
@@ -249,7 +250,7 @@ enum RoleArg {
 
 #[derive(Subcommand)]
 enum GrantCommand {
-    /// Asigna (o reemplaza) el rol de un principal en un feed.
+    /// Assigns (or replaces) a principal's role on a feed.
     Set {
         #[arg(long)]
         principal: String,
@@ -257,13 +258,13 @@ enum GrantCommand {
         feed: String,
         #[arg(long, value_enum)]
         role: RoleArg,
-        /// Restringe la publicación a ids que coincidan (p. ej. "Hemia.Payments.*"). Repetible.
+        /// Restricts publishing to matching ids (e.g. "Hemia.Payments.*"). Repeatable.
         #[arg(long = "publish-pattern")]
         publish_patterns: Vec<String>,
         #[command(flatten)]
         data: DataDir,
     },
-    /// Quita el acceso de un principal a un feed.
+    /// Removes a principal's access to a feed.
     Remove {
         #[arg(long)]
         principal: String,
@@ -278,28 +279,28 @@ enum GrantCommand {
 struct ServeArgs {
     #[command(flatten)]
     data: DataDir,
-    /// Dirección de escucha.
+    /// Listen address.
     #[arg(long, env = "ONEPACK_LISTEN", default_value = "127.0.0.1:8080")]
     listen: SocketAddr,
-    /// URL pública con la que los clientes acceden al servidor (p. ej. https://packages.example.com).
+    /// Public URL clients use to reach the server (e.g. https://packages.example.com).
     #[arg(long, env = "ONEPACK_PUBLIC_URL")]
     public_url: String,
-    /// Tamaño máximo de un paquete, en MiB.
+    /// Maximum package size, in MiB.
     #[arg(long, env = "ONEPACK_MAX_PACKAGE_SIZE_MIB", default_value_t = 100)]
     max_package_size_mib: u64,
-    /// Antigüedad mínima, en segundos, de un archivo en staging o de un blob huérfano para
-    /// eliminarlo. Debe superar la duración de cualquier subida: un valor bajo puede borrar
-    /// subidas en curso. Usa 0 solo en pruebas.
+    /// Minimum age, in seconds, of a staging file or an orphaned blob before it is
+    /// deleted. It must exceed the duration of any upload: a low value can delete uploads
+    /// in progress. Use 0 only in tests.
     #[arg(long, env = "ONEPACK_GC_GRACE_SECS", default_value_t = 3600)]
     gc_grace_secs: u64,
-    /// Intervalo entre limpiezas, en segundos.
+    /// Interval between cleanups, in seconds.
     #[arg(long, env = "ONEPACK_GC_INTERVAL_SECS", default_value_t = 600)]
     gc_interval_secs: u64,
-    /// Por debajo de este espacio libre, en MiB, se emite un aviso al arrancar.
+    /// Below this much free space, in MiB, a warning is logged at startup.
     #[arg(long, env = "ONEPACK_MIN_FREE_SPACE_MIB", default_value_t = 1024)]
     min_free_space_mib: u64,
-    /// Listener de operación sin autenticación: /metrics, /healthz y /readyz. Úsalo en una
-    /// interfaz interna (p. ej. 127.0.0.1:9464).
+    /// Unauthenticated operations listener: /metrics, /healthz and /readyz. Use it on an
+    /// internal interface (e.g. 127.0.0.1:9464).
     #[arg(long, env = "ONEPACK_OPS_LISTEN")]
     ops_listen: Option<SocketAddr>,
     #[command(flatten)]
@@ -309,48 +310,48 @@ struct ServeArgs {
 /// Límites frente a paquetes no confiables y saturación (ADR-014).
 #[derive(Args)]
 struct LimitArgs {
-    /// Número máximo de entradas del ZIP de un paquete.
+    /// Maximum number of entries in a package ZIP.
     #[arg(long, env = "ONEPACK_MAX_ZIP_ENTRIES", default_value_t = 20_000)]
     max_zip_entries: u64,
-    /// Tamaño descomprimido máximo de una entrada del paquete, en MiB.
+    /// Maximum uncompressed size of one package entry, in MiB.
     #[arg(long, env = "ONEPACK_MAX_ENTRY_SIZE_MIB", default_value_t = 512)]
     max_entry_size_mib: u64,
-    /// Tamaño descomprimido máximo del paquete completo, en MiB.
+    /// Maximum uncompressed size of the whole package, in MiB.
     #[arg(
         long,
         env = "ONEPACK_MAX_UNCOMPRESSED_SIZE_MIB",
         default_value_t = 2048
     )]
     max_uncompressed_size_mib: u64,
-    /// Tamaño máximo del .nuspec, en KiB.
+    /// Maximum .nuspec size, in KiB.
     #[arg(long, env = "ONEPACK_MAX_NUSPEC_SIZE_KIB", default_value_t = 1024)]
     max_nuspec_size_kib: u64,
-    /// Profundidad máxima de anidamiento XML del .nuspec.
+    /// Maximum XML nesting depth of the .nuspec.
     #[arg(long, env = "ONEPACK_MAX_XML_DEPTH", default_value_t = 32)]
     max_xml_depth: usize,
-    /// Tiempo máximo de inspección de un paquete, en segundos.
+    /// Maximum time to inspect a package, in seconds.
     #[arg(long, env = "ONEPACK_INSPECTION_TIMEOUT_SECS", default_value_t = 30)]
     inspection_timeout_secs: u64,
-    /// Inspecciones simultáneas (por defecto, la mitad de los núcleos).
+    /// Concurrent inspections (defaults to half the cores).
     #[arg(long, env = "ONEPACK_MAX_CONCURRENT_INSPECTIONS")]
     max_concurrent_inspections: Option<usize>,
-    /// Subidas simultáneas; el resto recibe 503.
+    /// Concurrent uploads; the rest get 503.
     #[arg(long, env = "ONEPACK_MAX_CONCURRENT_UPLOADS", default_value_t = 8)]
     max_concurrent_uploads: usize,
-    /// Tiempo máximo para recibir una subida, en segundos.
+    /// Maximum time to receive an upload, in seconds.
     #[arg(long, env = "ONEPACK_UPLOAD_TIMEOUT_SECS", default_value_t = 600)]
     upload_timeout_secs: u64,
-    /// Peticiones por segundo sostenidas por principal (0 = sin límite).
+    /// Sustained requests per second per principal (0 = no limit).
     #[arg(long, env = "ONEPACK_PRINCIPAL_RATE_LIMIT", default_value_t = 50)]
     principal_rate_limit: u32,
-    /// Ráfaga máxima por principal.
+    /// Maximum burst per principal.
     #[arg(long, env = "ONEPACK_PRINCIPAL_RATE_BURST", default_value_t = 1000)]
     principal_rate_burst: u32,
-    /// Peticiones por segundo sostenidas por IP (0 = sin límite). Detrás de un reverse
-    /// proxy todas comparten la IP del proxy.
+    /// Sustained requests per second per IP (0 = no limit). Behind a reverse proxy
+    /// they all share the proxy's IP.
     #[arg(long, env = "ONEPACK_IP_RATE_LIMIT", default_value_t = 100)]
     ip_rate_limit: u32,
-    /// Ráfaga máxima por IP.
+    /// Maximum burst per IP.
     #[arg(long, env = "ONEPACK_IP_RATE_BURST", default_value_t = 2000)]
     ip_rate_burst: u32,
 }
@@ -391,14 +392,14 @@ async fn require_principal(store: &Store, name: &str) -> CliResult<Principal> {
     Ok(store
         .principal(name)
         .await?
-        .ok_or_else(|| format!("no existe el principal {name:?}"))?)
+        .ok_or_else(|| format!("principal {name:?} does not exist"))?)
 }
 
 async fn require_feed(store: &Store, name: &str) -> CliResult<onepack_core::Feed> {
     Ok(store
         .feed(name)
         .await?
-        .ok_or_else(|| format!("no existe el feed {name:?}"))?)
+        .ok_or_else(|| format!("feed {name:?} does not exist"))?)
 }
 
 #[tokio::main]
@@ -428,19 +429,19 @@ async fn main() -> CliResult {
             let status = schema_status(&data.data_dir).await?;
             match status.current {
                 None => println!(
-                    "directorio sin inicializar; esquema disponible: {}",
+                    "uninitialized directory; available schema: {}",
                     status.latest
                 ),
                 Some(v) => println!(
-                    "esquema {v} (esta versión de onepackd llega a {})",
+                    "schema {v} (this onepackd version goes up to {})",
                     status.latest
                 ),
             }
             if status.pending.is_empty() {
-                println!("sin migraciones pendientes");
+                println!("no pending migrations");
             } else {
                 println!(
-                    "{} migración(es) pendiente(s): {:?}; `onepackd migrate` hará antes un backup",
+                    "{} pending migration(s): {:?}; `onepackd migrate` will take a backup first",
                     status.pending.len(),
                     status.pending
                 );
@@ -450,11 +451,11 @@ async fn main() -> CliResult {
             let report = migrate(&data.data_dir).await?;
             match report.backup {
                 Some(backup) => println!(
-                    "{} migración(es) aplicada(s); backup previo en {}",
+                    "{} migration(s) applied; pre-migration backup in {}",
                     report.applied,
                     backup.display()
                 ),
-                None => println!("{} migración(es) aplicada(s)", report.applied),
+                None => println!("{} migration(s) applied", report.applied),
             }
         }
         Command::Backup {
@@ -472,7 +473,7 @@ async fn main() -> CliResult {
             .await?;
             let bytes: u64 = manifest.blobs.iter().map(|b| b.size).sum();
             println!(
-                "backup en {} ({:.1} s): esquema {}, {} feed(s), {} versión(es), {} blob(s), {} bytes",
+                "backup in {} ({:.1} s): schema {}, {} feed(s), {} version(s), {} blob(s), {} bytes",
                 output.display(),
                 started.elapsed().as_secs_f64(),
                 manifest.schema_version,
@@ -482,14 +483,14 @@ async fn main() -> CliResult {
                 bytes
             );
             println!(
-                "No incluye la configuración del servicio (flags o variables de entorno) ni certificados: guárdalos aparte."
+                "It does not include the service configuration (flags or environment variables) or certificates: store them separately."
             );
         }
         Command::Restore { from, data } => {
             let report = restore(&from, &data.data_dir).await?;
             restrict_permissions(&data.data_dir, 0o700)?;
             println!(
-                "restaurado en {}: esquema {} ({} migración(es) aplicada(s)), {} versión(es), {} blob(s) verificados",
+                "restored into {}: schema {} ({} migration(s) applied), {} version(s), {} blob(s) verified",
                 data.data_dir.display(),
                 report.schema_version,
                 report.migrations_applied,
@@ -505,7 +506,7 @@ async fn main() -> CliResult {
                 print_check(&report);
             }
             if !report.ok() {
-                return Err("la comprobación encontró blobs faltantes o dañados".into());
+                return Err("the check found missing or corrupt blobs".into());
             }
         }
         Command::Maintenance(cmd) => maintenance(cmd).await?,
@@ -526,7 +527,7 @@ async fn main() -> CliResult {
                 .create_principal(&name, kind, admin, &local_actor())
                 .await?;
             store.close().await;
-            println!("principal creado: {} ({})", p.name, p.kind.as_str());
+            println!("principal created: {} ({})", p.name, p.kind.as_str());
         }
         Command::Token(cmd) => token(cmd).await?,
         Command::Grant(cmd) => grant(cmd).await?,
@@ -542,7 +543,7 @@ async fn init(data_dir: &Path) -> CliResult {
     let store = Store::open(data_dir).await?;
     if store.has_admin().await? {
         store.close().await;
-        return Err("el directorio de datos ya tiene un administrador; usa `onepackd token create` para emitir otra credencial".into());
+        return Err("the data directory already has an administrator; use `onepackd token create` to issue another credential".into());
     }
 
     let actor = local_actor();
@@ -557,7 +558,7 @@ async fn init(data_dir: &Path) -> CliResult {
     let issued = store
         .create_token(
             &admin,
-            Some("credencial inicial"),
+            Some("initial credential"),
             INITIAL_TOKEN_TTL_DAYS * 86_400,
             &actor,
         )
@@ -567,8 +568,8 @@ async fn init(data_dir: &Path) -> CliResult {
     let path = data_dir.join(INITIAL_TOKEN_FILE);
     write_secret_file(&path, &issued.token)?;
     println!(
-        "Directorio inicializado. Credencial administrativa inicial (caduca {}) en:\n  {}\n\
-         Guárdala en un gestor de secretos y borra el archivo.",
+        "Directory initialized. Initial administrative credential (expires {}) in:\n  {}\n\
+         Store it in a secrets manager and delete the file.",
         issued.expires_at,
         path.display()
     );
@@ -605,7 +606,7 @@ async fn feed(cmd: FeedCommand) -> CliResult {
             let store = Store::open(&data.data_dir).await?;
             let feed = store.create_feed(&name, &local_actor()).await?;
             store.close().await;
-            println!("feed creado: {}", feed.name);
+            println!("feed created: {}", feed.name);
         }
         FeedCommand::List { data } => {
             let store = Store::open(&data.data_dir).await?;
@@ -620,15 +621,15 @@ async fn feed(cmd: FeedCommand) -> CliResult {
             let usage = store.feed_usage(&feed).await?;
             let quota = store.feed_quota(&feed).await?;
             store.close().await;
-            let limit = |v: Option<u64>| v.map_or("sin límite".to_owned(), |v| v.to_string());
+            let limit = |v: Option<u64>| v.map_or("no limit".to_owned(), |v| v.to_string());
             println!("feed:            {}", feed.name);
             println!(
-                "versiones:       {} (cuota: {})",
+                "versions:        {} (quota: {})",
                 usage.versions,
                 limit(quota.max_versions)
             );
             println!(
-                "almacenamiento:  {} bytes (cuota: {})",
+                "storage:         {} bytes (quota: {})",
                 usage.storage_bytes,
                 limit(quota.max_storage_bytes)
             );
@@ -647,7 +648,7 @@ async fn feed(cmd: FeedCommand) -> CliResult {
             let feed = require_feed(&store, &name).await?;
             store.set_feed_quota(&feed, quota, &local_actor()).await?;
             store.close().await;
-            println!("cuotas de {} actualizadas", feed.name);
+            println!("quotas for {} updated", feed.name);
         }
     }
     Ok(())
@@ -660,7 +661,7 @@ async fn package(cmd: PackageCommand) -> CliResult {
     };
     let reason = args.reason.trim();
     if reason.is_empty() {
-        return Err("el motivo no puede estar vacío".into());
+        return Err("the reason cannot be empty".into());
     }
     let id = PackageId::parse(&args.id)?.identity();
     let version = NuGetVersion::parse(&args.version)?.identity();
@@ -670,13 +671,13 @@ async fn package(cmd: PackageCommand) -> CliResult {
         .set_blocked(&feed, &id, &version, blocked, reason, &local_actor())
         .await?;
     store.close().await;
-    let state = if blocked { "bloqueada" } else { "disponible" };
+    let state = if blocked { "blocked" } else { "available" };
     match change {
         VersionChange::NotFound => {
-            Err(format!("no existe {id}@{version} en el feed {}", feed.name).into())
+            Err(format!("{id}@{version} does not exist in feed {}", feed.name).into())
         }
         VersionChange::Unchanged => {
-            println!("{id}@{version} ya estaba {state}");
+            println!("{id}@{version} was already {state}");
             Ok(())
         }
         VersionChange::Changed => {
@@ -688,16 +689,16 @@ async fn package(cmd: PackageCommand) -> CliResult {
 
 fn print_check(report: &CheckReport) {
     println!(
-        "{} versión(es), {} blob(s) comprobados{}",
+        "{} version(s), {} blob(s) checked{}",
         report.versions,
         report.blobs_checked,
         if report.hashes_verified {
-            " con verificación de hash"
+            " with hash verification"
         } else {
-            " (sin verificar hashes: --quick)"
+            " (hashes not verified: --quick)"
         }
     );
-    for (label, problems) in [("FALTA", &report.missing), ("DAÑADO", &report.corrupt)] {
+    for (label, problems) in [("MISSING", &report.missing), ("CORRUPT", &report.corrupt)] {
         for p in problems {
             println!(
                 "{label} {} ({}): {}",
@@ -709,19 +710,19 @@ fn print_check(report: &CheckReport) {
     }
     if !report.orphan_files.is_empty() {
         println!(
-            "{} blob(s) huérfano(s) (los elimina la limpieza tras el periodo de gracia)",
+            "{} orphaned blob(s) (cleanup deletes them after the grace period)",
             report.orphan_files.len()
         );
     }
     if report.staging_files > 0 {
-        println!("{} archivo(s) en staging", report.staging_files);
+        println!("{} file(s) in staging", report.staging_files);
     }
     println!(
         "{}",
         if report.ok() {
-            "Integridad correcta."
+            "Integrity OK."
         } else {
-            "Hay versiones que no se pueden descargar: restaura sus blobs desde un backup."
+            "Some versions cannot be downloaded: restore their blobs from a backup."
         }
     );
 }
@@ -739,12 +740,10 @@ async fn maintenance(cmd: MaintenanceCommand) -> CliResult {
                 .await?;
             store.close().await;
             match result {
-                Ok(()) => println!(
-                    "mantenimiento activo ({reason}) durante {duration_secs} s como máximo"
-                ),
+                Ok(()) => println!("maintenance active ({reason}) for at most {duration_secs} s"),
                 Err(active) => {
                     return Err(format!(
-                        "ya hay un mantenimiento en curso: {} (hasta {})",
+                        "maintenance is already in progress: {} (until {})",
                         active.reason, active.expires_at
                     )
                     .into());
@@ -758,9 +757,9 @@ async fn maintenance(cmd: MaintenanceCommand) -> CliResult {
             println!(
                 "{}",
                 if ended {
-                    "mantenimiento terminado"
+                    "maintenance ended"
                 } else {
-                    "no había mantenimiento"
+                    "there was no maintenance"
                 }
             );
         }
@@ -770,13 +769,13 @@ async fn maintenance(cmd: MaintenanceCommand) -> CliResult {
             store.close().await;
             match state {
                 Some(m) => println!(
-                    "mantenimiento activo: {} (por {}, desde {}, caduca {})",
+                    "maintenance active: {} (by {}, since {}, expires {})",
                     m.reason,
                     m.actor.as_deref().unwrap_or("?"),
                     m.started_at,
                     m.expires_at
                 ),
-                None => println!("sin mantenimiento"),
+                None => println!("no maintenance"),
             }
         }
     }
@@ -804,7 +803,7 @@ async fn token(cmd: TokenCommand) -> CliResult {
             store.close().await;
             // Solo el token va a stdout, para poder capturarlo en scripts.
             eprintln!(
-                "token {} para {} (caduca {}); no se volverá a mostrar",
+                "token {} for {} (expires {}); it will not be shown again",
                 issued.id, principal.name, issued.expires_at
             );
             println!("{}", issued.token);
@@ -814,9 +813,9 @@ async fn token(cmd: TokenCommand) -> CliResult {
             let revoked = store.revoke_token(&id, &local_actor()).await?;
             store.close().await;
             if !revoked {
-                return Err(format!("no existe un token activo con id {id:?}").into());
+                return Err(format!("there is no active token with id {id:?}").into());
             }
-            println!("token {id} revocado");
+            println!("token {id} revoked");
         }
     }
     Ok(())
@@ -847,7 +846,7 @@ async fn grant(cmd: GrantCommand) -> CliResult {
                 .set_grant(&p, &f, role, &patterns, &local_actor())
                 .await?;
             store.close().await;
-            println!("{} es {} en {}", p.name, role.as_str(), f.name);
+            println!("{} is {} on {}", p.name, role.as_str(), f.name);
         }
         GrantCommand::Remove {
             principal,
@@ -860,9 +859,9 @@ async fn grant(cmd: GrantCommand) -> CliResult {
             let removed = store.remove_grant(&p, &f, &local_actor()).await?;
             store.close().await;
             if !removed {
-                return Err(format!("{} no tenía acceso a {}", p.name, f.name).into());
+                return Err(format!("{} had no access to {}", p.name, f.name).into());
             }
-            println!("acceso de {} a {} eliminado", p.name, f.name);
+            println!("{}'s access to {} removed", p.name, f.name);
         }
     }
     Ok(())
@@ -871,14 +870,14 @@ async fn grant(cmd: GrantCommand) -> CliResult {
 async fn serve(args: ServeArgs) -> CliResult {
     let store = Arc::new(Store::open(&args.data.data_dir).await?);
     let free = Store::check_data_dir(&args.data.data_dir, args.min_free_space_mib << 20).await?;
-    tracing::info!(free_mib = free >> 20, "directorio de datos verificado");
+    tracing::info!(free_mib = free >> 20, "data directory verified");
     let limits = args.limits.limits(args.max_package_size_mib << 20);
     let filled = backfill_metadata(&store, &limits.inspection).await?;
     if filled > 0 {
-        tracing::info!(versions = filled, "metadatos rellenados");
+        tracing::info!(versions = filled, "metadata backfilled");
     }
     if !store.has_admin().await? {
-        tracing::warn!("no hay ningún administrador; ejecuta `onepackd init`");
+        tracing::warn!("there is no administrator; run `onepackd init`");
     }
 
     tokio::spawn(gc_loop(
@@ -890,15 +889,15 @@ async fn serve(args: ServeArgs) -> CliResult {
     let (router, ops_router) = app_with_ops(store.clone(), &args.public_url, limits);
     if let Some(addr) = args.ops_listen {
         let listener = tokio::net::TcpListener::bind(addr).await?;
-        tracing::info!(listen = %addr, "listener de operación (/metrics, /healthz, /readyz)");
+        tracing::info!(listen = %addr, "operations listener (/metrics, /healthz, /readyz)");
         tokio::spawn(async move {
             if let Err(e) = axum::serve(listener, ops_router).await {
-                tracing::error!(error = %e, "el listener de operación terminó");
+                tracing::error!(error = %e, "the operations listener stopped");
             }
         });
     }
     let listener = tokio::net::TcpListener::bind(args.listen).await?;
-    tracing::info!(listen = %args.listen, public_url = %args.public_url, "onepackd escuchando");
+    tracing::info!(listen = %args.listen, public_url = %args.public_url, "onepackd listening");
     // Con la dirección del cliente, para el límite de peticiones por IP.
     axum::serve(
         listener,
@@ -907,7 +906,7 @@ async fn serve(args: ServeArgs) -> CliResult {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
     store.close().await;
-    tracing::info!("onepackd detenido");
+    tracing::info!("onepackd stopped");
     Ok(())
 }
 
@@ -931,5 +930,5 @@ async fn shutdown_signal() {
         () = ctrl_c => {}
         () = terminate => {}
     }
-    tracing::info!("parando: se terminan las peticiones en curso");
+    tracing::info!("stopping: finishing requests in progress");
 }

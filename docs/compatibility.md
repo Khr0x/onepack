@@ -1,53 +1,53 @@
-# Matriz de clientes comprobados
+# Verified client matrix
 
-> No se promete "compatibilidad total" con NuGet: solo lo que aparece aquí como comprobado
+> We do not promise "full compatibility" with NuGet: only what is listed here as verified
 > ([ADR-009](../roadmap/adr-mvp.md#adr-009), [ADR-019](../roadmap/adr-mvp.md#adr-019)).
 >
-> Última actualización: 2026-10-04
+> Last updated: 2026-10-07
 
-## Recursos del protocolo
+## Protocol resources
 
-| Recurso (`@type`) | Ruta | Notas |
+| Resource (`@type`) | Route | Notes |
 |---|---|---|
-| `PackageBaseAddress/3.0.0` | `/nuget/{feed}/v3/flat/` | Incluye versiones no listadas y bloqueadas; la descarga de una bloqueada responde `410`. |
-| `RegistrationsBaseUrl/3.6.0` | `/nuget/{feed}/v3/registration/` | Incluye SemVer 2.0.0, versiones no listadas (`listed: false`) y bloqueadas (con `deprecation`). Páginas de 64 versiones, inline hasta 128. Sin compresión gzip. |
-| `SearchQueryService` (y `/3.0.0-beta`, `/3.0.0-rc`, `/3.5.0`) | `/nuget/{feed}/v3/query` | `q`, `skip`, `take`, `prerelease`, `semVerLevel`, `packageType`. Solo versiones listadas. Sintaxis: términos libres, `id:` y `packageid:`. |
-| `SearchAutocompleteService` (y `/3.0.0-beta`, `/3.0.0-rc`, `/3.5.0`) | `/nuget/{feed}/v3/autocomplete` | Ids (`q`) y versiones de un id (`id`). |
-| `PackagePublish/2.0.0` | `/nuget/{feed}/v2/package` | `PUT` (publicar), `DELETE` (unlist), `POST` (relist). Errores con código estable al inicio del texto (`CÓDIGO: mensaje`). |
+| `PackageBaseAddress/3.0.0` | `/nuget/{feed}/v3/flat/` | Includes unlisted and blocked versions; downloading a blocked one responds `410`. |
+| `RegistrationsBaseUrl/3.6.0` | `/nuget/{feed}/v3/registration/` | Includes SemVer 2.0.0, unlisted versions (`listed: false`) and blocked ones (with `deprecation`). Pages of 64 versions, inline up to 128. No gzip compression. |
+| `SearchQueryService` (and `/3.0.0-beta`, `/3.0.0-rc`, `/3.5.0`) | `/nuget/{feed}/v3/query` | `q`, `skip`, `take`, `prerelease`, `semVerLevel`, `packageType`. Listed versions only. Syntax: free terms, `id:` and `packageid:`. |
+| `SearchAutocompleteService` (and `/3.0.0-beta`, `/3.0.0-rc`, `/3.5.0`) | `/nuget/{feed}/v3/autocomplete` | Ids (`q`) and the versions of an id (`id`). |
+| `PackagePublish/2.0.0` | `/nuget/{feed}/v2/package` | `PUT` (publish), `DELETE` (unlist), `POST` (relist). Errors carry a stable code at the start of the text (`CODE: message`). |
 
-No implementados: API V2 (OData), catálogo, `ReadmeUriTemplate`, `PackageDetailsUriTemplate`, servidor de símbolos, contadores de descargas (siempre 0) e iconos embebidos (`iconUrl` solo si el paquete declara una URL).
+Not implemented: V2 API (OData), catalog, `ReadmeUriTemplate`, `PackageDetailsUriTemplate`, symbol server, download counts (always 0) and embedded icons (`iconUrl` only if the package declares a URL).
 
-## Clientes
+## Clients
 
-Leyenda: ✅ comprobado · ⏳ pendiente · ➖ fuera del alcance actual.
+Legend: ✅ verified · ⏳ pending · ➖ out of current scope.
 
-CI de referencia: ejecución [37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143) (2026-10-04).
+Reference CI: run [37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143) (2026-10-04).
 
-| Cliente | Versión | Plataforma | Operaciones comprobadas | Cómo | Estado |
+| Client | Version | Platform | Verified operations | How | Status |
 |---|---|---|---|---|---|
-| `dotnet` CLI | SDK 8.0 (LTS anterior) | Linux | push, 409, search (con y sin prerelease, exacta), restore con rango, delete (unlist) | `scripts/e2e-dotnet.sh` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
-| `dotnet` CLI | SDK 10.0 (LTS actual) | Linux, detrás de nginx con TLS | igual que arriba, por HTTPS con CA propia | `ONEPACK_E2E_TLS=1` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
-| `dotnet` CLI | SDK 8.0 y 10.0 | macOS | igual que arriba | `scripts/e2e-dotnet.sh` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
-| `dotnet` CLI | SDK 8.0 | Windows | restore con credenciales en `NuGet.Config`, run | `tests/conformance-dotnet/e2e-windows.ps1` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
-| `nuget.exe` | última de dist.nuget.org | Windows | push, 409, search (con y sin prerelease), install con rango | `tests/conformance-dotnet/e2e-windows.ps1` en CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
-| GitHub Actions | — | Linux, macOS, Windows | push y restore con credenciales inyectadas por variables de entorno | los propios jobs de CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
-| Visual Studio | — | Windows | navegación y restore | manual | ⏳ diferido al piloto (Fase 8) |
-| JetBrains Rider | — | Windows / macOS | navegación y restore | manual | ⏳ diferido al piloto (Fase 8) |
-| Azure Pipelines | — | Linux | restore y push | — | ➖ sin entorno de prueba |
+| `dotnet` CLI | SDK 8.0 (previous LTS) | Linux | push, 409, search (with and without prerelease, exact), restore with a range, delete (unlist) | `scripts/e2e-dotnet.sh` in CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| `dotnet` CLI | SDK 10.0 (current LTS) | Linux, behind nginx with TLS | same as above, over HTTPS with a private CA | `ONEPACK_E2E_TLS=1` in CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| `dotnet` CLI | SDK 8.0 and 10.0 | macOS | same as above | `scripts/e2e-dotnet.sh` in CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| `dotnet` CLI | SDK 8.0 | Windows | restore with credentials in `NuGet.Config`, run | `tests/conformance-dotnet/e2e-windows.ps1` in CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| `nuget.exe` | latest from dist.nuget.org | Windows | push, 409, search (with and without prerelease), install with a range | `tests/conformance-dotnet/e2e-windows.ps1` in CI | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| GitHub Actions | — | Linux, macOS, Windows | push and restore with credentials injected through environment variables | the CI jobs themselves | ✅ [CI](https://github.com/Khr0x/onepack/actions/runs/37185158143) |
+| Visual Studio | — | Windows | browsing and restore | manual | ⏳ deferred to the pilot (Phase 8) |
+| JetBrains Rider | — | Windows / macOS | browsing and restore | manual | ⏳ deferred to the pilot (Phase 8) |
+| Azure Pipelines | — | Linux | restore and push | — | ➖ no test environment |
 
-### Verificación manual (IDE)
+### Manual verification (IDE)
 
-1. Añade el feed con credenciales (Visual Studio: *Herramientas → Opciones → NuGet → Orígenes*; Rider: *NuGet → Sources*).
-2. Busca `Onepack.Fixture` con y sin prerelease y abre el detalle de `Onepack.Fixture.Rich` (título, autores, licencia, etiquetas).
-3. Instala `Onepack.Fixture.Ranged` en un proyecto y comprueba que se restaura `Onepack.Fixture.Basic` 1.1.0.
-4. Anota aquí la versión del IDE, la fecha y el resultado.
+1. Add the feed with credentials (Visual Studio: *Tools → Options → NuGet Package Manager → Package Sources*; Rider: *NuGet → Sources*).
+2. Search for `Onepack.Fixture` with and without prerelease and open the details of `Onepack.Fixture.Rich` (title, authors, license, tags).
+3. Install `Onepack.Fixture.Ranged` in a project and check that `Onepack.Fixture.Basic` 1.1.0 is restored.
+4. Record the IDE version, the date and the result here.
 
-## Particularidades encontradas
+## Client quirks found
 
-| Cliente | Comportamiento | Cómo se resuelve |
+| Client | Behavior | How it is handled |
 |---|---|---|
-| `dotnet nuget push` | Hace el `PUT` sobre `{PackagePublish}/` con barra final. | Se aceptan las dos formas. |
-| `dotnet nuget push` | Consulta el service index con Basic (tras el `401`) y publica con `X-NuGet-ApiKey`. | Las rutas NuGet aceptan ambos mecanismos (ADR-011). |
-| `dotnet restore` | Ante un error de descarga muestra el estado y la frase de estado HTTP, no el cuerpo. | Las versiones bloqueadas responden `410` con la frase `PACKAGE_BLOCKED - version blocked by the registry` ([docs/security.md](security.md)). |
-| `dotnet restore` | Con un token revocado o caducado solo muestra `NU1301: no se puede cargar el índice de servicio`, sin mencionar la credencial. | `onepack exec` comprueba la credencial antes de lanzar el comando y explica el fallo ([cli](cli.md#nugetconfig-y-credenciales-de-nuget)); el log del servidor registra el motivo (`reason="revoked"`). |
-| `nuget.exe search` | No acepta `-ConfigFile` (sí `push` e `install`); lee el `NuGet.Config` del directorio actual. | Se ejecuta desde el directorio con la configuración del feed. |
+| `dotnet nuget push` | Sends the `PUT` to `{PackagePublish}/` with a trailing slash. | Both forms are accepted. |
+| `dotnet nuget push` | Queries the service index with Basic (after the `401`) and publishes with `X-NuGet-ApiKey`. | The NuGet routes accept both mechanisms (ADR-011). |
+| `dotnet restore` | On a download error it shows the HTTP status and reason phrase, not the body. | Blocked versions respond `410` with the reason phrase `PACKAGE_BLOCKED - version blocked by the registry` ([docs/security.md](security.md)). |
+| `dotnet restore` | With a revoked or expired token it only shows `NU1301: Unable to load the service index`, without mentioning the credential. | `onepack exec` checks the credential before running the command and explains the failure ([cli](cli.md#nugetconfig-and-nuget-credentials)); the server log records the reason (`reason="revoked"`). |
+| `nuget.exe search` | Does not accept `-ConfigFile` (`push` and `install` do); it reads the `NuGet.Config` in the current directory. | It runs from the directory with the feed configuration. |

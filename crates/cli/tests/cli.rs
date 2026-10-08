@@ -320,7 +320,7 @@ fn full_flow_without_ui() {
         &ci,
     );
     assert_eq!(conflict.code, 6);
-    assert!(conflict.stderr.contains("contenido distinto"));
+    assert!(conflict.stderr.contains("different content"));
     // Fuera de sus patrones: sin permiso.
     let foreign = nupkg(pkgs.path(), "Acme.Other", "1.0.0", "a");
     let denied = cli.run(
@@ -420,7 +420,7 @@ fn full_flow_without_ui() {
         &["token", "revoke", issued["id"].as_str().unwrap(), "--yes"],
         a,
     );
-    assert!(revoke.stdout.contains("revocado"));
+    assert!(revoke.stdout.contains("revoked"));
     let after = cli.run(&["whoami"], &ci);
     assert_eq!(after.code, 3, "token revocado: {}", after.stderr);
 
@@ -438,7 +438,7 @@ fn exit_codes_and_error_format() {
     let no_token = cli.run_with(&["whoami"], None, None);
     assert_eq!(no_token.code, 3);
     assert!(no_token.stderr.contains("AUTH_REQUIRED"));
-    assert!(no_token.stderr.contains("acción:"));
+    assert!(no_token.stderr.contains("action:"));
 
     let bad = cli.run(&["whoami"], "opk_0000000000000000_bad");
     assert_eq!(bad.code, 3);
@@ -603,7 +603,7 @@ fn exec_checks_the_credential_before_running_the_command() {
         bad.error_json()["error"]["action"]
             .as_str()
             .unwrap()
-            .contains("token nuevo")
+            .contains("new token")
     );
     assert!(!marker.exists(), "no debe ejecutar el comando");
 
@@ -650,7 +650,7 @@ fn exec_checks_the_credential_before_running_the_command() {
         .output()
         .unwrap();
     assert_eq!(down.status.code(), Some(0));
-    assert!(String::from_utf8_lossy(&down.stderr).contains("no se pudo comprobar la credencial"));
+    assert!(String::from_utf8_lossy(&down.stderr).contains("could not check the credential"));
     assert!(marker.exists());
 }
 
@@ -824,7 +824,7 @@ fn doctor_reports_missing_publish_scope_without_leaking_the_token() {
     // Con lectura basta: sin fallos.
     let fine = cli.run(&["doctor", "--feed", "internal"], &s.reader);
     assert_eq!(fine.code, 0, "{}", fine.stdout);
-    assert!(fine.stdout.contains("Sin fallos."));
+    assert!(fine.stdout.contains("No failures."));
 
     // Un servidor inaccesible se diagnostica en la red, antes de la credencial.
     let down = cli.run(

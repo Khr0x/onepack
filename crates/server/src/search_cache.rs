@@ -50,7 +50,7 @@ impl SearchCache {
         // Se toma antes de leer: si algo cambia mientras se construye, la entrada nace ya
         // obsoleta y la siguiente búsqueda la reconstruye.
         let generation = self.generation.load(Ordering::SeqCst);
-        if let Some(e) = self.entries.lock().expect("mutex no envenenado").get(&key)
+        if let Some(e) = self.entries.lock().expect("mutex not poisoned").get(&key)
             && e.generation == generation
             && e.built.elapsed() < TTL
         {
@@ -58,7 +58,7 @@ impl SearchCache {
         }
         let versions = store.listed_versions(feed, prerelease, semver2).await?;
         let index = Arc::new(SearchIndex::new(versions));
-        self.entries.lock().expect("mutex no envenenado").insert(
+        self.entries.lock().expect("mutex not poisoned").insert(
             key,
             Entry {
                 generation,

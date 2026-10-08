@@ -63,7 +63,7 @@ impl std::fmt::Display for ClientError {
                 write!(f, "{}: {} (HTTP {status})", detail.code, detail.message)
             }
             Self::Transport { message, .. } => f.write_str(message),
-            Self::InvalidResponse(m) => write!(f, "respuesta inesperada del servidor: {m}"),
+            Self::InvalidResponse(m) => write!(f, "unexpected response from the server: {m}"),
             Self::Config(m) => f.write_str(m),
         }
     }
@@ -119,7 +119,7 @@ impl Client {
         let base = config.base_url.trim_end_matches('/').to_owned();
         if !(base.starts_with("http://") || base.starts_with("https://")) {
             return Err(ClientError::Config(format!(
-                "URL inválida {base:?}: debe empezar por https:// o http://"
+                "invalid URL {base:?}: it must start with https:// or http://"
             )));
         }
         let root_certs = match &config.ca_cert_pem {
@@ -133,7 +133,7 @@ impl Client {
                     .collect();
                 if certs.is_empty() {
                     return Err(ClientError::Config(
-                        "el archivo de CA no contiene certificados PEM".into(),
+                        "the CA file contains no PEM certificates".into(),
                     ));
                 }
                 RootCerts::new_with_certs(&certs)
@@ -162,8 +162,8 @@ impl Client {
             status: 401,
             detail: ErrorDetail {
                 code: "AUTH_REQUIRED".into(),
-                message: "no hay credencial para este contexto".into(),
-                action: Some("ejecuta `onepack login` o define la variable de --token-env".into()),
+                message: "there is no credential for this context".into(),
+                action: Some("run `onepack login` or set the --token-env variable".into()),
                 request_id: None,
             },
         })
@@ -326,7 +326,7 @@ impl Client {
     pub fn capabilities(&self) -> Result<Capabilities, ClientError> {
         match self.get::<Capabilities>("/capabilities") {
             Err(ClientError::Api { status: 404, .. }) => Ok(Capabilities {
-                server_version: "desconocida".into(),
+                server_version: "unknown".into(),
                 api_version: 1,
                 capabilities: Vec::new(),
             }),
@@ -495,7 +495,7 @@ mod tests {
         };
         assert_eq!(detail.request_id.as_deref(), Some("r1"));
 
-        let e = api_error(&raw(409, "PACKAGE_VERSION_EXISTS: A@1.0.0 ya existe"));
+        let e = api_error(&raw(409, "PACKAGE_VERSION_EXISTS: A@1.0.0 already exists"));
         assert_eq!(e.code(), Some("PACKAGE_VERSION_EXISTS"));
         assert_eq!(api_error(&raw(404, "")).code(), Some("NOT_FOUND"));
         assert_eq!(api_error(&raw(500, "boom")).code(), Some("HTTP_ERROR"));

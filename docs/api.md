@@ -1,58 +1,58 @@
-# API administrativa `/api/v1`
+# Administrative API `/api/v1`
 
-> Fase 6 ([ADR-011](../roadmap/adr-mvp.md#adr-011), [ADR-015](../roadmap/adr-mvp.md#adr-015)).
-> Última actualización: 2026-10-04
+> Phase 6 ([ADR-011](../roadmap/adr-mvp.md#adr-011), [ADR-015](../roadmap/adr-mvp.md#adr-015)).
+> Last updated: 2026-10-07
 
-Autenticación: `Authorization: Bearer <token>` (solo Bearer; las rutas NuGet usan Basic o `X-NuGet-ApiKey`). Los tipos de petición y respuesta están en `crates/api-client` y los comparten el servidor y el CLI.
+Authentication: `Authorization: Bearer <token>` (Bearer only; the NuGet routes use Basic or `X-NuGet-ApiKey`). The request and response types live in `crates/api-client` and are shared by the server and the CLI.
 
 ## Endpoints
 
-| Método y ruta | Descripción | Requiere |
+| Method and route | Description | Requires |
 |---|---|---|
-| `GET /capabilities` | Versión del servidor, versión de la API y capacidades. | autenticado |
-| `GET /whoami` | Principal, token (id y caducidad) y grants. | autenticado |
-| `GET /feeds` | Feeds visibles, con uso y cuotas. | autenticado |
-| `POST /feeds` `{"name"}` | Crea un feed. `409 FEED_EXISTS`. | admin |
-| `GET /feeds/{feed}` | Detalle. | lectura |
-| `PATCH /feeds/{feed}` `{"max_storage_bytes", "max_versions"}` | Reemplaza las cuotas (ausente o `null`: sin límite). | admin |
+| `GET /capabilities` | Server version, API version and capabilities. | authenticated |
+| `GET /whoami` | Principal, token (id and expiry) and grants. | authenticated |
+| `GET /feeds` | Visible feeds, with usage and quotas. | authenticated |
+| `POST /feeds` `{"name"}` | Creates a feed. `409 FEED_EXISTS`. | admin |
+| `GET /feeds/{feed}` | Details. | read |
+| `PATCH /feeds/{feed}` `{"max_storage_bytes", "max_versions"}` | Replaces the quotas (missing or `null`: no limit). | admin |
 | `GET /principals` · `POST /principals` `{"name", "kind", "administrator"}` | | admin |
-| `POST /principals/{name}/disable` | `409 LAST_ADMIN` para el último administrador activo. | admin |
-| `GET /tokens?principal=` · `POST /tokens` `{"principal", "name", "expires_in_days"}` | La respuesta de `POST` es la única que incluye el secreto. | admin |
-| `POST /tokens/{id}/revoke` | `404 TOKEN_NOT_FOUND` si no hay un token activo con ese id. | admin |
+| `POST /principals/{name}/disable` | `409 LAST_ADMIN` for the last active administrator. | admin |
+| `GET /tokens?principal=` · `POST /tokens` `{"principal", "name", "expires_in_days"}` | The `POST` response is the only one that includes the secret. | admin |
+| `POST /tokens/{id}/revoke` | `404 TOKEN_NOT_FOUND` if there is no active token with that id. | admin |
 | `GET /grants?principal=&feed=` | | admin |
-| `PUT /feeds/{feed}/grants/{principal}` `{"role", "publish_patterns"}` | Crea o reemplaza. | admin |
+| `PUT /feeds/{feed}/grants/{principal}` `{"role", "publish_patterns"}` | Creates or replaces. | admin |
 | `DELETE /feeds/{feed}/grants/{principal}` | `204`; `404 GRANT_NOT_FOUND`. | admin |
-| `GET /feeds/{feed}/packages` | Paquetes con número de versiones y la más alta. | lectura |
-| `GET /feeds/{feed}/packages/{id}` | Versiones por precedencia. | lectura |
-| `GET /feeds/{feed}/packages/{id}/{version}` | Estado, SHA-256, tamaño; `blocked_reason` solo para Maintainer o admin. | lectura |
-| `POST /feeds/{feed}/packages/{id}/{version}/unlist` · `/relist` | Mismas reglas que el protocolo NuGet. | publicación (y patrones) |
-| `POST /feeds/{feed}/packages/{id}/{version}/block` · `/unblock` `{"reason"}` | Motivo obligatorio y auditado. | Maintainer |
-| `GET /audit?feed=&action=` | Del más reciente al más antiguo; `action` filtra por prefijo. | admin |
+| `GET /feeds/{feed}/packages` | Packages with their number of versions and the highest one. | read |
+| `GET /feeds/{feed}/packages/{id}` | Versions by precedence. | read |
+| `GET /feeds/{feed}/packages/{id}/{version}` | State, SHA-256, size; `blocked_reason` only for a Maintainer or an admin. | read |
+| `POST /feeds/{feed}/packages/{id}/{version}/unlist` · `/relist` | Same rules as the NuGet protocol. | publish (and patterns) |
+| `POST /feeds/{feed}/packages/{id}/{version}/block` · `/unblock` `{"reason"}` | Reason required and audited. | Maintainer |
+| `GET /audit?feed=&action=` | Newest first; `action` filters by prefix. | admin |
 
-Un feed sin permiso de lectura responde igual que uno inexistente (`404`). Los intentos denegados se auditan.
+A feed without read permission responds exactly like a nonexistent one (`404`). Denied attempts are audited.
 
-## Paginación
+## Pagination
 
-Los listados devuelven `{"items": [...], "next_cursor": "..." | null}`. Para la página siguiente, repite la petición con `?cursor=<next_cursor>`. `limit` va de 1 a 500 (50 por defecto). El cursor es opaco.
+Lists return `{"items": [...], "next_cursor": "..." | null}`. For the next page, repeat the request with `?cursor=<next_cursor>`. `limit` ranges from 1 to 500 (50 by default). The cursor is opaque.
 
-## Errores
+## Errors
 
 ```json
 {
   "error": {
     "code": "AUTH_SCOPE_MISSING",
-    "message": "la credencial es válida, pero no tiene el permiso packages:publish en este feed",
-    "action": "pide a un administrador un rol suficiente: `onepack grant add --principal <principal> --feed <feed> --role <rol>`",
+    "message": "the credential is valid, but lacks the packages:publish permission on this feed",
+    "action": "ask an administrator for a sufficient role: `onepack grant add --principal <principal> --feed <feed> --role <role>`",
     "request_id": "3f9c0a1b2c3d4e5f"
   }
 }
 ```
 
-`code` es estable. Además de los de [seguridad](security.md#errores): `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `AUTH_PREFIX_DENIED`, `AUTH_ADMIN_REQUIRED`, `NOT_FOUND`, `FEED_EXISTS`, `PRINCIPAL_EXISTS`, `PRINCIPAL_NOT_FOUND`, `TOKEN_NOT_FOUND`, `GRANT_NOT_FOUND`, `LAST_ADMIN`, `INVALID_REQUEST`, `INVALID_NAME`, `INVALID_CURSOR` e `INTERNAL`.
+`code` is stable. Besides those in [security](security.md#errores): `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `AUTH_PREFIX_DENIED`, `AUTH_ADMIN_REQUIRED`, `NOT_FOUND`, `FEED_EXISTS`, `PRINCIPAL_EXISTS`, `PRINCIPAL_NOT_FOUND`, `TOKEN_NOT_FOUND`, `GRANT_NOT_FOUND`, `LAST_ADMIN`, `INVALID_REQUEST`, `INVALID_NAME`, `INVALID_CURSOR` and `INTERNAL`.
 
-Todas las respuestas, también las de las rutas NuGet, llevan la cabecera `X-Request-Id`. El mismo id aparece en el span de las trazas del servidor. Siempre lo genera el servidor; uno enviado por el cliente se ignora.
+Every response, including those on the NuGet routes, carries the `X-Request-Id` header. The same id appears in the server's trace span. The server always generates it; one sent by the client is ignored.
 
-## Compatibilidad
+## Compatibility
 
-- Los campos nuevos se añaden como opcionales y nadie rechaza campos desconocidos: un CLI N funciona con un servidor N-1 y al revés.
-- Lo que un servidor sabe hacer lo anuncia `GET /capabilities` (`feeds`, `feeds.quotas`, `principals`, `tokens`, `grants`, `packages`, `packages.listing`, `packages.availability`, `audit`). `api_version` solo cambia con cambios incompatibles.
+- New fields are added as optional and nobody rejects unknown fields: CLI N works with server N-1 and vice versa.
+- What a server can do is advertised by `GET /capabilities` (`feeds`, `feeds.quotas`, `principals`, `tokens`, `grants`, `packages`, `packages.listing`, `packages.availability`, `audit`). `api_version` changes only with incompatible changes.

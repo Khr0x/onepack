@@ -121,11 +121,11 @@ impl App {
                 exit::INCOMPATIBLE,
                 "CAPABILITY_MISSING",
                 format!(
-                    "el servidor (versión {}) no ofrece la capacidad {capability:?} que necesita este comando",
+                    "the server (version {}) does not offer the capability {capability:?} this command needs",
                     caps.server_version
                 ),
             )
-            .with_action("actualiza onepackd o usa una versión del CLI acorde al servidor"))
+            .with_action("upgrade onepackd or use a CLI version that matches the server"))
         }
     }
 }

@@ -70,10 +70,10 @@ impl Metrics {
         *self
             .requests
             .lock()
-            .expect("mutex no envenenado")
+            .expect("mutex not poisoned")
             .entry((surface, method, status))
             .or_default() += 1;
-        let mut latency = self.latency.lock().expect("mutex no envenenado");
+        let mut latency = self.latency.lock().expect("mutex not poisoned");
         let h = latency.entry(surface).or_default();
         for (i, le) in LATENCY_BUCKETS.iter().enumerate() {
             if secs <= *le {
@@ -89,7 +89,7 @@ impl Metrics {
         *self
             .errors
             .lock()
-            .expect("mutex no envenenado")
+            .expect("mutex not poisoned")
             .entry(code)
             .or_default() += 1;
     }
@@ -99,7 +99,7 @@ impl Metrics {
         *self
             .uploads
             .lock()
-            .expect("mutex no envenenado")
+            .expect("mutex not poisoned")
             .entry(outcome)
             .or_default() += 1;
     }
@@ -111,19 +111,19 @@ impl Metrics {
 
     fn render(&self, free_bytes: Option<u64>, maintenance: bool) -> String {
         let mut out = format!(
-            "# HELP onepack_build_info Versión de onepackd.\n# TYPE onepack_build_info gauge\nonepack_build_info{{version=\"{}\"}} 1\n",
+            "# HELP onepack_build_info onepackd version.\n# TYPE onepack_build_info gauge\nonepack_build_info{{version=\"{}\"}} 1\n",
             env!("CARGO_PKG_VERSION")
         );
         out.push_str("# HELP onepack_http_requests_total Peticiones HTTP atendidas.\n# TYPE onepack_http_requests_total counter\n");
         for ((surface, method, status), n) in
-            self.requests.lock().expect("mutex no envenenado").iter()
+            self.requests.lock().expect("mutex not poisoned").iter()
         {
             out.push_str(&format!(
                 "onepack_http_requests_total{{surface=\"{surface}\",method=\"{method}\",status=\"{status}\"}} {n}\n"
             ));
         }
-        out.push_str("# HELP onepack_http_request_duration_seconds Latencia de las peticiones HTTP.\n# TYPE onepack_http_request_duration_seconds histogram\n");
-        for (surface, h) in self.latency.lock().expect("mutex no envenenado").iter() {
+        out.push_str("# HELP onepack_http_request_duration_seconds HTTP request latency.\n# TYPE onepack_http_request_duration_seconds histogram\n");
+        for (surface, h) in self.latency.lock().expect("mutex not poisoned").iter() {
             for (i, le) in LATENCY_BUCKETS.iter().enumerate() {
                 out.push_str(&format!(
                     "onepack_http_request_duration_seconds_bucket{{surface=\"{surface}\",le=\"{le}\"}} {}\n",
@@ -137,27 +137,27 @@ impl Metrics {
                 h.count, h.sum, h.count
             ));
         }
-        out.push_str("# HELP onepack_errors_total Respuestas de error por código estable.\n# TYPE onepack_errors_total counter\n");
-        for (code, n) in self.errors.lock().expect("mutex no envenenado").iter() {
+        out.push_str("# HELP onepack_errors_total Error responses by stable code.\n# TYPE onepack_errors_total counter\n");
+        for (code, n) in self.errors.lock().expect("mutex not poisoned").iter() {
             out.push_str(&format!("onepack_errors_total{{code=\"{code}\"}} {n}\n"));
         }
-        out.push_str("# HELP onepack_uploads_total Subidas de paquetes por resultado.\n# TYPE onepack_uploads_total counter\n");
-        for (outcome, n) in self.uploads.lock().expect("mutex no envenenado").iter() {
+        out.push_str("# HELP onepack_uploads_total Package uploads by outcome.\n# TYPE onepack_uploads_total counter\n");
+        for (outcome, n) in self.uploads.lock().expect("mutex not poisoned").iter() {
             out.push_str(&format!(
                 "onepack_uploads_total{{outcome=\"{outcome}\"}} {n}\n"
             ));
         }
         out.push_str(&format!(
-            "# HELP onepack_uploads_in_flight Subidas en curso.\n# TYPE onepack_uploads_in_flight gauge\nonepack_uploads_in_flight {}\n",
+            "# HELP onepack_uploads_in_flight Uploads in progress.\n# TYPE onepack_uploads_in_flight gauge\nonepack_uploads_in_flight {}\n",
             self.uploads_in_flight.load(Ordering::Relaxed)
         ));
         out.push_str(&format!(
-            "# HELP onepack_maintenance Modo mantenimiento activo (1) o no (0).\n# TYPE onepack_maintenance gauge\nonepack_maintenance {}\n",
+            "# HELP onepack_maintenance Maintenance mode active (1) or not (0).\n# TYPE onepack_maintenance gauge\nonepack_maintenance {}\n",
             u8::from(maintenance)
         ));
         if let Some(free) = free_bytes {
             out.push_str(&format!(
-                "# HELP onepack_data_dir_free_bytes Espacio libre en el directorio de datos.\n# TYPE onepack_data_dir_free_bytes gauge\nonepack_data_dir_free_bytes {free}\n"
+                "# HELP onepack_data_dir_free_bytes Free space in the data directory.\n# TYPE onepack_data_dir_free_bytes gauge\nonepack_data_dir_free_bytes {free}\n"
             ));
         }
         out
@@ -206,12 +206,12 @@ pub async fn maintenance_guard(
     if mutation {
         match state.store.maintenance().await {
             Ok(Some(m)) => {
-                tracing::info!(reason = %m.reason, "mutación rechazada por mantenimiento");
+                tracing::info!(reason = %m.reason, "mutation rejected by maintenance");
                 return ApiError::Maintenance.render(Surface::of(req.uri().path()));
             }
             Ok(None) => {}
             Err(e) => {
-                tracing::error!(error = %e, "no se pudo consultar el modo mantenimiento");
+                tracing::error!(error = %e, "could not query maintenance mode");
                 return ApiError::Internal(e.to_string()).render(Surface::of(req.uri().path()));
             }
         }
@@ -228,7 +228,7 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
     let database = match state.store.ping().await {
         Ok(()) => "ok".to_owned(),
         Err(e) => {
-            tracing::warn!(error = %e, "readyz: base no disponible");
+            tracing::warn!(error = %e, "readyz: database unavailable");
             "error".to_owned()
         }
     };
@@ -239,7 +239,7 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
         if blobs.is_dir() && staging.is_dir() {
             fs4::available_space(&dir)
         } else {
-            Err(std::io::Error::other("directorios de datos incompletos"))
+            Err(std::io::Error::other("incomplete data directories"))
         }
     })
     .await

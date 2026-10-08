@@ -35,7 +35,7 @@ pub async fn assign(req: Request, next: Next) -> Response {
     let mut res = REQUEST_ID.scope(id.clone(), next.run(req)).await;
     res.headers_mut().insert(
         HEADER,
-        HeaderValue::from_str(&id).expect("hexadecimal es un valor de cabecera válido"),
+        HeaderValue::from_str(&id).expect("hexadecimal is a valid header value"),
     );
     res
 }

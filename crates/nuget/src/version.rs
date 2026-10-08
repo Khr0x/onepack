@@ -20,7 +20,7 @@ pub struct InvalidVersion(pub String);
 
 impl fmt::Display for InvalidVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "versión NuGet inválida: {:?}", self.0)
+        write!(f, "invalid NuGet version: {:?}", self.0)
     }
 }
 

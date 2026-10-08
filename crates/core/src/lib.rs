@@ -21,7 +21,7 @@ impl fmt::Display for InvalidFeedName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "nombre de feed inválido: {:?} (usa a-z, 0-9 y '-', máximo 64, empezando por letra o dígito)",
+            "invalid feed name: {:?} (use a-z, 0-9 and '-', at most 64, starting with a letter or digit)",
             self.0
         )
     }
@@ -179,15 +179,15 @@ impl fmt::Display for PublishError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Conflict { identical: true } => {
-                f.write_str("la versión ya existe con el mismo contenido")
+                f.write_str("the version already exists with the same content")
             }
             Self::Conflict { identical: false } => {
-                f.write_str("la versión ya existe con contenido distinto")
+                f.write_str("the version already exists with different content")
             }
-            Self::QuotaExceeded(kind) => write!(f, "{}: cuota del feed superada", kind.code()),
-            Self::StorageFull => f.write_str("no queda espacio en el almacenamiento"),
-            Self::Io(e) => write!(f, "error de E/S: {e}"),
-            Self::Database(e) => write!(f, "error de base de datos: {e}"),
+            Self::QuotaExceeded(kind) => write!(f, "{}: feed quota exceeded", kind.code()),
+            Self::StorageFull => f.write_str("storage is out of space"),
+            Self::Io(e) => write!(f, "I/O error: {e}"),
+            Self::Database(e) => write!(f, "database error: {e}"),
         }
     }
 }

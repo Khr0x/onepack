@@ -127,7 +127,7 @@ impl Store {
         }
         let principal = to_principal(&row).ok_or_else(|| {
             StoreError::Database(sqlx::Error::Protocol(
-                "principal inválido en la base".into(),
+                "invalid principal in the database".into(),
             ))
         })?;
         let grants = self.grants(&principal).await?;
@@ -154,7 +154,7 @@ impl Store {
         }
         .await;
         if let Err(e) = result {
-            tracing::error!(error = %e, "no se pudo auditar el fallo de autenticación");
+            tracing::error!(error = %e, "could not audit the authentication failure");
         }
     }
 

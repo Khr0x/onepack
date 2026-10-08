@@ -344,7 +344,7 @@ fn tokens_never_reach_the_logs() {
 
     let logs = std::fs::read_to_string(&log_path).unwrap();
     assert!(
-        logs.contains("autenticación rechazada"),
+        logs.contains("authentication rejected"),
         "el log registra el rechazo"
     );
     let secret = token.rsplit('_').next().unwrap();

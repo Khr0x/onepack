@@ -14,7 +14,7 @@ pub struct InvalidName(pub String);
 
 impl fmt::Display for InvalidName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "valor inválido: {:?}", self.0)
+        write!(f, "invalid value: {:?}", self.0)
     }
 }
 
@@ -230,7 +230,7 @@ impl AuthContext {
         }
         let patterns = &self
             .grant(feed_id)
-            .expect("comprobado en check_feed")
+            .expect("checked in check_feed")
             .publish_patterns;
         if patterns.is_empty() || patterns.iter().any(|p| p.matches(package_key)) {
             Ok(())

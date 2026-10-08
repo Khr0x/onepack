@@ -24,7 +24,7 @@ onepack token create --principal ci --name pipeline --expires-in-days 90
 ```
 
 1. Store the new token in the pipeline secret ([guide](../guide-zero-to-ci.md)) **before** re-running it.
-2. Check that the old token no longer works: `onepack --token-env OLD whoami` exits with code 3. With `onepack exec`, the error says the credential is not valid; with `dotnet restore` directly, NuGet only shows `NU1301` and the server logs `autenticación rechazada reason="revoked"`.
+2. Check that the old token no longer works: `onepack --token-env OLD whoami` exits with code 3. With `onepack exec`, the error says the credential is not valid; with `dotnet restore` directly, NuGet only shows `NU1301` and the server logs `authentication rejected reason="revoked"`.
 3. Re-run the pipeline: it must restore.
 4. Review what the token did while it was leaked: `onepack audit list --limit 100` (actor `ci`) and the *last used* column (`ÚLTIMO USO`) of `onepack token list`.
 

@@ -49,12 +49,12 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
             let url = url.trim_end_matches('/').to_owned();
             if !(url.starts_with("https://") || url.starts_with("http://")) {
                 return Err(CliError::usage(format!(
-                    "URL inválida {url:?}: debe empezar por https:// o http://"
+                    "invalid URL {url:?}: it must start with https:// or http://"
                 )));
             }
             if url.starts_with("http://") {
                 app.out
-                    .note("aviso: HTTP sin TLS expone el token en la red; úsalo solo en local");
+                    .note("warning: HTTP without TLS exposes the token on the network; use it only locally");
             }
             app.config.contexts.insert(
                 name.clone(),
@@ -75,10 +75,10 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
             };
             app.out.data(&view, || {
                 format!(
-                    "contexto {} -> {}{}",
+                    "context {} -> {}{}",
                     view.name,
                     view.url,
-                    if view.current { " (actual)" } else { "" }
+                    if view.current { " (current)" } else { "" }
                 )
             });
         }
@@ -96,7 +96,7 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
                 .collect();
             app.out.data(&views, || {
                 table(
-                    &["", "NOMBRE", "URL"],
+                    &["", "NAME", "URL"],
                     views
                         .iter()
                         .map(|v| {
@@ -115,13 +115,13 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
                 return Err(CliError::new(
                     exit::NOT_FOUND,
                     "CONTEXT_MISSING",
-                    format!("no existe el contexto {name:?}"),
+                    format!("context {name:?} does not exist"),
                 ));
             }
             app.config.current = Some(name.clone());
             app.config.save()?;
             app.out.data(&serde_json::json!({ "current": name }), || {
-                format!("contexto actual: {name}")
+                format!("current context: {name}")
             });
         }
         ContextCommand::Remove { name, yes } => {
@@ -129,11 +129,11 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
                 return Err(CliError::new(
                     exit::NOT_FOUND,
                     "CONTEXT_MISSING",
-                    format!("no existe el contexto {name:?}"),
+                    format!("context {name:?} does not exist"),
                 ));
             }
             app.out
-                .confirm(&format!("¿Eliminar el contexto {name} y su token?"), yes)?;
+                .confirm(&format!("Remove context {name} and its token?"), yes)?;
             // Sin keychain no hay token que borrar; el contexto se elimina igualmente.
             let removed_token = credentials::delete(&name).unwrap_or(false);
             app.config.contexts.remove(&name);
@@ -143,7 +143,7 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
             app.config.save()?;
             app.out.data(
                 &serde_json::json!({ "name": name, "removed_token": removed_token }),
-                || format!("contexto {name} eliminado"),
+                || format!("context {name} removed"),
             );
         }
     }
@@ -153,13 +153,13 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
 pub fn login(app: &App, token_stdin: bool) -> CliResult<i32> {
     let target = app.target()?;
     let name = target.name.clone().ok_or_else(|| {
-        CliError::usage("login guarda el token de un contexto; no se puede usar con --url")
-            .with_action("crea un contexto con `onepack context add`")
+        CliError::usage("login stores the token of a context; it cannot be used with --url")
+            .with_action("create a context with `onepack context add`")
     })?;
     // Si no hay keychain, se falla antes de pedir el token (ADR-015: sin texto plano).
     credentials::ensure_available(&name)?;
     let token = app.out.read_secret(
-        &format!("Token para {} ({}): ", name, target.url),
+        &format!("Token for {} ({}): ", name, target.url),
         token_stdin,
     )?;
     // Se valida antes de guardarlo.
@@ -176,7 +176,7 @@ pub fn login(app: &App, token_stdin: bool) -> CliResult<i32> {
     });
     app.out.data(&view, || {
         format!(
-            "sesión iniciada en {name} como {} (token {}, caduca {})",
+            "logged in to {name} as {} (token {}, expires {})",
             me.principal,
             me.token_id,
             opt(&me.token_expires_at)
@@ -187,17 +187,17 @@ pub fn login(app: &App, token_stdin: bool) -> CliResult<i32> {
 
 pub fn logout(app: &App) -> CliResult<i32> {
     let target = app.target()?;
-    let name = target.name.ok_or_else(|| {
-        CliError::usage("logout requiere un contexto; no se puede usar con --url")
-    })?;
+    let name = target
+        .name
+        .ok_or_else(|| CliError::usage("logout needs a context; it cannot be used with --url"))?;
     let removed = credentials::delete(&name)?;
     app.out.data(
         &serde_json::json!({ "context": name, "removed": removed }),
         || {
             if removed {
-                format!("token de {name} eliminado del keychain")
+                format!("token for {name} removed from the keychain")
             } else {
-                format!("{name} no tenía token en el keychain")
+                format!("{name} had no token in the keychain")
             }
         },
     );
@@ -213,13 +213,13 @@ pub fn whoami(app: &App) -> CliResult<i32> {
                 me.principal,
                 me.kind,
                 if me.administrator {
-                    ", administrador"
+                    ", administrator"
                 } else {
                     ""
                 }
             ),
             format!(
-                "token {} (caduca {})",
+                "token {} (expires {})",
                 me.token_id,
                 opt(&me.token_expires_at)
             ),
@@ -242,17 +242,17 @@ pub fn whoami(app: &App) -> CliResult<i32> {
 // ---------------------------------------------------------------------------------------------
 
 fn feed_text(f: &api::Feed) -> String {
-    let limit = |v: Option<u64>, fmt: fn(u64) -> String| v.map_or("sin límite".to_owned(), fmt);
+    let limit = |v: Option<u64>, fmt: fn(u64) -> String| v.map_or("no limit".to_owned(), fmt);
     [
         format!("feed:            {}", f.name),
-        format!("creado:          {}", f.created_at),
+        format!("created:         {}", f.created_at),
         format!(
-            "versiones:       {} (cuota: {})",
+            "versions:        {} (quota: {})",
             f.versions,
             limit(f.max_versions, |v| v.to_string())
         ),
         format!(
-            "almacenamiento:  {} (cuota: {})",
+            "storage:         {} (quota: {})",
             bytes(f.storage_bytes),
             limit(f.max_storage_bytes, bytes)
         ),
@@ -266,13 +266,13 @@ pub fn feed(app: &App, cmd: FeedCommand) -> CliResult<i32> {
     match cmd {
         FeedCommand::Create { name } => {
             let f: api::Feed = client.post("/feeds", &CreateFeed { name })?;
-            app.out.data(&f, || format!("feed creado: {}", f.name));
+            app.out.data(&f, || format!("feed created: {}", f.name));
         }
         FeedCommand::List => {
             let feeds: Vec<api::Feed> = client.list_all("/feeds")?;
             app.out.data(&feeds, || {
                 table(
-                    &["FEED", "VERSIONES", "TAMAÑO"],
+                    &["FEED", "VERSIONS", "SIZE"],
                     feeds
                         .iter()
                         .map(|f| {
@@ -325,8 +325,8 @@ fn principal_row(p: &Principal) -> Vec<String> {
     vec![
         p.name.clone(),
         p.kind.clone(),
-        if p.administrator { "sí" } else { "no" }.to_owned(),
-        if p.disabled { "desactivado" } else { "activo" }.to_owned(),
+        if p.administrator { "yes" } else { "no" }.to_owned(),
+        if p.disabled { "disabled" } else { "active" }.to_owned(),
     ]
 }
 
@@ -348,27 +348,27 @@ pub fn principal(app: &App, cmd: PrincipalCommand) -> CliResult<i32> {
                 },
             )?;
             app.out
-                .data(&p, || format!("principal creado: {} ({})", p.name, p.kind));
+                .data(&p, || format!("principal created: {} ({})", p.name, p.kind));
         }
         PrincipalCommand::List => {
             let list: Vec<Principal> = client.list_all("/principals")?;
             app.out.data(&list, || {
                 table(
-                    &["NOMBRE", "TIPO", "ADMIN", "ESTADO"],
+                    &["NAME", "KIND", "ADMIN", "STATUS"],
                     list.iter().map(principal_row).collect(),
                 )
             });
         }
         PrincipalCommand::Disable { name, yes } => {
             app.out.confirm(
-                &format!("¿Desactivar {name}? Sus tokens dejarán de funcionar"),
+                &format!("Disable {name}? Its tokens will stop working"),
                 yes,
             )?;
             let p: Principal = client.post(
                 &format!("/principals/{}/disable", seg(&name)),
                 &serde_json::json!({}),
             )?;
-            app.out.data(&p, || format!("{} desactivado", p.name));
+            app.out.data(&p, || format!("{} disabled", p.name));
         }
     }
     Ok(exit::OK)
@@ -393,7 +393,7 @@ pub fn token(app: &App, cmd: TokenCommand) -> CliResult<i32> {
             )?;
             if !app.out.json {
                 app.out.note(format!(
-                    "token {} para {} (caduca {}); no se volverá a mostrar",
+                    "token {} for {} (expires {}); it will not be shown again",
                     t.id, t.principal, t.expires_at
                 ));
             }
@@ -408,14 +408,7 @@ pub fn token(app: &App, cmd: TokenCommand) -> CliResult<i32> {
             let list: Vec<Token> = client.list_all(&path)?;
             app.out.data(&list, || {
                 table(
-                    &[
-                        "ID",
-                        "PRINCIPAL",
-                        "NOMBRE",
-                        "CADUCA",
-                        "ÚLTIMO USO",
-                        "REVOCADO",
-                    ],
+                    &["ID", "PRINCIPAL", "NAME", "EXPIRES", "LAST USED", "REVOKED"],
                     list.iter()
                         .map(|t| {
                             vec![
@@ -432,12 +425,12 @@ pub fn token(app: &App, cmd: TokenCommand) -> CliResult<i32> {
             });
         }
         TokenCommand::Revoke { id, yes } => {
-            app.out.confirm(&format!("¿Revocar el token {id}?"), yes)?;
+            app.out.confirm(&format!("Revoke token {id}?"), yes)?;
             let t: Token = client.post(
                 &format!("/tokens/{}/revoke", seg(&id)),
                 &serde_json::json!({}),
             )?;
-            app.out.data(&t, || format!("token {} revocado", t.id));
+            app.out.data(&t, || format!("token {} revoked", t.id));
         }
     }
     Ok(exit::OK)
@@ -479,7 +472,7 @@ pub fn grant(app: &App, cmd: GrantCommand) -> CliResult<i32> {
                 },
             )?;
             app.out.data(&g, || {
-                format!("{} es {} en {}", g.principal, g.role, g.feed)
+                format!("{} is {} on {}", g.principal, g.role, g.feed)
             });
         }
         GrantCommand::Remove {
@@ -488,12 +481,12 @@ pub fn grant(app: &App, cmd: GrantCommand) -> CliResult<i32> {
             yes,
         } => {
             app.out
-                .confirm(&format!("¿Quitar el acceso de {principal} a {feed}?"), yes)?;
+                .confirm(&format!("Remove {principal}'s access to {feed}?"), yes)?;
             let _: serde_json::Value =
                 client.delete(&format!("/feeds/{}/grants/{}", seg(&feed), seg(&principal)))?;
             app.out.data(
                 &serde_json::json!({ "principal": principal, "feed": feed, "removed": true }),
-                || format!("acceso de {principal} a {feed} eliminado"),
+                || format!("{principal}'s access to {feed} removed"),
             );
         }
         GrantCommand::List { principal, feed } => {
@@ -512,7 +505,7 @@ pub fn grant(app: &App, cmd: GrantCommand) -> CliResult<i32> {
             let list: Vec<Grant> = client.list_all(&path)?;
             app.out.data(&list, || {
                 table(
-                    &["FEED", "PRINCIPAL", "ROL", "PUBLICA"],
+                    &["FEED", "PRINCIPAL", "ROLE", "PUBLISHES"],
                     list.iter().map(grant_row).collect(),
                 )
             });
@@ -538,15 +531,15 @@ struct PushResult {
 fn version_text(v: &PackageVersion) -> String {
     let mut lines = vec![
         format!("{} {} ({})", v.id, v.version, v.feed),
-        format!("listado:         {}", if v.listed { "sí" } else { "no" }),
-        format!("disponibilidad:  {}", v.availability),
+        format!("listed:          {}", if v.listed { "yes" } else { "no" }),
+        format!("availability:    {}", v.availability),
     ];
     if let Some(reason) = &v.blocked_reason {
-        lines.push(format!("motivo:          {reason}"));
+        lines.push(format!("reason:          {reason}"));
     }
     lines.push(format!("sha256:          {}", v.sha256));
-    lines.push(format!("tamaño:          {}", bytes(v.size)));
-    lines.push(format!("publicado:       {}", v.published_at));
+    lines.push(format!("size:            {}", bytes(v.size)));
+    lines.push(format!("published:       {}", v.published_at));
     lines.join("\n")
 }
 
@@ -554,7 +547,7 @@ fn state_text(s: &VersionState, verb: &str) -> String {
     if s.changed {
         format!("{} {} {verb}", s.id, s.version)
     } else {
-        format!("{} {} ya estaba {verb}", s.id, s.version)
+        format!("{} {} was already {verb}", s.id, s.version)
     }
 }
 
@@ -583,7 +576,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                 client.list_all(&format!("/feeds/{}/packages", seg(&feed)))?;
             app.out.data(&list, || {
                 table(
-                    &["PAQUETE", "VERSIONES", "ÚLTIMA"],
+                    &["PACKAGE", "VERSIONS", "LATEST"],
                     list.iter()
                         .map(|p| {
                             vec![
@@ -609,18 +602,12 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                     let list: Vec<PackageVersion> = client.get(&base)?;
                     app.out.data(&list, || {
                         table(
-                            &[
-                                "VERSIÓN",
-                                "LISTADA",
-                                "DISPONIBILIDAD",
-                                "TAMAÑO",
-                                "PUBLICADA",
-                            ],
+                            &["VERSION", "LISTED", "AVAILABILITY", "SIZE", "PUBLISHED"],
                             list.iter()
                                 .map(|v| {
                                     vec![
                                         v.version.clone(),
-                                        if v.listed { "sí" } else { "no" }.to_owned(),
+                                        if v.listed { "yes" } else { "no" }.to_owned(),
                                         v.availability.clone(),
                                         bytes(v.size),
                                         v.published_at.clone(),
@@ -664,12 +651,10 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                                 exit::CONFLICT,
                                 "PACKAGE_VERSION_EXISTS",
                                 format!(
-                                    "{id} {version} ya existe en {feed} con contenido distinto"
+                                    "{id} {version} already exists in {feed} with different content"
                                 ),
                             )
-                            .with_action(
-                                "publica una versión nueva: las versiones son inmutables",
-                            ));
+                            .with_action("publish a new version: versions are immutable"));
                         }
                         "skipped"
                     }
@@ -677,8 +662,10 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                 };
                 if !app.out.json {
                     app.out.note(match status {
-                        "pushed" => format!("publicado {id} {version} en {feed}"),
-                        _ => format!("omitido {id} {version}: ya existe con el mismo contenido"),
+                        "pushed" => format!("pushed {id} {version} to {feed}"),
+                        _ => format!(
+                            "skipped {id} {version}: it already exists with the same content"
+                        ),
                     });
                 }
                 results.push(PushResult {
@@ -698,7 +685,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                 &format!("{}/unlist", version_path(&v)),
                 &serde_json::json!({}),
             )?;
-            app.out.data(&s, || state_text(&s, "oculta"));
+            app.out.data(&s, || state_text(&s, "unlisted"));
         }
         PackageCommand::Relist(v) => {
             let client = app.client()?;
@@ -707,7 +694,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                 &format!("{}/relist", version_path(&v)),
                 &serde_json::json!({}),
             )?;
-            app.out.data(&s, || state_text(&s, "listada"));
+            app.out.data(&s, || state_text(&s, "listed"));
         }
         PackageCommand::Block {
             version,
@@ -718,7 +705,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
             app.require(&client, capability::PACKAGE_AVAILABILITY)?;
             app.out.confirm(
                 &format!(
-                    "¿Bloquear la descarga de {} {} en {}?",
+                    "Block downloads of {} {} in {}?",
                     version.id, version.version, version.feed
                 ),
                 yes,
@@ -727,7 +714,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                 &format!("{}/block", version_path(&version)),
                 &Reason { reason },
             )?;
-            app.out.data(&s, || state_text(&s, "bloqueada"));
+            app.out.data(&s, || state_text(&s, "blocked"));
         }
         PackageCommand::Unblock { version, reason } => {
             let client = app.client()?;
@@ -736,7 +723,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
                 &format!("{}/unblock", version_path(&version)),
                 &Reason { reason },
             )?;
-            app.out.data(&s, || state_text(&s, "disponible"));
+            app.out.data(&s, || state_text(&s, "available"));
         }
     }
     Ok(exit::OK)
@@ -769,7 +756,7 @@ pub fn audit(app: &App, cmd: AuditCommand) -> CliResult<i32> {
     let events = page.items;
     app.out.data(&events, || {
         table(
-            &["FECHA", "ACTOR", "ACCIÓN", "FEED", "RECURSO", "RESULTADO"],
+            &["DATE", "ACTOR", "ACTION", "FEED", "RESOURCE", "OUTCOME"],
             events
                 .iter()
                 .map(|e| {

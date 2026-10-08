@@ -77,7 +77,7 @@ fn ok<T: Serialize>(value: &T) -> AdminResult<Response> {
 
 fn parse_body<T: DeserializeOwned>(body: &[u8]) -> AdminResult<T> {
     serde_json::from_slice(body)
-        .map_err(|e| invalid("INVALID_REQUEST", format!("cuerpo JSON inválido: {e}")))
+        .map_err(|e| invalid("INVALID_REQUEST", format!("invalid JSON body: {e}")))
 }
 
 /// Identidades, permisos, cuotas y auditoría: solo administradores. El intento se audita.
@@ -108,7 +108,7 @@ fn decode_cursor(params: &HashMap<String, String>) -> AdminResult<Option<String>
                 .decode(c)
                 .ok()
                 .and_then(|b| String::from_utf8(b).ok())
-                .ok_or_else(|| invalid("INVALID_CURSOR", "cursor inválido"))
+                .ok_or_else(|| invalid("INVALID_CURSOR", "invalid cursor"))
         })
         .transpose()
 }
@@ -123,7 +123,7 @@ fn page_size(params: &HashMap<String, String>) -> AdminResult<u32> {
             .ok_or_else(|| {
                 invalid(
                     "INVALID_REQUEST",
-                    format!("limit debe estar entre 1 y {}", api::MAX_PAGE_SIZE),
+                    format!("limit must be between 1 and {}", api::MAX_PAGE_SIZE),
                 )
             }),
     }
@@ -143,7 +143,7 @@ fn paginate<T>(
             items
                 .iter()
                 .position(|i| key(i) == cursor)
-                .ok_or_else(|| invalid("INVALID_CURSOR", "el cursor ya no es válido"))?
+                .ok_or_else(|| invalid("INVALID_CURSOR", "the cursor is no longer valid"))?
                 + 1
         }
     };
@@ -255,7 +255,7 @@ pub async fn create_feed(
     if state.store.feed(name.as_str()).await?.is_some() {
         return Err(conflict(
             "FEED_EXISTS",
-            format!("ya existe el feed {}", name.as_str()),
+            format!("feed {} already exists", name.as_str()),
         ));
     }
     let feed = state.store.create_feed(&name, &auth.actor()).await?;
@@ -303,7 +303,7 @@ async fn find_principal(state: &AppState, name: &str) -> AdminResult<onepack_cor
     state.store.principal(name).await?.ok_or_else(|| {
         not_found(
             "PRINCIPAL_NOT_FOUND",
-            format!("no existe el principal {name:?}"),
+            format!("principal {name:?} does not exist"),
         )
     })
 }
@@ -325,7 +325,7 @@ async fn principal_dto(state: &AppState, name: &str) -> AdminResult<api::Princip
         .ok_or_else(|| {
             not_found(
                 "PRINCIPAL_NOT_FOUND",
-                format!("no existe el principal {name:?}"),
+                format!("principal {name:?} does not exist"),
             )
         })
 }
@@ -362,11 +362,11 @@ pub async fn create_principal(
     let name =
         PrincipalName::parse(&req.name).map_err(|e| invalid("INVALID_NAME", e.to_string()))?;
     let kind = PrincipalKind::parse(&req.kind)
-        .ok_or_else(|| invalid("INVALID_REQUEST", "kind debe ser user o service"))?;
+        .ok_or_else(|| invalid("INVALID_REQUEST", "kind must be user or service"))?;
     if state.store.principal(name.as_str()).await?.is_some() {
         return Err(conflict(
             "PRINCIPAL_EXISTS",
-            format!("ya existe el principal {}", name.as_str()),
+            format!("principal {} already exists", name.as_str()),
         ));
     }
     state
@@ -393,7 +393,7 @@ pub async fn disable_principal(
     {
         DisableOutcome::LastAdmin => Err(conflict(
             "LAST_ADMIN",
-            "no se puede desactivar al último administrador activo",
+            "the last active administrator cannot be disabled",
         )),
         DisableOutcome::Disabled | DisableOutcome::AlreadyDisabled => {
             ok(&principal_dto(&state, &name).await?)
@@ -444,7 +444,7 @@ pub async fn create_token(
     if !(1..=3650).contains(&req.expires_in_days) {
         return Err(invalid(
             "INVALID_REQUEST",
-            "expires_in_days debe estar entre 1 y 3650",
+            "expires_in_days must be between 1 and 3650",
         ));
     }
     let principal = find_principal(&state, &req.principal).await?;
@@ -477,7 +477,7 @@ pub async fn revoke_token(
     if !state.store.revoke_token(&id, &auth.actor()).await? {
         return Err(not_found(
             "TOKEN_NOT_FOUND",
-            format!("no existe un token activo con id {id:?}"),
+            format!("there is no active token with id {id:?}"),
         ));
     }
     let token = state
@@ -486,7 +486,7 @@ pub async fn revoke_token(
         .await?
         .into_iter()
         .find(|t| t.id == id)
-        .ok_or_else(|| not_found("TOKEN_NOT_FOUND", "token no encontrado"))?;
+        .ok_or_else(|| not_found("TOKEN_NOT_FOUND", "token not found"))?;
     ok(&api::Token {
         id: token.id,
         principal: token.principal,
@@ -547,7 +547,7 @@ pub async fn set_grant(
     let role = Role::parse(&req.role).ok_or_else(|| {
         invalid(
             "INVALID_REQUEST",
-            "role debe ser reader, publisher o maintainer",
+            "role must be reader, publisher or maintainer",
         )
     })?;
     let patterns = req
@@ -584,7 +584,7 @@ pub async fn remove_grant(
         return Err(not_found(
             "GRANT_NOT_FOUND",
             format!(
-                "{} no tiene acceso a {}",
+                "{} has no access to {}",
                 principal.name.as_str(),
                 feed.name.as_str()
             ),
@@ -799,7 +799,7 @@ async fn set_blocked(
             invalid(
                 "INVALID_REQUEST",
                 format!(
-                    "el cuerpo debe ser JSON con \"reason\": un motivo de 1 a {MAX_REASON_CHARS} caracteres"
+                    "the body must be JSON with \"reason\": a reason of 1 to {MAX_REASON_CHARS} characters"
                 ),
             )
         })?;
@@ -837,7 +837,7 @@ pub async fn list_audit(
     let before_id = decode_cursor(&params)?
         .map(|c| c.parse::<i64>())
         .transpose()
-        .map_err(|_| invalid("INVALID_CURSOR", "cursor inválido"))?;
+        .map_err(|_| invalid("INVALID_CURSOR", "invalid cursor"))?;
     let feed_id = match params.get("feed") {
         Some(name) => Some(authorized_feed(&state, &auth, name, Access::Read).await?.id),
         None => None,

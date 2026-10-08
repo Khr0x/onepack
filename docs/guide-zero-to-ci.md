@@ -1,19 +1,19 @@
-# De cero a restore en CI
+# From zero to restore in CI
 
-> Guía de la Fase 6. Se ejecuta tal cual, de arriba abajo, en una terminal bash (Linux o macOS).
-> Última actualización: 2026-10-04
+> Phase 6 guide. Run it as is, top to bottom, in a bash terminal (Linux or macOS).
+> Last updated: 2026-10-07
 
-Al terminar tendrás un registro en marcha, un feed privado, una cuenta de servicio para CI con un token limitado a sus paquetes, un paquete publicado y un proyecto que lo restaura como lo haría un agente de CI. Todo sin interfaz web: solo `onepack` y `dotnet`.
+By the end you will have a running registry, a private feed, a CI service account with a token limited to its packages, a published package, and a project that restores it the way a CI agent would. No web UI: just `onepack` and `dotnet`.
 
-Tiempo estimado: 15 minutos (más la primera compilación).
+Estimated time: 15 minutes (plus the first build).
 
-## 0. Requisitos
+## 0. Requirements
 
-- [rustup](https://rustup.rs) (la versión de Rust la fija el repositorio).
-- SDK de .NET 8 o posterior (`dotnet --version`).
-- `git` y `curl`.
+- [rustup](https://rustup.rs) (the repository pins the Rust version).
+- .NET SDK 8 or later (`dotnet --version`).
+- `git` and `curl`.
 
-## 1. Compilar los binarios
+## 1. Build the binaries
 
 ```bash
 git clone https://github.com/Khr0x/onepack.git
@@ -24,9 +24,9 @@ onepack --version
 onepackd --version
 ```
 
-`onepackd` es el servidor; `onepack`, el CLI. En una estación de trabajo basta con `onepack`.
+`onepackd` is the server; `onepack` is the CLI. A workstation only needs `onepack`.
 
-## 2. Arrancar el servidor
+## 2. Start the server
 
 ```bash
 export DEMO="$HOME/onepack-demo"
@@ -34,41 +34,41 @@ mkdir -p "$DEMO"
 onepackd init --data-dir "$DEMO/data"
 ```
 
-`init` crea el directorio de datos y escribe la credencial administrativa inicial en `$DEMO/data/initial-admin-token`. En **otra terminal**, arranca el servidor y déjalo corriendo:
+`init` creates the data directory and writes the initial administrative credential to `$DEMO/data/initial-admin-token`. In **another terminal**, start the server and leave it running:
 
 ```bash
 export DEMO="$HOME/onepack-demo"
-export PATH="$PWD/target/release:$PATH"   # desde el directorio del repositorio
+export PATH="$PWD/target/release:$PATH"   # from the repository directory
 onepackd serve --data-dir "$DEMO/data" --public-url http://127.0.0.1:8080
 ```
 
-> Esta guía usa HTTP en `127.0.0.1` para probar en local. En un servidor real, pon `onepackd` detrás de TLS y usa como `--public-url` la URL `https://` con la que llegarán los clientes.
+> This guide uses HTTP on `127.0.0.1` to try things locally. On a real server, put `onepackd` behind TLS and use as `--public-url` the `https://` URL clients will reach it at.
 
-Vuelve a la primera terminal.
+Go back to the first terminal.
 
-## 3. Configurar el CLI como administrador
+## 3. Set up the CLI as administrator
 
 ```bash
 onepack context add local --url http://127.0.0.1:8080
 onepack login --token-stdin < "$DEMO/data/initial-admin-token"
 ```
 
-`login` valida el token y lo guarda en el keychain del sistema. Si responde `KEYCHAIN_UNAVAILABLE` (p. ej. en un servidor sin sesión gráfica), pasa el token por una variable de entorno:
+`login` validates the token and stores it in the system keychain. If it answers `KEYCHAIN_UNAVAILABLE` (e.g. on a server without a graphical session), pass the token in an environment variable instead:
 
 ```bash
 export ONEPACK_TOKEN="$(cat "$DEMO/data/initial-admin-token")"
 ```
 
-Comprueba la identidad y, ya guardada, borra el archivo de la credencial inicial:
+Check the identity and, once the credential is stored, delete the initial credential file:
 
 ```bash
 onepack whoami
-rm "$DEMO/data/initial-admin-token"   # solo si usaste `login`; con ONEPACK_TOKEN, guárdala antes en un gestor de secretos
+rm "$DEMO/data/initial-admin-token"   # only if you used `login`; with ONEPACK_TOKEN, store it in a secrets manager first
 ```
 
-`whoami` debe mostrar `admin (user, administrador)`.
+`whoami` should show `admin (user, administrator)`.
 
-## 4. Crear el feed y la cuenta de CI
+## 4. Create the feed and the CI account
 
 ```bash
 onepack feed create payments
@@ -78,17 +78,17 @@ CI_TOKEN="$(onepack token create --principal ci-payments --name github-actions -
 export CI_TOKEN
 ```
 
-El token se muestra una sola vez; en un caso real se guardaría directamente como secreto del pipeline. Con `--publish-pattern`, la cuenta de CI solo puede publicar ids `Hemia.Payments.*` en `payments`.
+The token is shown only once; in a real setup it would go straight into the pipeline secret. With `--publish-pattern`, the CI account can only publish `Hemia.Payments.*` ids to `payments`.
 
-Comprueba qué puede hacer:
+Check what it can do:
 
 ```bash
 onepack --token-env CI_TOKEN doctor --feed payments --require publish
 ```
 
-Todas las comprobaciones deben salir `ok`, salvo `nuget-config`, que avisa (`WARN`) porque aún no hay `NuGet.Config`; el resultado final es `Sin fallos.` El token nunca aparece en la salida: solo su id (`opk_<id>_…`).
+Every check should report `ok`, except `nuget-config`, which warns (`WARN`) because there is no `NuGet.Config` yet; the final line is `No failures.` The token never appears in the output: only its id (`opk_<id>_…`).
 
-## 5. Publicar un paquete como lo haría el pipeline
+## 5. Publish a package the way the pipeline would
 
 ```bash
 mkdir -p "$DEMO/src"
@@ -98,9 +98,9 @@ onepack --token-env CI_TOKEN package push --feed payments "$DEMO"/out/*.nupkg --
 onepack package list --feed payments
 ```
 
-`--skip-existing-identical` hace que reintentar el pipeline con el mismo paquete no falle. Con una versión ya publicada y contenido distinto, falla (salida 6): las versiones son inmutables.
+`--skip-existing-identical` means retrying the pipeline with the same package does not fail. With an already published version and different content it fails (exit 6): versions are immutable.
 
-## 6. Preparar el proyecto consumidor
+## 6. Prepare the consumer project
 
 ```bash
 dotnet new console -n Consumer -o "$DEMO/consumer"
@@ -111,25 +111,25 @@ cat NuGet.Config
 dotnet add package Hemia.Payments.Core --version 1.0.0 --no-restore
 ```
 
-`--dry-run` muestra el diff sin escribir. El `NuGet.Config` resultante declara la fuente `onepack_payments` y un `packageSourceMapping`: los ids `Hemia.Payments.*` solo se resuelven desde onepack y el resto sigue en nuget.org. **No contiene ningún secreto**, así que se puede subir al repositorio.
+`--dry-run` shows the diff without writing. The resulting `NuGet.Config` declares the `onepack_payments` source and a `packageSourceMapping`: `Hemia.Payments.*` ids are only resolved from onepack and everything else still comes from nuget.org. **It contains no secrets**, so it can be committed to the repository.
 
-## 7. Restaurar en local
+## 7. Restore locally
 
 ```bash
 onepack exec --feed payments -- dotnet restore
 dotnet build --no-restore
 ```
 
-`onepack exec` define la credencial solo en el entorno de `dotnet restore`. Al terminar no queda ni en el shell ni en disco:
+`onepack exec` sets the credential only in the environment of `dotnet restore`. Afterwards it is neither in the shell nor on disk:
 
 ```bash
-env | grep NuGetPackageSourceCredentials || echo "sin credenciales en el shell"
+env | grep NuGetPackageSourceCredentials || echo "no credentials in the shell"
 grep -c Password NuGet.Config || true
 ```
 
-## 8. Restaurar como un agente de CI
+## 8. Restore like a CI agent
 
-En CI no se usa `onepack`: NuGet lee la credencial de la variable `NuGetPackageSourceCredentials_<fuente>`, que el pipeline rellena desde un secreto. Simúlalo con una caché vacía y solo el token de CI:
+CI does not use `onepack`: NuGet reads the credential from the `NuGetPackageSourceCredentials_<source>` variable, which the pipeline fills from a secret. Simulate it with an empty cache and only the CI token:
 
 ```bash
 cd "$DEMO/consumer"
@@ -142,9 +142,9 @@ env -u ONEPACK_TOKEN \
 dotnet build --no-restore
 ```
 
-El restore descarga `Hemia.Payments.Core 1.0.0` desde onepack con la credencial de CI.
+The restore downloads `Hemia.Payments.Core 1.0.0` from onepack with the CI credential.
 
-En GitHub Actions, con el servidor accesible por HTTPS y el token guardado como secreto `ONEPACK_TOKEN`:
+In GitHub Actions, with the server reachable over HTTPS and the token stored as the `ONEPACK_TOKEN` secret:
 
 ```yaml
 jobs:
@@ -161,9 +161,9 @@ jobs:
       - run: dotnet build --no-restore
 ```
 
-Para publicar desde el pipeline sirve tanto `dotnet nuget push out/*.nupkg --source onepack_payments --api-key "$ONEPACK_TOKEN"` como `onepack --url https://packages.example.com package push --feed payments out/*.nupkg --skip-existing-identical` (`onepack` lee `ONEPACK_TOKEN`).
+To publish from the pipeline, either `dotnet nuget push out/*.nupkg --source onepack_payments --api-key "$ONEPACK_TOKEN"` or `onepack --url https://packages.example.com package push --feed payments out/*.nupkg --skip-existing-identical` works (`onepack` reads `ONEPACK_TOKEN`).
 
-## 9. Comprobar y auditar
+## 9. Check and audit
 
 ```bash
 cd "$DEMO/consumer"
@@ -171,25 +171,25 @@ onepack --token-env CI_TOKEN doctor --feed payments --require publish
 onepack audit list --limit 10
 ```
 
-Ahora `doctor` sale sin fallos, también en `nuget-config` y `source-mapping`. La auditoría muestra la creación del feed, del principal, del token, el grant y la publicación, con el actor de cada una.
+Now `doctor` reports no failures, including `nuget-config` and `source-mapping`. The audit log shows the creation of the feed, the principal, the token, the grant and the publish, each with its actor.
 
-## 10. Revocar y limpiar
+## 10. Revoke and clean up
 
 ```bash
 onepack token list --principal ci-payments
-onepack token revoke <ID> --yes            # el ID es la primera columna
-onepack --token-env CI_TOKEN whoami; echo "salida: $?"   # 3: credencial revocada
+onepack token revoke <ID> --yes            # the ID is the first column
+onepack --token-env CI_TOKEN whoami; echo "exit: $?"   # 3: revoked credential
 ```
 
-Para terminar, detén `onepackd` (Ctrl+C en su terminal) y borra el directorio de la prueba:
+To finish, stop `onepackd` (Ctrl+C in its terminal) and delete the test directory:
 
 ```bash
-onepack logout                      # solo si usaste `login` (con ONEPACK_TOKEN: unset ONEPACK_TOKEN)
+onepack logout                      # only if you used `login` (with ONEPACK_TOKEN: unset ONEPACK_TOKEN)
 onepack context remove local --yes
 rm -rf "$DEMO"
 ```
 
-## Si algo falla
+## If something fails
 
-- `onepack doctor --feed payments` indica qué comprobación falla y qué hacer.
-- Cada error del CLI incluye un código estable, una acción sugerida y un `request_id` que también aparece en el log de `onepackd`. Los códigos de salida están en [docs/cli.md](cli.md#códigos-de-salida).
+- `onepack doctor --feed payments` tells you which check fails and what to do.
+- Every CLI error includes a stable code, a suggested action and a `request_id` that also appears in the `onepackd` log. Exit codes are in [docs/cli.md](cli.md#exit-codes).
