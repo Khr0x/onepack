@@ -1550,7 +1550,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "onepack-api-client"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "serde",
@@ -1560,7 +1560,7 @@ dependencies = [
 
 [[package]]
 name = "onepack-bench"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "serde_json",
  "ureq",
@@ -1568,7 +1568,7 @@ dependencies = [
 
 [[package]]
 name = "onepack-cli"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "clap",
@@ -1591,11 +1591,11 @@ dependencies = [
 
 [[package]]
 name = "onepack-core"
-version = "0.0.0"
+version = "0.1.0"
 
 [[package]]
 name = "onepack-nuget"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "onepack-core",
  "quick-xml",
@@ -1605,7 +1605,7 @@ dependencies = [
 
 [[package]]
 name = "onepack-server"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -1634,7 +1634,7 @@ dependencies = [
 
 [[package]]
 name = "onepack-storage"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "fs4",
  "getrandom 0.4.3",
