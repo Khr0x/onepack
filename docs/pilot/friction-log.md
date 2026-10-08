@@ -20,7 +20,7 @@ Classes: **B** = MVP blocker, **P** = post-MVP. Status: open, fixed (with a link
 
 | ID | Date | Who / where | What they were trying to do | What happened | Time lost | Class | Status |
 |---|---|---|---|---|---|---|---|
-| F-001 | 2026-10-04 | Automated acceptance test | Restore from CI with a revoked token | `dotnet restore` only said `NU1301: unable to load the service index`, without mentioning the credential. The server did log `reason="revoked"`. | — | B | Fixed: `onepack exec` checks the credential before running the command and fails with exit code 3 and a clear action ([cli](../cli.md#nugetconfig-y-credenciales-de-nuget)). |
+| F-001 | 2026-10-04 | Automated acceptance test | Restore from CI with a revoked token | `dotnet restore` only said `NU1301: unable to load the service index`, without mentioning the credential. The server did log `reason="revoked"`. | — | B | Fixed: `onepack exec` checks the credential before running the command and fails with exit code 3 and a clear action ([cli](../cli.md#nugetconfig-and-nuget-credentials)). |
 
 <!-- Row template:
 | F-00N | YYYY-MM-DD | person, machine or pipeline | | | | B/P | open |
