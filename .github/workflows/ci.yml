@@ -79,6 +79,18 @@ jobs:
         env:
           ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
 
+  cli-linux:
+    # The other end-to-end tests run the CLI without a keychain and over plain HTTP.
+    name: onepack CLI on Linux (system keychain, headless, TLS)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show toolchain
+        run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - name: Secret Service keychain, headless machine and TLS trust
+        run: ./scripts/e2e-cli-linux.sh
+
   windows-conformance:
     # The script uses tests/conformance-dotnet/global.json (SDK 8); SDK 10 is covered on Linux and macOS.
     name: nuget.exe and .NET 8.0 on Windows

@@ -23,7 +23,7 @@ Record who takes part, the agreed period and the environment in [the log](fricti
 | Week | What | Outcome |
 |---|---|---|
 | 0 | Preparation: release candidate (see [release](../runbooks/release.md)), 30-minute kickoff meeting. | Signed and verified binaries available. |
-| 1 | **Installation using only the documentation**: [installation](../runbooks/install.md) and the [zero to CI restore guide](../guide-zero-to-ci.md). Nobody from the project helps unless the team is stuck; if that happens, it is a friction. | Server running, feed created, library published from CI and restored in another pipeline. |
+| 1 | **Installation using only the documentation**: [server installation](../runbooks/install.md), [CLI installation](../install-cli.md) and the [zero to CI restore guide](../guide-zero-to-ci.md). Nobody from the project helps unless the team is stuck; if that happens, it is a friction. | Server running, feed created, library published from CI and restored in another pipeline. |
 | 1 | IDE check: Visual Studio and Rider ([steps](../compatibility.md#manual-verification-ide)). | IDE rows filled in `docs/compatibility.md`. |
 | 1–4 | **Regular use**: publish new versions from CI, restore in builds and on workstations, rotate a token. Daily scheduled backup ([backup](../runbooks/backup-restore.md)). | Frictions logged as they happen. |
 | 2–3 | **Incident drill** ([runbook](../runbooks/incident-drill.md)): revoke the CI credential, block a version and restore from a backup, timed. | Times and deviations recorded in the log. |
