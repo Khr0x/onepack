@@ -17,7 +17,7 @@
 Hay dos modos:
 
 - **Nativo**: `scripts/bench.py`.
-- **Perfil objetivo**: `scripts/bench.py --docker` ejecuta onepackd en la [imagen](../packaging/container/Containerfile) con `--cpus 2 --memory 1g`. La memoria se lee del cgroup (memoria anónima, sin caché de páginas). El CI lo ejecuta en cada cambio (job *Benchmark*) y publica el informe en el resumen del job y en el artefacto `bench-results`.
+- **Perfil objetivo**: `scripts/bench.py --docker` ejecuta onepackd en la [imagen](../packaging/container/Containerfile) con `--cpus 2 --memory 1g`. La memoria se lee del cgroup (memoria anónima, sin caché de páginas). El CI lo ejecuta en cada push a `main` y a mano con *Run workflow* (job *Benchmark*; no corre en los PRs) y publica el informe en el resumen del job y en el artefacto `bench-results`.
 
 `--large-mib N` cambia el tamaño del paquete grande (200 MiB por defecto).
 
