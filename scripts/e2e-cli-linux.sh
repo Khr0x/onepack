@@ -196,7 +196,7 @@ tls whoami >/dev/null || fail "whoami with the system trust store"
 # --- 4. Other distributions -------------------------------------------------------------------
 
 if [ -n "${ONEPACK_E2E_DISTROS:-}" ]; then
-  file -b "$bin/onepack" | grep -q "statically linked" || fail "ONEPACK_E2E_DISTROS needs a static binary"
+  file -b "$bin/onepack" | grep -Eq "statically linked|static-pie linked" || fail "ONEPACK_E2E_DISTROS needs a static binary"
   for image in $ONEPACK_E2E_DISTROS; do
     step "Distribution $image: --version, whoami over HTTP and over TLS with --ca-cert"
     docker run --rm --network host -e ADMIN_TOKEN -e ONEPACK_KEYRING=off -e ONEPACK_CONFIG_DIR=/tmp/opk \
