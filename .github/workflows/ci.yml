@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -50,9 +51,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # SDK 8 runs here on Linux and on Windows; on macOS only Recovery (2/2) uses it (dotnet restore).
           - { os: ubuntu-24.04, sdk: "8.0", corpus: true }
           - { os: ubuntu-24.04, sdk: "10.0", tls: true }
-          - { os: macos-15, sdk: "8.0" }
           - { os: macos-15, sdk: "10.0" }
     steps:
       - uses: actions/checkout@v7
@@ -156,6 +157,8 @@ jobs:
         run: ./tests/ops/proxy-configs.sh
 
   benchmark:
+    # Reports only (no thresholds enforced) and noisy on shared runners: main and manual runs only.
+    if: github.event_name != 'pull_request'
     name: Benchmark (container, 2 vCPU / 1 GiB)
     runs-on: ubuntu-24.04
     steps:

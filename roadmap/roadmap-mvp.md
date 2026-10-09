@@ -226,7 +226,7 @@ Implementar todos los recursos anunciados con sus requisitos reales y publicar u
 ### Matriz de clientes objetivo (mínimo)
 | Cliente | Plataforma | Operaciones | Prueba |
 |---|---|---|---|
-| `dotnet` CLI (SDK 10 LTS y 8 LTS anterior) | Linux, macOS, Windows | push, restore, search, list | `scripts/e2e-dotnet.sh` (Linux/macOS, SDK 8 y 10), `e2e-windows.ps1` (SDK 8) |
+| `dotnet` CLI (SDK 10 LTS y 8 LTS anterior) | Linux, macOS, Windows | push, restore, search, list | `scripts/e2e-dotnet.sh` (Linux SDK 8 y 10, macOS SDK 10), `e2e-windows.ps1` (SDK 8) |
 | `nuget.exe` | Windows | push, restore, search | `tests/conformance-dotnet/e2e-windows.ps1` |
 | Visual Studio / Rider | Windows / macOS | navegación y restore (manual, documentado) | manual |
 | CI (GitHub Actions / Azure Pipelines) | Linux | restore y push con credenciales inyectadas | jobs de GitHub Actions; Azure Pipelines sin entorno |
