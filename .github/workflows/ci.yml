@@ -18,7 +18,7 @@ jobs:
     name: Rust (fmt, clippy, tests, crate boundaries)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # rustup installs the version pinned in rust-toolchain.toml when cargo runs.
       - name: Show toolchain
         run: rustup show active-toolchain
@@ -40,7 +40,7 @@ jobs:
     name: cargo-deny (licenses, advisories, sources)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   dotnet-conformance:
@@ -55,8 +55,8 @@ jobs:
           - { os: macos-15, sdk: "8.0" }
           - { os: macos-15, sdk: "10.0" }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ matrix.sdk }}.x
       - name: Show toolchain
@@ -84,7 +84,7 @@ jobs:
     name: onepack CLI on Linux (system keychain, headless, TLS)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Show toolchain
         run: rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
@@ -96,8 +96,8 @@ jobs:
     name: nuget.exe and .NET 8.0 on Windows
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
       - name: Show toolchain
@@ -111,14 +111,14 @@ jobs:
     name: Recovery (1/2) backup on Linux
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
       - uses: Swatinem/rust-cache@v2
       - name: Publish packages and take a backup with the server running (ADR-017)
         run: ./scripts/e2e-recovery.sh backup "$RUNNER_TEMP/onepack-backup.tar.gz"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: onepack-backup
           path: ${{ runner.temp }}/onepack-backup.tar.gz
@@ -130,12 +130,12 @@ jobs:
     needs: recovery-backup
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: onepack-backup
           path: ${{ runner.temp }}
@@ -146,7 +146,7 @@ jobs:
     name: systemd, container and reverse proxy examples
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: systemd unit with hardening, restart after SIGKILL
         run: ./tests/ops/systemd.sh
@@ -159,11 +159,11 @@ jobs:
     name: Benchmark (container, 2 vCPU / 1 GiB)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: Benchmark
         run: python3 scripts/bench.py --docker --out bench-results.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bench-results
           path: bench-results.json
