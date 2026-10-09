@@ -192,7 +192,8 @@ export NUGET_HTTP_CACHE_PATH="$work/http-cache"
 
 step "Publicando con dotnet nuget push"
 for pkg in "$work"/nupkgs/*.nupkg; do
-  (cd "$client" && dotnet nuget push "$pkg" --source onepack --api-key "$token") >/dev/null || fail "push de $(basename "$pkg")"
+  (cd "$client" && dotnet nuget push "$pkg" --source onepack --api-key "$token" >"$work/push.log" 2>&1) \
+    || fail "push de $(basename "$pkg"): $(cat "$work/push.log")"
 done
 
 step "Comprobando que una versión duplicada se rechaza (409)"
