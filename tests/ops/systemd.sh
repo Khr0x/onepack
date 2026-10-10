@@ -59,7 +59,8 @@ ready || fail "no volvió a ready tras el reinicio"
 echo "    reiniciado: PID $before -> $(systemctl show -p MainPID --value onepackd)"
 
 step "Logs JSON en journald y parada ordenada"
-sudo journalctl -u onepackd --no-pager -o cat -n 5 | grep -q '^{' || fail "los logs no son JSON"
+logs=$(sudo journalctl -u onepackd --no-pager -o cat -n 5)
+grep -q '^{' <<<"$logs" || fail "los logs no son JSON"
 sudo systemctl stop onepackd
 [ "$(systemctl show -p Result --value onepackd)" = success ] || fail "la parada no fue limpia"
 

@@ -14,7 +14,7 @@ cleanup() {
   docker volume rm "$volume" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-fail() { echo "CONTENEDOR FALLÓ: $*" >&2; docker logs "$name" >&2 2>/dev/null || true; exit 1; }
+fail() { echo "CONTENEDOR FALLÓ: $*" >&2; docker logs "$name" >&2 2>&1 || true; exit 1; }
 step() { echo "==> $*"; }
 
 step "Construyendo $image"
@@ -48,8 +48,11 @@ curl -fs -H "X-NuGet-ApiKey: $token" "http://127.0.0.1:$port/nuget/internal/v3/i
   || fail "service index"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/nuget/internal/v3/index.json")" = 401 ] \
   || fail "sin credencial debería ser 401"
-docker logs "$name" 2>&1 | head -1 | grep -q '^{' || fail "los logs no son JSON"
-docker logs "$name" 2>&1 | grep -qF "$token" && fail "el token apareció en los logs"
+# Se leen antes de filtrarlos: con pipefail, head/grep -q cierran la tubería y docker logs
+# muere por SIGPIPE, lo que daba falsos fallos y ocultaba un token filtrado.
+logs=$(docker logs "$name" 2>&1)
+[[ "$logs" == "{"* ]] || fail "los logs no son JSON"
+grep -qF "$token" <<<"$logs" && fail "el token apareció en los logs"
 
 step "Parada ordenada con SIGTERM"
 docker stop -t 10 "$name" >/dev/null
