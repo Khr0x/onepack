@@ -12,7 +12,7 @@ license.workspace = true
 onepack-core.workspace = true
 quick-xml = "0.42.0"
 serde_json = "1.0.151"
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true
