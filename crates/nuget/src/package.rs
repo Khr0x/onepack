@@ -309,7 +309,7 @@ fn read_nuspec_within<R: Read + Seek>(
         deadline.check()?;
         // Solo el directorio central: nada se descomprime ni se escribe a disco.
         let entry = archive.by_index_raw(i).map_err(PackageError::NotAZip)?;
-        let name = entry.name().to_owned();
+        let name = entry.name().map_err(PackageError::NotAZip)?.into_owned();
         check_entry_name(&name)?;
         if !seen.insert(canonical_name(&name)) {
             return Err(PackageError::DuplicateEntry(name));

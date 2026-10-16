@@ -34,4 +34,4 @@ onepack-storage.workspace = true
 axum = "0.8.9"
 tempfile = "3.27.0"
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "net"] }
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
