@@ -8,19 +8,20 @@
 > (npm) y OP-027 (PyPI). No implementa adaptadores.
 >
 > Baseline consultado: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
-> Fecha: 2026-10-19. Estado: propuesto para revisión; ninguna decisión se da por aceptada
-> hasta cerrar OP-021.
+> Fecha: 2026-10-19. Estado: **aceptado**. Revisión del 2026-10-19 por el mantenedor
+> (instrucción en la sesión de trabajo); ADR-021…026 aceptados sin cambios de alcance.
+> La implementación sigue correspondiendo a OP-022, OP-024 y OP-033.
 
 ## Índice
 
 | ADR | Decisión | Estatus |
 |---|---|---|
-| [021](#adr-021) | Feeds tipados por ecosistema; `format` inmutable | Propuesto |
-| [022](#adr-022) | Identidad, versión y orden delegados al adaptador | Propuesto |
-| [023](#adr-023) | Múltiples archivos por versión con `version_file` | Propuesto |
-| [024](#adr-024) | Rutas, capacidades y contratos aditivos por protocolo | Propuesto |
-| [025](#adr-025) | `feed_format` como tabla autoritativa; el CHECK v1 queda como legado | Propuesto |
-| [026](#adr-026) | Frontera de crates: adaptadores fuera de `core`/`storage` | Propuesto |
+| [021](#adr-021) | Feeds tipados por ecosistema; `format` inmutable | Aceptado |
+| [022](#adr-022) | Identidad, versión y orden delegados al adaptador | Aceptado |
+| [023](#adr-023) | Múltiples archivos por versión con `version_file` | Aceptado |
+| [024](#adr-024) | Rutas, capacidades y contratos aditivos por protocolo | Aceptado |
+| [025](#adr-025) | `feed_format` como tabla autoritativa; el CHECK v1 queda como legado | Aceptado |
+| [026](#adr-026) | Frontera de crates: adaptadores fuera de `core`/`storage` | Aceptado |
 
 ---
 
@@ -158,11 +159,12 @@ un tarball más metadatos. Python es obligatorio en v2.
 - `kind` distingue el rol del archivo (`package`, `tarball`, `wheel`, `sdist`, `metadata`).
   La lista exacta se fija en OP-023/OP-027; el valor es opaco para `storage`.
 - Un `filename` es inmutable: subir el mismo nombre con bytes distintos responde `409`
-  (`VERSION_FILE_CONFLICT`). Subir otro nombre a una versión existente es válido solo para
-  ecosistemas que lo permiten; el adaptador decide (PyPI sí; NuGet no).
+  (`VERSION_FILE_CONFLICT`). La comparación es exacta sobre el nombre; el adaptador
+  normaliza cuando su protocolo lo exige. Subir otro nombre a una versión existente es
+  válido solo para ecosistemas que lo permiten; el adaptador decide (PyPI sí; NuGet no).
 - La cuota del feed suma el tamaño de los archivos de cada versión. Un blob compartido entre
   versiones se cuenta una vez por versión, como hoy.
-- Primera versión: no se borran archivos desde el registro; retirar (yank/unlist) es un
+- En el primer corte no se borran archivos desde el registro; retirar (yank/unlist) es un
   cambio de estado, no una eliminación.
 
 **Consecuencias.** PyPI puede publicar varias distribuciones sin duplicar la fila de versión
@@ -313,7 +315,9 @@ transacción:
 
 Antes de migrar se sigue el procedimiento de backup vigente
 ([docs/runbooks/backup-restore.md](../docs/runbooks/backup-restore.md)); el ensayo de
-`onepackd backup` + migración + restauración es parte de la evidencia de OP-022.
+`onepackd backup` + migración + restauración es parte de la evidencia de OP-022. El backup
+existente ya cubre las tablas nuevas y los blobs; no se introduce un formato de datos
+distinto ni una recuperación nueva.
 
 Compatibilidad verificable:
 
@@ -366,10 +370,11 @@ Pruebas mínimas que OP-022 debe entregar:
 - AC-01: inventario de la sección 2, con el `CHECK format IN ('nuget')` y `is_semver2`
   señalados.
 - AC-02: ADR-021 (feeds) y la tabla de identidad con ejemplos y contraejemplos de los tres
-  protocolos.
+  protocolos; decisión aceptada el 2026-10-19.
 - AC-03: secciones 4–6 con contratos de API/CLI, errores, migración y compatibilidad; `core`
   y `storage` conservan su frontera sin dependencias NuGet.
-- AC-CIERRE: pendiente de revisión del usuario y de sincronizar OP-021/backlog.
+- AC-CIERRE: cerrado con la aceptación registrada del 2026-10-19, la nota OP-021 y el
+  backlog sincronizados.
 
-Evidencia esperada al cerrar: ruta de este documento, SHA-256, commit local y revisión
-registrada en Obsidian.
+Evidencia: ruta de este documento, SHA-256 del contenido aceptado, commit local `514e439`
+(entrega) y la aceptación registrada en Obsidian el 2026-10-19.
