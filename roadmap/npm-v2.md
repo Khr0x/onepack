@@ -7,7 +7,9 @@
 > `docs/api.md` y el código de `crates/server/src` y `crates/core/src`.
 >
 > Baseline consultado: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
-> Fecha: 2026-10-19. Estado: propuesto para revisión; se acepta al cerrar OP-023.
+> Fecha: 2026-10-19. Estado: **aceptado**. Revisión del 2026-10-19 por el mantenedor
+> (instrucción en la sesión de trabajo); matriz, contratos y decisión de primer corte
+> aceptados sin cambios de alcance. La implementación corresponde a OP-024 y OP-025.
 
 ## 1. Alcance
 
@@ -292,7 +294,7 @@ superficies, y `reason` queda para lectura humana. npm muestra el texto y su pro
 | `RATE_LIMITED` | 429 | Límite por principal o IP |
 | `INTERNAL` | 500 | Error no clasificado |
 
-## 10. Retirada y búsqueda (decisión pendiente de OP-023)
+## 10. Retirada y búsqueda (decisión aceptada)
 
 Decisión para el primer corte:
 
@@ -337,7 +339,8 @@ tarea de evolución antes de ampliar este alcance.
   ausente/revocado, rol insuficiente y namespace ajeno sin revelar paquetes.
 - AC-03: plan adverso de la sección 8 (traversal, links, expansión, colisiones) y metadatos
   que anuncian solo lo implementado (sección 3).
-- AC-CIERRE: pendiente de la aceptación de la spec, con nota y backlog sincronizados.
+- AC-CIERRE: cerrado con la aceptación registrada del 2026-10-19, la nota OP-023 y el
+  backlog sincronizados.
 
-Evidencia esperada al cerrar: ruta de este documento, SHA-256, commit local y revisión
-registrada en Obsidian.
+Evidencia: ruta de este documento, SHA-256 del contenido aceptado, commit local `fa0d526`
+(entrega) y la aceptación registrada en Obsidian el 2026-10-19.
