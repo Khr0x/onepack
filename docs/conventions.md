@@ -15,6 +15,18 @@ Libraries: `onepack-core`, `onepack-nuget`, `onepack-storage`, `onepack-api-clie
 - To bump the version, change both values in the same PR.
 - `unsafe` is forbidden across the workspace (`unsafe_code = "forbid"`).
 
+The CLI uses `keyring-core` with native credential stores: Keychain on macOS,
+Credential Manager on Windows, and `dbus-secret-service-keyring-store` on Unix.
+The Unix backend enables `crypto-rust` and `vendored` to preserve static musl
+binaries. Building it requires a C toolchain, make, Perl and pkg-config (in
+addition to musl tools when cross-compiling); users of the binaries need a
+running Secret Service for `login`, without installing libdbus or OpenSSL.
+For ARM64 musl, `.cargo/config.toml` keeps C atomics inline so libdbus does not
+require the outlined atomic helpers from libgcc at link time.
+Credential attributes remain `service=onepack` and `username=<context>` in the
+default collection. To check compatibility with an earlier CLI, run
+`ONEPACK_PREVIOUS_BIN_DIR=/path/to/old/bin ./scripts/e2e-cli-linux.sh` on Linux.
+
 ## Language
 
 - Everything users see is in English: CLI and server messages, `--help` texts, logs and metrics descriptions.

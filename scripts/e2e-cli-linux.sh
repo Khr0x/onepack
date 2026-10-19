@@ -13,6 +13,7 @@
 # Variables:
 #   ONEPACK_BIN_DIR=DIR                  use `onepackd` and `onepack` from DIR (e.g. release
 #                                        binaries) instead of building them.
+#   ONEPACK_PREVIOUS_BIN_DIR=DIR         also check credentials saved by the previous CLI.
 #   ONEPACK_E2E_DISTROS="alpine:3.20 …"  container images to run the CLI in (needs docker and a
 #                                        static binary).
 set -euo pipefail
@@ -107,7 +108,19 @@ onepack context add local --url "$http_url" --use >/dev/null
 dbus-run-session -- bash -euo pipefail -c '
   echo -n onepack-e2e | gnome-keyring-daemon --unlock --components=secrets >/dev/null
   onepack() { "$0" "$@"; }
+  if [ -n "${ONEPACK_PREVIOUS_BIN_DIR:-}" ]; then
+    echo "Checking credentials saved by the previous CLI, including logout"
+    printf %s "$ADMIN_TOKEN" | "$ONEPACK_PREVIOUS_BIN_DIR/onepack" login --token-stdin >/dev/null
+    onepack whoami >/dev/null
+    onepack logout >/dev/null
+    set +e; "$ONEPACK_PREVIOUS_BIN_DIR/onepack" whoami >/dev/null 2>&1; code=$?; set -e
+    [ "$code" = 3 ] || { echo "previous CLI after logout exited $code, expected 3" >&2; exit 1; }
+  fi
   printf %s "$ADMIN_TOKEN" | onepack login --token-stdin >/dev/null
+  if [ -n "${ONEPACK_PREVIOUS_BIN_DIR:-}" ]; then
+    echo "Checking that the previous CLI can read newly saved credentials"
+    "$ONEPACK_PREVIOUS_BIN_DIR/onepack" whoami >/dev/null
+  fi
   [ "$(onepack whoami --json | python3 -c "import json, sys; print(json.load(sys.stdin)[\"principal\"])")" = admin ]
   onepack doctor --json | python3 -c "
 import json, sys

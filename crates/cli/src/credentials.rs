@@ -11,6 +11,25 @@
 
 use crate::error::{CliError, CliResult, exit};
 
+static KEYCHAIN: std::sync::LazyLock<keyring_core::Result<()>> = std::sync::LazyLock::new(|| {
+    #[cfg(target_os = "macos")]
+    let store = apple_native_keyring_store::keychain::Store::new()?;
+    #[cfg(target_os = "windows")]
+    let store = windows_native_keyring_store::Store::new()?;
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
+    ))]
+    let store = dbus_secret_service_keyring_store::Store::new()?;
+    #[cfg(all(any(unix, windows), not(any(target_os = "ios", target_os = "android"))))]
+    {
+        keyring_core::set_default_store(store);
+        Ok(())
+    }
+    #[cfg(not(all(any(unix, windows), not(any(target_os = "ios", target_os = "android")))))]
+    Err(keyring_core::Error::NoDefaultStore)
+});
+
 const SERVICE: &str = "onepack";
 pub const TOKEN_ENV: &str = "ONEPACK_TOKEN";
 
@@ -68,11 +87,12 @@ fn keyring_disabled() -> bool {
     std::env::var("ONEPACK_KEYRING").is_ok_and(|v| v.eq_ignore_ascii_case("off"))
 }
 
-fn entry(context: &str) -> CliResult<keyring::Entry> {
+fn entry(context: &str) -> CliResult<keyring_core::Entry> {
     if keyring_disabled() {
         return Err(keychain_unavailable("disabled with ONEPACK_KEYRING=off"));
     }
-    keyring::Entry::new(SERVICE, context).map_err(keychain_unavailable)
+    KEYCHAIN.as_ref().map_err(keychain_unavailable)?;
+    keyring_core::Entry::new(SERVICE, context).map_err(keychain_unavailable)
 }
 
 /// Token para un contexto. `Ok(None)` si no hay ninguno configurado.
@@ -110,7 +130,7 @@ pub fn resolve(context: Option<&str>, token_env: Option<&str>) -> CliResult<Opti
             token,
             source: Source::Keychain,
         })),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring_core::Error::NoEntry) => Ok(None),
         Err(e) => Err(keychain_unavailable(e)),
     }
 }
@@ -130,7 +150,7 @@ pub fn store(context: &str, token: &str) -> CliResult<()> {
 pub fn delete(context: &str) -> CliResult<bool> {
     match entry(context)?.delete_credential() {
         Ok(()) => Ok(true),
-        Err(keyring::Error::NoEntry) => Ok(false),
+        Err(keyring_core::Error::NoEntry) => Ok(false),
         Err(e) => Err(keychain_unavailable(e)),
     }
 }
