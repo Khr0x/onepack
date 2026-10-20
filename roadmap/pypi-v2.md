@@ -8,7 +8,9 @@
 > `crates/server/src` y `crates/core/src`.
 >
 > Baseline consultado: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
-> Fecha: 2026-10-19. Estado: propuesto para revisión; se acepta al cerrar OP-027.
+> Fecha: 2026-10-19. Estado: **aceptado**. Revisión del 2026-10-19 por el mantenedor
+> (instrucción en la sesión de trabajo); matriz, contratos y decisiones de primer corte
+> aceptados sin cambios de alcance. La implementación corresponde a OP-033, OP-034 y OP-035.
 
 ## 1. Alcance
 
@@ -321,7 +323,7 @@ resolverse desde el índice público (o al revés). Reglas del primer corte:
 - `pip` no consulta ningún índice público por sí solo: si el usuario no configura
   `extra-index-url`, la resolución es solo privada.
 
-## 11. Estados, retirada y yank (decisión)
+## 11. Estados, retirada y yank (decisión aceptada)
 
 - **Sin `yank` (PEP 592) en el primer corte.** No se implementa el endpoint ni
   `data-yanked`. La retirada efectiva es el bloqueo administrativo existente (ADR-013), que
@@ -361,7 +363,8 @@ resolverse desde el índice público (o al revés). Reglas del primer corte:
   rechazados y auditados) y auth sin filtración de metadatos de la sección 4.
 - AC-03: plan con pip desde caché vacía y fixtures adversos de la sección 8, incluidos los
   accesos sin permiso de la sección 4.
-- AC-CIERRE: pendiente de la aceptación de la spec, con nota y backlog sincronizados.
+- AC-CIERRE: cerrado con la aceptación registrada del 2026-10-19, la nota OP-027 y el
+  backlog sincronizados.
 
-Evidencia esperada al cerrar: ruta de este documento, SHA-256, commit local y revisión
-registrada en Obsidian.
+Evidencia: ruta de este documento, SHA-256 del contenido aceptado, commit local `7d9d1dd`
+(entrega) y la aceptación registrada en Obsidian el 2026-10-19.
