@@ -1,7 +1,7 @@
 # Rendimiento
 
 > Fase 7. Resultados reales: los objetivos no cumplidos se documentan, no se ocultan.
-> Última actualización: 2026-10-04
+> Última actualización: 2026-10-16
 
 ## Método
 
@@ -52,18 +52,38 @@ Hay dos modos:
 
 La subida se escribe en staging mientras llega y la descarga se transmite desde el archivo; ninguna pasa por memoria.
 
-### Contenedor, 2 vCPU / 1 GiB
+### Contenedor, 2 vCPU / 1 GiB — 2026-10-16
 
-Lo mide el job *Benchmark* del CI en `ubuntu-24.04`, con la imagen limitada con `--cpus 2 --memory 1g`. El job pasó en la ejecución que cerró la Fase 7 ([CI run 37247176082](https://github.com/Khr0x/onepack/actions/runs/37247176082)); sus cifras están en el resumen del job y en el artefacto `bench-results`, y se transcribirán aquí en la Fase 8.
+Resultados del [job *Benchmark*](https://github.com/Khr0x/onepack/actions/runs/38917726054/job/117029413791), completado correctamente en el [CI de main](https://github.com/Khr0x/onepack/actions/runs/38917726054) para el commit [`88467a94eaee4fc7345bac54fdf6fa4449a913b8`](https://github.com/Khr0x/onepack/commit/88467a94eaee4fc7345bac54fdf6fa4449a913b8). Los datos se conservan en el artefacto [`bench-results`](https://github.com/Khr0x/onepack/actions/runs/38917726054/artifacts/12053542020) (`bench-results.json`).
 
-| Medida | Resultado | Objetivo |
-|---|---|---|
-| Arranque hasta `ready` | pendiente del CI | < 2 s |
-| RSS en reposo | pendiente del CI | < 100 MiB |
-| p95 metadatos | pendiente del CI | < 50 ms |
-| Memoria adicional en transferencias | pendiente del CI | acotada |
+Entorno: `ubuntu-24.04`, Linux x86-64, host con 4 CPU lógicas y contenedor limitado con `--cpus 2 --memory 1g`. Comando ejecutado:
 
-El runner no es un disco SSD dedicado ni una máquina de 2 vCPU reales: el límite lo pone el cgroup sobre una VM compartida. Es una aproximación reproducible, no una medición en el hardware objetivo.
+```bash
+python3 scripts/bench.py --docker --out bench-results.json
+```
+
+| Medida | Resultado | Objetivo | |
+|---|---|---|---|
+| Arranque hasta `ready` | 0,16 s | < 2 s | ✅ |
+| Memoria anónima en reposo (cgroup) | 1,2 MiB | < 100 MiB | ✅ |
+| p95 metadatos (16 clientes) | 11,2 ms | < 50 ms | ✅ |
+| Memoria adicional al subir 200 MiB | +1,0 MiB | < 100 MiB adicionales | ✅ |
+| Memoria adicional al descargar 200 MiB | +0,0 MiB | < 100 MiB adicionales | ✅ |
+
+| Recurso | p50 | p95 | p99 |
+|---|---|---|---|
+| service index | 5,7 ms | 9,4 ms | 11,9 ms |
+| flat container | 7,4 ms | 11,5 ms | 13,9 ms |
+| registro | 7,6 ms | 11,8 ms | 14,6 ms |
+| búsqueda | 7,3 ms | 11,2 ms | 14,1 ms |
+
+Con 1.000 versiones cargadas: 3,4 MiB de memoria anónima; 2.125 peticiones/s de metadatos, sin errores; publicación de paquetes pequeños: 265/s. La subida de 200 MiB duró 0,9 s y la descarga 1,9 s. Se conservan los redondeos del informe original.
+
+Todos los objetivos numéricos de esta ejecución se cumplieron. El job publica resultados, pero no impone los umbrales como condición de éxito del CI. La comprobación de memoria corresponde a transferencias de 200 MiB; esta ejecución no compara distintos tamaños para demostrar independencia respecto al tamaño del paquete.
+
+El script desactiva los límites de peticiones por principal y por IP durante la medición. El informe llama «RSS» a la memoria, pero en este perfil se mide memoria anónima del cgroup, sin caché de páginas; no es directamente comparable con el RSS del proceso medido en modo nativo.
+
+El runner no tiene un SSD dedicado ni dos CPU reservadas: el límite lo pone el cgroup sobre una VM compartida. Es una aproximación reproducible, no una medición en el hardware objetivo ni una garantía de rendimiento en otros despliegues.
 
 ## Lo que cambió con la medición
 

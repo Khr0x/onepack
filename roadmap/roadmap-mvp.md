@@ -441,8 +441,8 @@ Validar con un equipo real que el producto resuelve el problema y ejecutar la pr
 - [ ] Ejercicio de incidente: revocar credencial de CI, bloquear una versión, restaurar desde backup.
 - [ ] Verificación manual con Visual Studio y Rider (diferida desde la Fase 3), anotada en `docs/compatibility.md`.
 - [ ] Ejecución literal de la guía [de cero a restore en CI](../docs/guide-zero-to-ci.md) por alguien que no escribió el código (diferida desde la Fase 6).
-- [ ] Primera ejecución de `release.yml` (binarios, checksums y firma) antes de etiquetar `v0.1.0` (diferida desde la Fase 7).
-- [ ] Resultados del benchmark en contenedor (2 vCPU / 1 GiB) del job *Benchmark* anotados en `docs/performance.md` (diferido desde la Fase 7).
+- [x] Primera ejecución de `release.yml` (binarios, checksums y firma): [dry run 37891824376](https://github.com/Khr0x/onepack/actions/runs/37891824376). Candidata `88467a9` validada en [dry run 39068572157](https://github.com/Khr0x/onepack/actions/runs/39068572157), con firma comprobada fuera de Actions y aceptación de los binarios descargados en Linux ARM64. La promoción sigue bloqueada por F-002: `cargo deny check` actualizado falla (OP-036 / OP-045).
+- [x] Resultados del benchmark en contenedor (2 vCPU / 1 GiB) del job *Benchmark* anotados en [docs/performance.md](../docs/performance.md): [CI run 38917726054](https://github.com/Khr0x/onepack/actions/runs/38917726054), commit `88467a9`, ejecución del 2026-10-16; objetivos, cifras y limitaciones documentados (OP-002).
 - [ ] Registro de fricciones, errores y peticiones; clasificación en "bloqueante MVP" / "post-MVP".
 - [ ] Corrección de todos los bloqueantes MVP.
 - [ ] Retrospectiva y actualización del orden de evolución (credential provider, S3, proxy…).
