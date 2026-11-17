@@ -16,7 +16,7 @@ getrandom = "0.4.3"
 onepack-core.workspace = true
 sha2 = "0.11.0"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
-tokio = { version = "1.53.2", features = ["fs", "io-util", "rt", "macros", "time"] }
+tokio = { version = "1.54.1", features = ["fs", "io-util", "rt", "macros", "time"] }
 tracing = "0.1.44"
 
 [features]
@@ -28,4 +28,4 @@ workspace = true
 
 [dev-dependencies]
 tempfile = "3.27.0"
-tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
