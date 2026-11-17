@@ -28,3 +28,8 @@ todo = "warn"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# Temporal: sqlx 0.9.1 aún no está en crates.io y 0.9.0 limita
+# libsqlite3-sys a <0.38.0 (RUSTSEC-2026-0459). Retirar al publicar 0.9.1.
+[patch.crates-io]
+sqlx = { git = "https://github.com/transact-rs/sqlx", rev = "4f22dcfd42cbc15ea7a977cb38a39ef0ce6b3be4" }

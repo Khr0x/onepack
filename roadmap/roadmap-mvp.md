@@ -3,7 +3,7 @@
 > Plan por fases derivado de [mvp-registro-privado-paquetes-nuget.md](mvp-registro-privado-paquetes-nuget.md).
 > Las decisiones de arquitectura están en [adr-mvp.md](adr-mvp.md).
 >
-> Última actualización: 2026-10-04
+> Última actualización: 2026-11-16
 
 ---
 
@@ -442,7 +442,9 @@ Validar con un equipo real que el producto resuelve el problema y ejecutar la pr
 - [ ] Verificación manual con Visual Studio y Rider (diferida desde la Fase 3), anotada en `docs/compatibility.md`.
 - [ ] Ejecución literal de la guía [de cero a restore en CI](../docs/guide-zero-to-ci.md) por alguien que no escribió el código (diferida desde la Fase 6).
 - [x] Primera ejecución de `release.yml` (binarios, checksums y firma): [dry run 37891824376](https://github.com/Khr0x/onepack/actions/runs/37891824376). Candidata `88467a9` validada en [dry run 39068572157](https://github.com/Khr0x/onepack/actions/runs/39068572157), con firma comprobada fuera de Actions y aceptación de los binarios descargados en Linux ARM64. La promoción sigue bloqueada por F-002: `cargo deny check` actualizado falla (OP-036 / OP-045).
+- [x] Revalidación del 2026-10-29: candidata `f84978b`, [dry run 40900732673](https://github.com/Khr0x/onepack/actions/runs/40900732673) con 9 jobs correctos, 7 checksums y firma comprobados fuera de Actions, aceptación y CLI de los binarios descargados aprobadas en Linux ARM64 limpio. F-002 está corregido en el artefacto nuevo; la promoción continúa bloqueada por cuatro avisos nuevos de cargo-deny, F-003/OP-046 (TLS) y F-004/OP-047 (Tokio). Evidencia en Obsidian: `OP-036-Resultados-2026-10-29`; ver [fricciones actuales](../docs/pilot/friction-log.md#current-candidate-validation--2026-10-29). No se publica release ni se cierra el piloto.
 - [x] Resultados del benchmark en contenedor (2 vCPU / 1 GiB) del job *Benchmark* anotados en [docs/performance.md](../docs/performance.md): [CI run 38917726054](https://github.com/Khr0x/onepack/actions/runs/38917726054), commit `88467a9`, ejecución del 2026-10-16; objetivos, cifras y limitaciones documentados (OP-002).
+- [x] Actualización de dependencias del 2026-11-16: commits locales `bc78dc4` (`rustls-webpki` 0.103.17, `webpki-roots`/`webpki-root-certs` 1.0.12, Tokio 1.54.1) y `1a50859` (`sqlx 0.9.1` pin temporal y `libsqlite3-sys` 0.39.1) resuelven F-003/F-004/F-005. `cargo deny` pasa; también fmt, Clippy, 151 tests, fronteras, E2E Linux de TLS/keychain, aceptación y disco lleno. Retirar el pin y `allow-git` al publicar sqlx 0.9.1. Falta la candidata nueva con CI y artefacto firmado; sin push ni release. Ver [fricciones actuales](../docs/pilot/friction-log.md#dependency-gate-update--2026-11-16).
 - [ ] Registro de fricciones, errores y peticiones; clasificación en "bloqueante MVP" / "post-MVP".
 - [ ] Corrección de todos los bloqueantes MVP.
 - [ ] Retrospectiva y actualización del orden de evolución (credential provider, S3, proxy…).
