@@ -145,6 +145,14 @@ For connection and permission issues, start with:
 onepack doctor --feed internal
 ```
 
+## Project policies
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Changelog](CHANGELOG.md)
+
 ## Contributing
 
 Bug reports, documentation improvements, and focused pull requests are welcome. [Open an issue](https://github.com/Khr0x/onepack/issues) to report a reproducible problem or discuss a larger change before implementing it.
