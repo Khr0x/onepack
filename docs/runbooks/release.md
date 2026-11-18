@@ -10,6 +10,7 @@
    - the [acceptance test](../../scripts/e2e-acceptance.sh) on Linux x86-64: install, publish, restore from CI, revoke, block and recover from a backup;
    - the [Linux CLI checks](../../scripts/e2e-cli-linux.sh) on Linux x86-64 and ARM64: system keychain (Secret Service), headless machine without a keychain, TLS with the system trust store and with `--ca-cert`, and the CLI on Debian, Fedora, Rocky Linux and Alpine.
 3. **Publish**: `SHA256SUMS`, Sigstore *keyless* signature (`SHA256SUMS.sigstore.json`), verification of that signature and, when triggered by a tag, a **draft** release on GitHub.
+4. **Container image**: on a tag, builds a multi-arch image (`linux/amd64`, `linux/arm64`) from the verified `onepackd` binaries and pushes `ghcr.io/khr0x/onepack:vX.Y.Z` plus `:latest`. The GHCR package must be public before the quick start can use it.
 
 If any verification fails, nothing is signed or published.
 
@@ -34,7 +35,8 @@ Before the first tag, and whenever the workflow changes:
    ```
 
 4. When the workflow finishes, review the draft release (files, `SHA256SUMS`, signature bundle), write the notes and publish it.
-5. Check the installation from the published release by following [installation](install.md) on a clean machine.
+5. Verify that `ghcr.io/khr0x/onepack:vX.Y.Z` is public and pulls on both architectures; if it is still private, change the package visibility in GitHub.
+6. Check the installation from the published release by following [installation](install.md) on a clean machine, and run the quick start from the README.
 
 To repeat the checks with downloaded binaries, unpack `onepack` and `onepackd` into a directory and run, from the repository, `ONEPACK_BIN_DIR=<dir> ./scripts/e2e-acceptance.sh` (requires the .NET 8 SDK) and, on Linux, `ONEPACK_BIN_DIR=<dir> ./scripts/e2e-cli-linux.sh`.
 
@@ -43,3 +45,4 @@ To repeat the checks with downloaded binaries, unpack `onepack` and `onepackd` i
 - A green dry run.
 - The workspace version is `0.1.0` (done in the same change that added the Linux CLI checks).
 - [CLI installation](../install-cli.md) checked on a clean Linux machine with the dry-run binaries.
+- The GHCR package is public and the quick start (`compose.yaml` + `install.sh`) works on a clean machine.
