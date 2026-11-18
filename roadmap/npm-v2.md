@@ -1,93 +1,93 @@
-# Especificación de conformidad npm — hosting privado v2 (OP-023)
+# npm conformance specification — private hosting v2 (OP-023)
 
-> Tarea OP-023. Depende de OP-020 y OP-021 (verificadas). Entrega los contratos que OP-024
-> (adaptador), OP-025 (CLI) y la documentación de cliente necesitan; no implementa nada.
+> Task OP-023. Depends on OP-020 and OP-021 (verified). Delivers the contracts that OP-024
+> (adapter), OP-025 (CLI) and the client documentation need; implements nothing.
 >
-> Fuentes: `roadmap/adr-v2.md` (ADR-021…026), `docs/security.md`, `docs/compatibility.md`,
-> `docs/api.md` y el código de `crates/server/src` y `crates/core/src`.
+> Sources: `roadmap/adr-v2.md` (ADR-021…026), `docs/security.md`, `docs/compatibility.md`,
+> `docs/api.md` and the code in `crates/server/src` and `crates/core/src`.
 >
-> Baseline consultado: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
-> Fecha: 2026-10-19. Estado: **aceptado**. Revisión del 2026-10-19 por el mantenedor
-> (instrucción en la sesión de trabajo); matriz, contratos y decisión de primer corte
-> aceptados sin cambios de alcance. La implementación corresponde a OP-024 y OP-025.
+> Baseline consulted: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
+> Date: 2026-10-19. Status: **accepted**. Review on 2026-10-19 by the maintainer
+> (instruction in the work session); matrix, contracts and first-cut decision
+> accepted without scope changes. Implementation corresponds to OP-024 and OP-025.
 
-## 1. Alcance
+## 1. Scope
 
-Habilitar **publish, install y ci** con npm real contra un feed privado `npm`, con paquetes
-scoped y no scoped, dist-tags, autenticación por token, límites de inspección y errores
-estables, reutilizando los roles, cuotas, auditoría y almacenamiento existentes.
+Enable **publish, install and ci** with real npm against a private `npm` feed, with scoped and
+unscoped packages, dist-tags, token authentication, inspection limits and stable errors,
+reusing the existing roles, quotas, auditing and storage.
 
-**Fuera de alcance:** proxy o espejo de npmjs; pnpm, yarn y cualquier cliente no listado en la
-matriz (no se anuncian); `npm login`; `npm unpublish`; `npm deprecate`; `npm search`; ejecutar
-Node.js en el servidor; plugins dinámicos. Todo esto queda documentado como limitación con su
-condición de revisión en la sección 10.
+**Out of scope:** npmjs proxy or mirror; pnpm, yarn and any client not listed in the
+matrix (not announced); `npm login`; `npm unpublish`; `npm deprecate`; `npm search`; running
+Node.js on the server; dynamic plugins. All of this is documented as a limitation with its
+review condition in section 10.
 
-## 2. Matriz de conformidad inicial (AC-01)
+## 2. Initial conformance matrix (AC-01)
 
-Clientes candidatos; el patch exacto se fija al preparar OP-024 (AC-01) y una fila solo se
-publica como verificada si pasa el E2E de la sección 11.
+Candidate clients; the exact patch is fixed when preparing OP-024 (AC-01) and a row is only
+published as verified if it passes the E2E in section 11.
 
-| Cliente | Node | Rol en la matriz |
+| Client | Node | Role in the matrix |
 |---|---|---|
-| npm 10.x | Node 22 LTS | compatibilidad con la LTS anterior |
-| npm 11.x | Node 24 LTS | línea principal |
+| npm 10.x | Node 22 LTS | compatibility with the previous LTS |
+| npm 11.x | Node 24 LTS | main line |
 
-Al preparar OP-024 se fijan las versiones patch y se añade la LTS vigente si ya existe; no se
-anuncia un cliente npm que no haya pasado el E2E en CI. pnpm y yarn quedan explícitamente no
-verificados (REQ-03) y `capabilities` solo anuncia el formato `npm`, no clientes.
+When preparing OP-024, patch versions are fixed and the current LTS is added if it already
+exists; an npm client that has not passed the E2E in CI is not announced. pnpm and yarn remain
+explicitly unverified (REQ-03) and `capabilities` announces only the `npm` format, not clients.
 
-| # | Flujo | Ejemplo | Qué comprueba |
+| # | Flow | Example | What it checks |
 |---|---|---|---|
-| F1 | Publish no scoped | `npm publish` en `widgets` | Aceptación, transacción, `latest` |
-| F2 | Publish scoped | `npm publish` en `@acme/widgets` | Namespace, prefijo de grant, tarball scoped |
-| F3 | Install nuevo | `npm install widgets --registry ...` | Packument abreviado + tarball |
-| F4 | CI con lockfile | `npm ci` con `package-lock.json` | `resolved` + `integrity` (sha512) |
-| F5 | Consulta | `npm view @acme/widgets`, `... versions`, `... dist-tags` | Packument completo y rutas de versión |
-| F6 | Dist-tags | `npm dist-tag add @acme/widgets@1.2.3 next`, `npm dist-tag rm ...` | Alta, movimiento y borrado |
-| F7 | Auth adversa | sin token, token revocado, reader publicando, prefijo ajeno | 401/403/404 según la sección 4 |
-| F8 | Aislamiento | token con grant solo en el feed A contra el feed B | 404 sin revelar |
-| F9 | Versión bloqueada | `npm install` de una versión bloqueada | Tarball `410 PACKAGE_BLOCKED` |
-| F10 | Integridad | `npm ci` con integridad correcta; lockfile alterado | Falla local del cliente, no del registro |
-| F11 | Dependencia transitiva | `app` declara `dependencies: {"lib": "^1.0.0"}`; `npm install app` | Resolución de `lib` desde el mismo feed |
+| F1 | Unscoped publish | `npm publish` in `widgets` | Acceptance, transaction, `latest` |
+| F2 | Scoped publish | `npm publish` in `@acme/widgets` | Namespace, grant prefix, scoped tarball |
+| F3 | Fresh install | `npm install widgets --registry ...` | Abbreviated packument + tarball |
+| F4 | CI with lockfile | `npm ci` with `package-lock.json` | `resolved` + `integrity` (sha512) |
+| F5 | Query | `npm view @acme/widgets`, `... versions`, `... dist-tags` | Full packument and version routes |
+| F6 | Dist-tags | `npm dist-tag add @acme/widgets@1.2.3 next`, `npm dist-tag rm ...` | Add, move and delete |
+| F7 | Adversarial auth | no token, revoked token, reader publishing, foreign prefix | 401/403/404 according to section 4 |
+| F8 | Isolation | token with a grant only on feed A against feed B | 404 without disclosure |
+| F9 | Blocked version | `npm install` of a blocked version | Tarball `410 PACKAGE_BLOCKED` |
+| F10 | Integrity | `npm ci` with correct integrity; tampered lockfile | Client-side failure, not registry failure |
+| F11 | Transitive dependency | `app` declares `dependencies: {"lib": "^1.0.0"}`; `npm install app` | `lib` resolution from the same feed |
 
-## 3. Superficie HTTP
+## 3. HTTP surface
 
-Base: `{public_url}/npm/{feed}` (ADR-018). El formato del feed debe ser `npm`; si es de otro
-formato, la ruta responde `404` como `FEED_NOT_FOUND` (ADR-024).
+Base: `{public_url}/npm/{feed}` (ADR-018). The feed format must be `npm`; if it is of another
+format, the route responds `404` as `FEED_NOT_FOUND` (ADR-024).
 
-| Método | Ruta | Operación |
+| Method | Route | Operation |
 |---|---|---|
-| GET | `/npm/{feed}/{name}` | Packument completo o abreviado según `Accept` |
-| GET | `/npm/{feed}/{name}/{version}` | Manifiesto de una versión concreta |
+| GET | `/npm/{feed}/{name}` | Full or abbreviated packument according to `Accept` |
+| GET | `/npm/{feed}/{name}/{version}` | Manifest of a specific version |
 | GET, HEAD | `/npm/{feed}/{name}/-/{file}.tgz` | Tarball |
-| PUT | `/npm/{feed}/{name}` | Publicación |
-| GET | `/npm/{feed}/-/package/{name}/dist-tags` | Listar dist-tags |
-| PUT | `/npm/{feed}/-/package/{name}/dist-tags/{tag}` | Crear o mover un tag |
-| DELETE | `/npm/{feed}/-/package/{name}/dist-tags/{tag}` | Borrar un tag |
-| GET | `/npm/{feed}/-/whoami` | Identidad del token |
-| GET | `/npm/{feed}/-/ping` | Sonda |
-| — | `/npm/{feed}/-/v1/search` | No registrada: `npm search` recibe `404` |
-| — | Login | No implementado: la credencial se configura en `.npmrc` |
+| PUT | `/npm/{feed}/{name}` | Publication |
+| GET | `/npm/{feed}/-/package/{name}/dist-tags` | List dist-tags |
+| PUT | `/npm/{feed}/-/package/{name}/dist-tags/{tag}` | Create or move a tag |
+| DELETE | `/npm/{feed}/-/package/{name}/dist-tags/{tag}` | Delete a tag |
+| GET | `/npm/{feed}/-/whoami` | Token identity |
+| GET | `/npm/{feed}/-/ping` | Probe |
+| — | `/npm/{feed}/-/v1/search` | Not registered: `npm search` receives `404` |
+| — | Login | Not implemented: the credential is configured in `.npmrc` |
 
-Detalles de ruta:
+Route details:
 
-- `{name}` admite `@scope/name` y `name`. Se aceptan las formas percent-encoded `%40` y
-  `%2F`; se decodifica una sola vez y se rechaza el doble encoding, segmentos vacíos, `..`,
-  bytes nulos y caracteres de control.
-- El parser es un catch-all por método; las rutas estáticas `/-/...` tienen prioridad. La
-  implementación concreta (patrón Axum y extractores) se fija en OP-024 con pruebas de ambas
-  formas de scoped.
-- Sin compresión de respuesta en el primer corte (`identity`), igual que las rutas NuGet.
+- `{name}` accepts `@scope/name` and `name`. The percent-encoded forms `%40` and
+  `%2F` are accepted; decoding happens once and double encoding, empty segments, `..`,
+  null bytes and control characters are rejected.
+- The parser is a per-method catch-all; static `/-/...` routes take priority. The
+  concrete implementation (Axum pattern and extractors) is fixed in OP-024 with tests for both
+  scoped forms.
+- No response compression in the first cut (`identity`), like the NuGet routes.
 
-## 4. Autenticación y autorización (AC-02)
+## 4. Authentication and authorization (AC-02)
 
-La superficie npm acepta **solo** `Authorization: Bearer <token>` (mecanismo de npm); no
-acepta `X-NuGet-ApiKey` ni `Basic`. La superficie NuGet y la administrativa no cambian. Esto
-implica añadir `Surface::Npm` a la clasificación de rutas, a `credential()` y al renderizado
-de errores, y la etiqueta `npm` en métricas (ADR-024).
+The npm surface accepts **only** `Authorization: Bearer <token>` (npm's mechanism); it does not
+accept `X-NuGet-ApiKey` or `Basic`. The NuGet and administrative surfaces do not change. This
+implies adding `Surface::Npm` to the route classification, to `credential()` and to error
+rendering, and the `npm` label in metrics (ADR-024).
 
-Todas las peticiones siguen autenticadas; no hay lectura anónima en este corte. La
-credencial se configura así:
+All requests remain authenticated; there is no anonymous read in this cut. The credential is
+configured like this:
 
 ```ini
 ; .npmrc
@@ -99,248 +99,249 @@ credencial se configura así:
 onepack token create --principal ci-web --name npm-publish
 ```
 
-| Caso | Resultado |
+| Case | Result |
 |---|---|
-| Token ausente, expirado, revocado o mal formado | `401 AUTH_REQUIRED` + `WWW-Authenticate: Bearer realm="onepack"` |
-| Token válido sin grant en el feed | `404 FEED_NOT_FOUND` (no revela que el feed o el paquete existen; ADR-012) |
-| `reader` intenta publicar o mover tags | `403 AUTH_SCOPE_MISSING` |
-| `publisher` publica un id fuera de sus prefijos | `403 AUTH_PREFIX_DENIED` |
-| `reader`/`publisher`/`maintainer` leen | Permitido según rol acumulativo |
-| `maintainer` o admin | Publicación, tags y bloqueo vía API administrativa |
+| Missing, expired, revoked or malformed token | `401 AUTH_REQUIRED` + `WWW-Authenticate: Bearer realm="onepack"` |
+| Valid token without a grant on the feed | `404 FEED_NOT_FOUND` (does not reveal that the feed or package exists; ADR-012) |
+| `reader` tries to publish or move tags | `403 AUTH_SCOPE_MISSING` |
+| `publisher` publishes an id outside its prefixes | `403 AUTH_PREFIX_DENIED` |
+| `reader`/`publisher`/`maintainer` read | Allowed according to cumulative role |
+| `maintainer` or admin | Publication, tags and blocking via the administrative API |
 
-Reglas adicionales:
+Additional rules:
 
-- Lectura: `Access::Read` del feed. Packument, manifiesto y tarball comparten decisión.
-- Publicación: `Access::Publish` + patrón del grant sobre el `package_key` (ADR-022);
-  `@acme/*` cubre `@acme/widgets`.
-- Dist-tags: `Access::Publish` + patrón del paquete; mover o crear un tag es una operación de
-  publicación, borrarlo también. `latest` no se puede borrar.
-- `/-/whoami` y `/-/ping` requieren token válido, sin exigir grant: no exponen datos del feed.
-- La revocación surte efecto en la siguiente petición; npm puede reutilizar credenciales en
-  caché, así que la documentación recordará refrescar `.npmrc` tras revocar.
-- TLS: npm rechaza enviar credenciales por HTTP salvo localhost. El despliegue exige HTTPS en
-  el proxy inverso y `public_url` HTTPS; el servidor no confía en `X-Forwarded-For` (ADR-018).
+- Read: `Access::Read` on the feed. Packument, manifest and tarball share the decision.
+- Publication: `Access::Publish` + grant pattern on `package_key` (ADR-022);
+  `@acme/*` covers `@acme/widgets`.
+- Dist-tags: `Access::Publish` + package pattern; moving or creating a tag is a publication
+  operation, and deleting it is too. `latest` cannot be deleted.
+- `/-/whoami` and `/-/ping` require a valid token, without requiring a grant: they do not expose
+  feed data.
+- Revocation takes effect on the next request; npm may reuse cached credentials, so the
+  documentation will remind users to refresh `.npmrc` after revoking.
+- TLS: npm refuses to send credentials over HTTP except to localhost. Deployment requires HTTPS at
+  the reverse proxy and an HTTPS `public_url`; the server does not trust `X-Forwarded-For` (ADR-018).
 
-## 5. Identidad, versiones y conflictos
+## 5. Identity, versions and conflicts
 
-Reglas del adaptador (ADR-022); la implementación reproducirá las reglas de
-`validate-npm-package-name` y SemVer con un corpus de conformidad.
+Adapter rules (ADR-022); the implementation will reproduce the rules of
+`validate-npm-package-name` and SemVer with a conformance corpus.
 
-| Regla | Detalle |
+| Rule | Detail |
 |---|---|
-| Nombre no scoped | Minúsculas, ≤ 214 caracteres, sin espacios ni caracteres no seguros, sin empezar por `.` ni `_` |
-| Nombre scoped | `@scope/name`; scope y name con las mismas reglas |
-| `package_key` | Nombre completo en minúsculas, incluido `@scope/` |
-| Versión | SemVer 2.0.0 estricta; `pre` y `build` según SemVer |
-| Identidad de versión (`version_key`) | Sin build metadata; `full_version` conserva el valor publicado |
-| Dist-tags | No son versiones y no crean identidad; un tag no puede ser SemVer ni un rango válido |
-| Orden | Precedencia SemVer, en el adaptador |
+| Unscoped name | Lowercase, ≤ 214 characters, no spaces or unsafe characters, not starting with `.` or `_` |
+| Scoped name | `@scope/name`; scope and name with the same rules |
+| `package_key` | Full name in lowercase, including `@scope/` |
+| Version | Strict SemVer 2.0.0; `pre` and `build` according to SemVer |
+| Version identity (`version_key`) | Without build metadata; `full_version` preserves the published value |
+| Dist-tags | They are not versions and do not create identity; a tag cannot be SemVer or a valid range |
+| Ordering | SemVer precedence, in the adapter |
 
-| Publicación | Clave | Resultado |
+| Publication | Key | Result |
 |---|---|---|
-| `@acme/widgets` `1.2.3-beta.1+build.5` | `@acme/widgets` / `1.2.3-beta.1` | Aceptada; `full_version` conserva `+build.5` |
-| `@acme/widgets` `1.2.3` tras la anterior | `1.2.3` | Distinta identidad: aceptada |
-| `Widgets` | — | Rechazada: npm exige minúsculas |
-| `@acme/widgets` `1.2.3` repetida, mismos bytes | `1.2.3` | `409 VERSION_EXISTS` |
-| `@acme/widgets` `1.2.3` repetida, otros bytes | `1.2.3` | `409 VERSION_EXISTS` |
-| `@acme/widgets` `latest` como versión | — | Rechazada: no es SemVer válida |
+| `@acme/widgets` `1.2.3-beta.1+build.5` | `@acme/widgets` / `1.2.3-beta.1` | Accepted; `full_version` preserves `+build.5` |
+| `@acme/widgets` `1.2.3` after the previous one | `1.2.3` | Different identity: accepted |
+| `Widgets` | — | Rejected: npm requires lowercase |
+| `@acme/widgets` `1.2.3` repeated, same bytes | `1.2.3` | `409 VERSION_EXISTS` |
+| `@acme/widgets` `1.2.3` repeated, other bytes | `1.2.3` | `409 VERSION_EXISTS` |
+| `@acme/widgets` `latest` as version | — | Rejected: not valid SemVer |
 
-Un reintento de `npm publish` tras un fallo de red devuelve `409`; npm no tiene publicación
-idempotente y la spec lo asume explícitamente (ADR-007).
+A retry of `npm publish` after a network failure returns `409`; npm does not have idempotent
+publication and the spec assumes this explicitly (ADR-007).
 
-## 6. Publicación
+## 6. Publication
 
-El cliente envía `PUT /npm/{feed}/{name}` con `Content-Type: application/json`. El cuerpo es
-el documento estilo CouchDB de npm:
+The client sends `PUT /npm/{feed}/{name}` with `Content-Type: application/json`. The body is
+npm's CouchDB-style document:
 
-- `versions` con **exactamente una** versión nueva; cualquier otro caso es
+- `versions` with **exactly one** new version; any other case is
   `400 PUBLISH_BODY_INVALID`.
-- `_attachments` con **exactamente** un adjunto. La clave puede ser
-  `{name}-{version}.tgz` (con scope) o `{unscoped}-{version}.tgz`; el registro canoniza el
-  nombre servido como `{unscoped}-{version}.tgz`, que es el que emite en `dist.tarball`.
-  `content_type: application/octet-stream` y `data` en base64.
-- `name` del documento y `versions[version].name` deben coincidir con la URL; `version` debe
-  ser SemVer y coincidir con el nombre del adjunto.
-- El `package.json` dentro del tarball es la **fuente autoritativa** del manifiesto; el
-  manifiesto del cuerpo solo se valida y no se persiste. `dist` lo genera el registro.
+- `_attachments` with **exactly** one attachment. The key can be
+  `{name}-{version}.tgz` (with scope) or `{unscoped}-{version}.tgz`; the registry canonicalizes the
+  served name as `{unscoped}-{version}.tgz`, which is what it emits in `dist.tarball`.
+  `content_type: application/octet-stream` and `data` in base64.
+- The document `name` and `versions[version].name` must match the URL; `version` must
+  be SemVer and match the attachment name.
+- The `package.json` inside the tarball is the **authoritative source** of the manifest; the
+  body manifest is only validated and is not persisted. `dist` is generated by the registry.
 
-Procesamiento acotado (no se materializa el JSON completo en memoria):
+Bounded processing (the full JSON is not materialized in memory):
 
-1. El cuerpo va a `staging/` con el límite
-   `max_package_bytes × 4/3 + 1 MiB` (base64 + metadatos).
-2. Se recorre el JSON en streaming; `_attachments[*].data` se decodifica con un lector base64
-   hacia un archivo de staging, aplicando el límite comprimido mientras se decodifica.
-3. El resto de campos se recogen con topes de tamaño; los campos desconocidos se ignoran.
+1. The body goes to `staging/` with the limit
+   `max_package_bytes × 4/3 + 1 MiB` (base64 + metadata).
+2. The JSON is traversed in streaming; `_attachments[*].data` is decoded with a base64 reader
+   into a staging file, applying the compressed limit while decoding.
+3. The remaining fields are collected with size caps; unknown fields are ignored.
 
-Persistencia, reutilizando el flujo actual de subida → inspección → blob → transacción:
+Persistence, reusing the current upload → inspection → blob → transaction flow:
 
-- Blob por SHA-256 y fila en `version_file` con `kind = tarball` y el nombre del adjunto
+- Blob by SHA-256 and a row in `version_file` with `kind = tarball` and the attachment name
   (ADR-023).
-- `package_version.metadata` guarda un JSON del adaptador con el manifiesto normalizado, la
-  integridad y el nombre del tarball; `search_text` sale de descripción y `keywords`.
-- `listed = true`, `is_semver2 = false` (señal NuGet; ADR-022) e `is_prerelease` según SemVer.
-- Dist-tags en una tabla nueva `package_tag` (PK `feed_id + package_key + tag`, FK al
-  paquete), en la **misma transacción** que la versión: un fallo no deja un tag apuntando a
-  una versión inexistente. La migración es la siguiente disponible después de la de OP-022
-  (p. ej. `0007`).
-- Integridad calculada en la inspección: `sha512` SRI (`sha512-<base64>`) y `sha1` hexadecimal
-  heredado, ambos persistidos para el packument.
-- Cuota: se aplica la suma de tamaños de la versión como hoy (ADR-014).
-- Auditoría `package.publish` con actor y token, también en rechazos.
+- `package_version.metadata` stores an adapter JSON with the normalized manifest, the
+  integrity and the tarball name; `search_text` comes from the description and `keywords`.
+- `listed = true`, `is_semver2 = false` (NuGet signal; ADR-022) and `is_prerelease` according to SemVer.
+- Dist-tags in a new `package_tag` table (PK `feed_id + package_key + tag`, FK to the
+  package), in the **same transaction** as the version: a failure does not leave a tag pointing to
+  a nonexistent version. The migration is the next one available after the OP-022 migration
+  (e.g. `0007`).
+- Integrity computed during inspection: SRI `sha512` (`sha512-<base64>`) and legacy hexadecimal
+  `sha1`, both persisted for the packument.
+- Quota: the sum of version sizes is applied as today (ADR-014).
+- `package.publish` audit with actor and token, also on rejections.
 
-Dist-tags del cuerpo: se aplican los tags enviados; si el paquete no tenía ningún tag y el
-cuerpo no trae, se asigna `latest` a la primera versión. No se inventa `latest` cuando el
-cuerpo declara otros tags (`npm publish --tag next` no mueve `latest`). Respuesta `201` con
-`{"ok": true}`. `PUT`/`DELETE` de tags:
+Body dist-tags: the tags sent are applied; if the package had no tags and the
+body does not include any, `latest` is assigned to the first version. `latest` is not invented
+when the body declares other tags (`npm publish --tag next` does not move `latest`). Response `201` with
+`{"ok": true}`. Tag `PUT`/`DELETE`:
 
-- `PUT .../dist-tags/{tag}` con un string JSON de versión; crea o mueve; `201`.
-- `DELETE .../dist-tags/{tag}`; `latest` → `400 DIST_TAG_PROTECTED`; tag inexistente → `404`;
-  versión inexistente → `404 VERSION_NOT_FOUND`; tag inválido → `400 DIST_TAG_INVALID`.
+- `PUT .../dist-tags/{tag}` with a JSON version string; creates or moves; `201`.
+- `DELETE .../dist-tags/{tag}`; `latest` → `400 DIST_TAG_PROTECTED`; nonexistent tag → `404`;
+  nonexistent version → `404 VERSION_NOT_FOUND`; invalid tag → `400 DIST_TAG_INVALID`.
 
-## 7. Lectura
+## 7. Read
 
-Packument completo (`GET .../{name}`, `Accept: application/json`):
+Full packument (`GET .../{name}`, `Accept: application/json`):
 
-| Campo | Contenido |
+| Field | Content |
 |---|---|
-| `_id`, `name` | Nombre tal como figura en el feed |
-| `dist-tags` | Tags actuales |
-| `versions` | Manifiesto por versión con `dist.tarball`, `dist.integrity`, `dist.shasum` |
-| `time` | `created`, `modified` y una entrada por versión (RFC 3339 UTC con milisegundos, como el resto del registro) |
-| `description`, `keywords`, `license`, `repository` | Del último manifiesto publicado, si existen |
-| `maintainers` | Vacío u omitido; el registro no inventa identidades npm |
+| `_id`, `name` | Name as it appears in the feed |
+| `dist-tags` | Current tags |
+| `versions` | Manifest per version with `dist.tarball`, `dist.integrity`, `dist.shasum` |
+| `time` | `created`, `modified` and one entry per version (RFC 3339 UTC with milliseconds, like the rest of the registry) |
+| `description`, `keywords`, `license`, `repository` | From the last published manifest, if they exist |
+| `maintainers` | Empty or omitted; the registry does not invent npm identities |
 
-Packument abreviado (`Accept: application/vnd.npm.install-v1+json`): `name`, `dist-tags` y
-`versions` con los campos que npm necesita para instalar (`name`, `version`,
+Abbreviated packument (`Accept: application/vnd.npm.install-v1+json`): `name`, `dist-tags` and
+`versions` with the fields npm needs to install (`name`, `version`,
 `dependencies`, `optionalDependencies`, `peerDependencies`, `peerDependenciesMeta`,
-`bundleDependencies`, `bin`, `engines`, `os`, `cpu`, `dist`, `deprecated`). El resto se omite.
-`npm ci` obtiene `dist.integrity` de aquí.
+`bundleDependencies`, `bin`, `engines`, `os`, `cpu`, `dist`, `deprecated`). The rest is omitted.
+`npm ci` obtains `dist.integrity` from here.
 
-- `dist.tarball` es absoluto y estable: `{public_url}/npm/{feed}/{@scope/name}/-/{file}.tgz`;
-  un cambio de `public_url` invalida lockfiles, y la documentación lo advertirá.
-- Versión bloqueada (ADR-013): permanece en el packument completo y abreviado; el tarball
-  responde `410 PACKAGE_BLOCKED`. No se usa el campo `deprecated` para bloquear en el primer
-  corte.
-- `listed` no aplica a npm: las versiones se listan siempre; la retirada no existe (sección
+- `dist.tarball` is absolute and stable: `{public_url}/npm/{feed}/{@scope/name}/-/{file}.tgz`;
+  a change to `public_url` invalidates lockfiles, and the documentation will warn about it.
+- Blocked version (ADR-013): it remains in the full and abbreviated packument; the tarball
+  responds `410 PACKAGE_BLOCKED`. The `deprecated` field is not used for blocking in the first
+  cut.
+- `listed` does not apply to npm: versions are always listed; withdrawal does not exist (section
   10).
-- Tarball: `application/octet-stream`, soporte de `HEAD`, sin rangos. Sin compresión.
+- Tarball: `application/octet-stream`, `HEAD` support, no ranges. No compression.
 - `/-/whoami` → `{"username": "<principal.name>"}`; `/-/ping` → `{}`.
 
-## 8. Validación de tar/gzip (AC-03)
+## 8. tar/gzip validation (AC-03)
 
-La inspección corre como la de NuGet: en el pool bloqueante, con semáforo propio y plazo
+Inspection runs like NuGet's: in the blocking pool, with its own semaphore and deadline
 (ADR-014).
 
-| Límite | Por defecto |
+| Limit | Default |
 |---|---|
-| Tamaño comprimido | `max_package_bytes` compartido (100 MiB) |
-| Tamaño descomprimido total | 512 MiB |
-| Entradas tar | 50 000 |
+| Compressed size | shared `max_package_bytes` (100 MiB) |
+| Total uncompressed size | 512 MiB |
+| tar entries | 50,000 |
 | `package.json` | 1 MiB |
-| Profundidad del JSON de `package.json` | 64 |
-| Tiempo de inspección | 30 s |
-| Inspecciones simultáneas | las de NuGet |
+| `package.json` JSON depth | 64 |
+| Inspection time | 30 s |
+| Simultaneous inspections | those of NuGet |
 
-Reglas (espejo de las NuGet, adaptadas a tar):
+Rules (mirroring NuGet's, adapted to tar):
 
-- gzip de un solo miembro; se rechaza el gzip inválido o truncado. Los topes se aplican
-  mientras se descomprime, no sobre tamaños declarados.
-- Solo entradas regulares y directorios. Se rechazan symlinks, hardlinks, dispositivos, FIFOs,
-  entradas sparse, cifradas o de un tipo que la librería no interprete; las extensiones
-  normales de tar (pax, GNU long name) se procesan como metadatos, no como entradas.
-- Cada ruta debe ser relativa y empezar por `package/`; se rechazan rutas absolutas, `..`,
-  caracteres de control o `:`, nombres reservados de Windows, terminaciones en punto o
-  espacio, entradas duplicadas (sin distinguir mayúsculas) y cualquier ruta fuera de
-  `package/`.
-- Se exige `package/package.json`; un JSON válido con `name` y `version` coincidentes con la
-  URL y el adjunto, nombre y versión válidos según la sección 5.
-- Los `scripts` no se ejecutan ni se materializan; `bin` se sirve como metadato.
-- Un rechazo no persiste nada y se audita con su código.
+- Single-member gzip; invalid or truncated gzip is rejected. Caps are applied
+  while decompressing, not against declared sizes.
+- Only regular entries and directories. Symlinks, hardlinks, devices, FIFOs,
+  sparse or encrypted entries, or entries of a type the library does not interpret are rejected; normal
+  tar extensions (pax, GNU long name) are processed as metadata, not as entries.
+- Each path must be relative and start with `package/`; absolute paths, `..`,
+  control characters or `:`, reserved Windows names, trailing dots or
+  spaces, duplicate entries (case-insensitive) and any path outside
+  `package/` are rejected.
+- `package/package.json` is required; a valid JSON with `name` and `version` matching the
+  URL and the attachment, with a name and version valid according to section 5.
+- `scripts` are not executed or materialized; `bin` is served as metadata.
+- A rejection persists nothing and is audited with its code.
 
-Fixtures adversos previstos (OP-024): traversal (`package/../..`), ruta absoluta, symlink,
-hardlink, entrada duplicada con distinta capitalización, gzip bomb, 50 001 entradas,
-`package.json` ausente, sobredimensionado o con JSON inválido, nombre/versión que no coinciden
-con la URL, base64 inválido, `length` del adjunto que miente, tarball mayor que el límite y
-cuerpo con dos versiones o dos adjuntos.
+Adversarial fixtures planned (OP-024): traversal (`package/../..`), absolute path, symlink,
+hardlink, duplicate entry with different capitalization, gzip bomb, 50,001 entries,
+missing `package.json`, oversized or with invalid JSON, name/version that do not match
+the URL, invalid base64, attachment `length` that lies, tarball larger than the limit and
+body with two versions or two attachments.
 
-## 9. Errores
+## 9. Errors
 
-Formato de error de la superficie npm: JSON `{"error": "<CODE>: <mensaje>", "reason":
-"<mensaje>", "code": "<CODE>"}`; el prefijo estable es el mismo `CODE` que usan las demás
-superficies, y `reason` queda para lectura humana. npm muestra el texto y su propio código
+npm surface error format: JSON `{"error": "<CODE>: <message>", "reason":
+"<message>", "code": "<CODE>"}`; the stable prefix is the same `CODE` used by the other
+surfaces, and `reason` is left for human reading. npm displays the text and its own code
 `E<status>`.
 
-| Código | HTTP | Cuándo |
+| Code | HTTP | When |
 |---|---|---|
-| `AUTH_REQUIRED` | 401 | Token ausente, inválido, expirado o revocado |
-| `FEED_NOT_FOUND` | 404 | Feed inexistente, sin grant o de otro formato |
-| `AUTH_SCOPE_MISSING` | 403 | Rol insuficiente para la operación |
-| `AUTH_PREFIX_DENIED` | 403 | Prefijo de publicación no autorizado |
-| `PACKAGE_NOT_FOUND` | 404 | Paquete o versión inexistente con acceso al feed |
-| `PUBLISH_BODY_INVALID` | 400 | Cuerpo que no cumple la sección 6 |
-| `VERSION_EXISTS` | 409 | Identidad de versión ya publicada |
-| `TARBALL_INVALID` | 400 | gzip/tar inválido o estructura inesperada |
-| `PACKAGE_UNSAFE_PATH` | 400 | Ruta o entrada peligrosa o duplicada |
-| `PACKAGE_LIMIT_EXCEEDED` | 413 | Se supera un límite de inspección o el plazo |
-| `PACKAGE_TOO_LARGE` | 413 | Se supera el tamaño comprimido |
-| `DIST_TAG_INVALID` | 400 | Nombre de tag inválido |
-| `DIST_TAG_PROTECTED` | 400 | Intento de borrar `latest` |
-| `VERSION_NOT_FOUND` | 404 | Tag hacia versión inexistente |
-| `FEED_QUOTA_VERSIONS` | 403 | Cuota de versiones superada |
-| `FEED_QUOTA_STORAGE` | 413 | Cuota de almacenamiento superada |
-| `PACKAGE_BLOCKED` | 410 | Tarball de una versión bloqueada |
-| `UPLOADS_BUSY` | 503 | Sin plazas de subida |
-| `UPLOAD_TIMEOUT` | 408 | Subida agotó el plazo |
-| `RATE_LIMITED` | 429 | Límite por principal o IP |
-| `INTERNAL` | 500 | Error no clasificado |
+| `AUTH_REQUIRED` | 401 | Missing, invalid, expired or revoked token |
+| `FEED_NOT_FOUND` | 404 | Nonexistent feed, without grant or of another format |
+| `AUTH_SCOPE_MISSING` | 403 | Insufficient role for the operation |
+| `AUTH_PREFIX_DENIED` | 403 | Unauthorized publication prefix |
+| `PACKAGE_NOT_FOUND` | 404 | Nonexistent package or version with feed access |
+| `PUBLISH_BODY_INVALID` | 400 | Body that does not comply with section 6 |
+| `VERSION_EXISTS` | 409 | Version identity already published |
+| `TARBALL_INVALID` | 400 | Invalid gzip/tar or unexpected structure |
+| `PACKAGE_UNSAFE_PATH` | 400 | Dangerous or duplicate path or entry |
+| `PACKAGE_LIMIT_EXCEEDED` | 413 | An inspection limit or the deadline is exceeded |
+| `PACKAGE_TOO_LARGE` | 413 | The compressed size is exceeded |
+| `DIST_TAG_INVALID` | 400 | Invalid tag name |
+| `DIST_TAG_PROTECTED` | 400 | Attempt to delete `latest` |
+| `VERSION_NOT_FOUND` | 404 | Tag pointing to a nonexistent version |
+| `FEED_QUOTA_VERSIONS` | 403 | Version quota exceeded |
+| `FEED_QUOTA_STORAGE` | 413 | Storage quota exceeded |
+| `PACKAGE_BLOCKED` | 410 | Tarball of a blocked version |
+| `UPLOADS_BUSY` | 503 | No upload slots |
+| `UPLOAD_TIMEOUT` | 408 | Upload exhausted the deadline |
+| `RATE_LIMITED` | 429 | Limit per principal or IP |
+| `INTERNAL` | 500 | Unclassified error |
 
-## 10. Retirada y búsqueda (decisión aceptada)
+## 10. Withdrawal and search (accepted decision)
 
-Decisión para el primer corte:
+Decision for the first cut:
 
-- **Sin `npm unpublish`.** El registro nunca borra bytes (ADR-005); la ruta de publicación
-  rechaza cualquier intento de modificar o quitar versiones existentes con `409` o
-  `PUBLISH_BODY_INVALID`. La retirada real se hará con el bloqueo administrativo existente.
-- **Sin `npm deprecate`.** npm implementa `deprecate` con un `PUT` que modifica el packument;
-  el contrato aditivo de publicación lo rechaza. Queda como evolución con su propia migración
-  de metadatos si se prioriza.
-- **Sin `npm search`.** `/-/v1/search` no se registra; `npm search` recibe `404`. La búsqueda
-  del registro sigue siendo la administrativa y la de NuGet.
-- **Bloqueo como retirada:** `410` en el tarball, versión visible en el packument; bloquea y
-  desbloquea Maintainer o admin con motivo y auditoría, igual que NuGet.
+- **No `npm unpublish`.** The registry never deletes bytes (ADR-005); the publication route
+  rejects any attempt to modify or remove existing versions with `409` or
+  `PUBLISH_BODY_INVALID`. Actual withdrawal will be done with the existing administrative block.
+- **No `npm deprecate`.** npm implements `deprecate` with a `PUT` that modifies the packument;
+  the additive publication contract rejects it. It remains as an evolution with its own metadata
+  migration if prioritized.
+- **No `npm search`.** `/-/v1/search` is not registered; `npm search` receives `404`. Registry
+  search remains the administrative one and the NuGet one.
+- **Blocking as withdrawal:** `410` on the tarball, version visible in the packument; Maintainer or admin
+  blocks and unblocks with a reason and auditing, like NuGet.
 
-Condición de revisión: si el piloto o los usuarios piden retirada o búsqueda npm, se abre una
-tarea de evolución antes de ampliar este alcance.
+Review condition: if the pilot or users request npm withdrawal or search, an evolution
+task is opened before expanding this scope.
 
-## 11. Pruebas y handoff
+## 11. Tests and handoff
 
-- **Corpus de identidad:** nombres válidos e inválidos (scoped, mayúsculas, bordes de 214
-  caracteres) y versiones SemVer, incluido build metadata; sin equivalentes NuGet.
-- **Unitarias del adaptador:** parseo del body, extracción de `package.json`, integridad,
-  dist-tags, render del packument completo y abreviado.
-- **Integración de servidor:** auth por superficie, 401/403/404, `VERSION_EXISTS`,
-  `DIST_TAG_*`, cuotas y auditoría, transacción de versión + tag.
-- **Seguridad:** los fixtures adversos de la sección 8, sin persistencia.
-- **E2E real:** guion `scripts/e2e-npm.sh` (patrón de `scripts/e2e-dotnet.sh`) y job de CI con
-  la matriz de la sección 2: F1–F11, incluidas revocación, prefijo ajeno, aislamiento entre
-  feeds y bloqueo.
-- **Docs a actualizar al implementar:** `docs/security.md` (límites, tabla de errores y
-  fixtures npm), `docs/compatibility.md` (matriz npm verificada), `docs/cli.md`
-  (`.npmrc` y `onepack token create`). La spec no las modifica todavía.
-- **Handoff:** OP-024 crea `onepack-npm` (ADR-026), registra las rutas aprobadas aquí y añade
-  la migración de `package_tag`; OP-025 decide los comandos de CLI. Ninguna dependencia de
-  npm entra en `core` ni en `storage`.
+- **Identity corpus:** valid and invalid names (scoped, uppercase, 214-character
+  boundaries) and SemVer versions, including build metadata; no NuGet equivalents.
+- **Adapter unit tests:** body parsing, `package.json` extraction, integrity,
+  dist-tags, rendering of the full and abbreviated packument.
+- **Server integration:** per-surface auth, 401/403/404, `VERSION_EXISTS`,
+  `DIST_TAG_*`, quotas and auditing, version + tag transaction.
+- **Security:** the adversarial fixtures from section 8, without persistence.
+- **Real E2E:** `scripts/e2e-npm.sh` script (pattern of `scripts/e2e-dotnet.sh`) and CI job with
+  the matrix from section 2: F1–F11, including revocation, foreign prefix, isolation between
+  feeds and blocking.
+- **Docs to update when implementing:** `docs/security.md` (limits, error table and
+  npm fixtures), `docs/compatibility.md` (verified npm matrix), `docs/cli.md`
+  (`.npmrc` and `onepack token create`). The spec does not modify them yet.
+- **Handoff:** OP-024 creates `onepack-npm` (ADR-026), registers the routes approved here and adds
+  the `package_tag` migration; OP-025 decides the CLI commands. No npm dependency enters
+  `core` or `storage`.
 
-## 12. Verificación de esta especificación
+## 12. Verification of this specification
 
-- AC-01: matriz de la sección 2 con publish/install/ci, scoped/no scoped, dist-tags y la regla
-  de fijación de versiones en OP-024.
-- AC-02: contratos de auth y errores de las secciones 4 y 9, probables con token
-  ausente/revocado, rol insuficiente y namespace ajeno sin revelar paquetes.
-- AC-03: plan adverso de la sección 8 (traversal, links, expansión, colisiones) y metadatos
-  que anuncian solo lo implementado (sección 3).
-- AC-CIERRE: cerrado con la aceptación registrada del 2026-10-19, la nota OP-023 y el
-  backlog sincronizados.
+- AC-01: matrix from section 2 with publish/install/ci, scoped/unscoped, dist-tags and the rule
+  for fixing versions in OP-024.
+- AC-02: auth and error contracts from sections 4 and 9, testable with missing/revoked token,
+  insufficient role and foreign namespace without revealing packages.
+- AC-03: adversarial plan from section 8 (traversal, links, expansion, collisions) and metadata
+  that announces only what is implemented (section 3).
+- AC-CIERRE: closed with the recorded acceptance of 2026-10-19, the OP-023 note and the
+  backlog synchronized.
 
-Evidencia: ruta de este documento, SHA-256 del contenido aceptado, commit local `fa0d526`
-(entrega) y la aceptación registrada en Obsidian el 2026-10-19.
+Evidence: path of this document, SHA-256 of the accepted content, local commit `fa0d526`
+(delivery) and the acceptance recorded in Obsidian on 2026-10-19.

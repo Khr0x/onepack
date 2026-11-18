@@ -1,511 +1,511 @@
-# Roadmap MVP — Registro privado de paquetes NuGet
+# MVP Roadmap — Private NuGet package registry
 
-> Plan por fases derivado de [mvp-registro-privado-paquetes-nuget.md](mvp-registro-privado-paquetes-nuget.md).
-> Las decisiones de arquitectura están en [adr-mvp.md](adr-mvp.md).
+> Phase plan derived from [mvp-private-nuget-registry.md](mvp-private-nuget-registry.md).
+> Architecture decisions are in [adr-mvp.md](adr-mvp.md).
 >
-> Última actualización: 2026-11-16
+> Last updated: 2026-11-16
 
 ---
 
-## Prueba decisiva del MVP
+## Decisive MVP test
 
-> Un equipo instala el servidor, configura su proyecto, publica una librería y la restaura desde CI; después revoca una credencial y recupera el servicio desde un backup, **sin abrir una interfaz web ni editar manualmente la base de datos**.
+> A team installs the server, configures its project, publishes a library and restores it from CI; then revokes a credential and recovers the service from a backup, **without opening a web interface or manually editing the database**.
 
-Todas las fases existen para que esa frase sea verificable de punta a punta en la Fase 8.
+All phases exist so that this sentence is verifiable end to end in Phase 8.
 
 ---
 
-## Sistema de estatus
+## Status system
 
-### Estatus de fase
+### Phase status
 
-| Estatus | Significado | Condición para entrar |
+| Status | Meaning | Entry condition |
 |---|---|---|
-| ⚪ `NO INICIADA` | Planificada, sin trabajo activo. | Estado inicial. |
-| 🔵 `EN DISEÑO` | Se definen alcance fino, ADRs y casos de prueba. Todavía no se escribe código de producto. | Dependencias en `EN VALIDACIÓN` o `COMPLETADA`. |
-| 🟡 `EN PROGRESO` | Implementación activa de entregables. | ADRs de la fase en estado `Aceptado` y criterios de aceptación escritos. |
-| 🟣 `EN VALIDACIÓN` | Entregables implementados; se ejecutan las pruebas bloqueantes y la revisión del gate. | Todos los entregables marcados como hechos. |
-| 🟢 `COMPLETADA` | Gate de salida superado y evidencia registrada. | Todas las pruebas bloqueantes en verde y evidencia enlazada. |
-| 🔴 `BLOQUEADA` | No puede avanzar. Debe indicar **motivo**, **condición de desbloqueo** y **responsable**. | Cualquier estado activo. |
-| ⚫ `POSPUESTA` | Se saca del MVP de forma deliberada. Requiere ADR o nota de decisión. | Decisión explícita de alcance. |
+| ⚪ `NOT STARTED` | Planned, no active work. | Initial state. |
+| 🔵 `IN DESIGN` | Fine scope, ADRs and test cases are defined. Product code is not written yet. | Dependencies in `IN VALIDATION` or `COMPLETED`. |
+| 🟡 `IN PROGRESS` | Active implementation of deliverables. | Phase ADRs in `Accepted` status and acceptance criteria written. |
+| 🟣 `IN VALIDATION` | Deliverables implemented; blocking tests and the gate review are run. | All deliverables marked done. |
+| 🟢 `COMPLETED` | Exit gate passed and evidence recorded. | All blocking tests green and evidence linked. |
+| 🔴 `BLOCKED` | Cannot advance. It must state **reason**, **unblock condition** and **owner**. | Any active state. |
+| ⚫ `POSTPONED` | Deliberately removed from the MVP. Requires an ADR or decision note. | Explicit scope decision. |
 
 ```mermaid
 stateDiagram-v2
-    [*] --> NO_INICIADA
-    NO_INICIADA --> EN_DISEÑO
-    EN_DISEÑO --> EN_PROGRESO : ADRs aceptados
-    EN_PROGRESO --> EN_VALIDACIÓN : entregables hechos
-    EN_VALIDACIÓN --> EN_PROGRESO : prueba bloqueante falla
-    EN_VALIDACIÓN --> COMPLETADA : gate superado
-    EN_DISEÑO --> BLOQUEADA
-    EN_PROGRESO --> BLOQUEADA
-    EN_VALIDACIÓN --> BLOQUEADA
-    BLOQUEADA --> EN_DISEÑO
-    BLOQUEADA --> EN_PROGRESO
-    NO_INICIADA --> POSPUESTA
-    EN_DISEÑO --> POSPUESTA
-    COMPLETADA --> [*]
+    [*] --> NOT_STARTED
+    NOT_STARTED --> IN_DESIGN
+    IN_DESIGN --> IN_PROGRESS : ADRs accepted
+    IN_PROGRESS --> IN_VALIDATION : deliverables done
+    IN_VALIDATION --> IN_PROGRESS : blocking test fails
+    IN_VALIDATION --> COMPLETED : gate passed
+    IN_DESIGN --> BLOCKED
+    IN_PROGRESS --> BLOCKED
+    IN_VALIDATION --> BLOCKED
+    BLOCKED --> IN_DESIGN
+    BLOCKED --> IN_PROGRESS
+    NOT_STARTED --> POSTPONED
+    IN_DESIGN --> POSTPONED
+    COMPLETED --> [*]
 ```
 
-**Reglas:**
+**Rules:**
 
-1. Una fase solo pasa a `COMPLETADA` con evidencia enlazada (PR, reporte de pruebas, log de ejecución). "Funciona en mi máquina" no es evidencia.
-2. Si una prueba bloqueante falla en `EN VALIDACIÓN`, la fase vuelve a `EN PROGRESO`; no se avanza con excepciones informales.
-3. Una fase posterior puede empezar `EN DISEÑO` mientras su dependencia está `EN VALIDACIÓN`, pero no `EN PROGRESO`.
-4. `BLOQUEADA` siempre lleva un bloque con: *motivo*, *desde* (fecha), *condición de desbloqueo*, *responsable*.
-5. Un cambio que reabre una fase `COMPLETADA` se registra como regresión en la fase actual, no reabriendo la anterior.
+1. A phase only moves to `COMPLETED` with linked evidence (PR, test report, execution log). "It works on my machine" is not evidence.
+2. If a blocking test fails in `IN VALIDATION`, the phase returns to `IN PROGRESS`; it does not advance with informal exceptions.
+3. A later phase may start `IN DESIGN` while its dependency is `IN VALIDATION`, but not `IN PROGRESS`.
+4. `BLOCKED` always carries a block with: *reason*, *since* (date), *unblock condition*, *owner*.
+5. A change that reopens a `COMPLETED` phase is recorded as a regression in the current phase, not by reopening the previous one.
 
-### Estatus de entregable
+### Deliverable status
 
-Cada entregable dentro de una fase usa una casilla con marcador:
+Each deliverable within a phase uses a checkbox with a marker:
 
-| Marcador | Significado |
+| Marker | Meaning |
 |---|---|
-| `[ ]` | Pendiente |
-| `[~]` | En curso |
-| `[x]` | Hecho (con evidencia) |
-| `[!]` | Bloqueado (añadir nota) |
-| `[-]` | Descartado / movido fuera de la fase (añadir nota) |
+| `[ ]` | Pending |
+| `[~]` | In progress |
+| `[x]` | Done (with evidence) |
+| `[!]` | Blocked (add note) |
+| `[-]` | Discarded / moved outside the phase (add note) |
 
 ---
 
-## Vista general
+## Overview
 
-| # | Fase | Estatus | Depende de | Gate de salida (resumen) |
+| # | Phase | Status | Depends on | Exit gate (summary) |
 |---|---|---|---|---|
-| 0 | Fundaciones del proyecto | 🟢 `COMPLETADA` | — | Workspace compila en CI y ADRs base aceptados. |
-| 1 | Spike de compatibilidad NuGet | 🟢 `COMPLETADA` | 0 | `dotnet` real publica y restaura contra el servidor; decisión Rust/C# ratificada. |
-| 2 | Núcleo de dominio y persistencia | 🟢 `COMPLETADA` | 1 | Publicación consistente, inmutable y resistente a caídas. |
-| 3 | Superficie NuGet V3 completa | 🟢 `COMPLETADA` | 2 | Matriz de clientes comprobados en verde. |
-| 4 | Identidad, autenticación y autorización | 🟢 `COMPLETADA` | 2 | Feeds aislados en todos los endpoints; tokens revocables. |
-| 5 | Endurecimiento frente a paquetes y abuso | 🟢 `COMPLETADA` | 3, 4 | ZIP/XML maliciosos rechazados; bloqueo de versiones operativo. |
-| 6 | API administrativa y CLI `onepack` | 🟢 `COMPLETADA` | 4 | Operación completa del registro desde terminal. |
-| 7 | Operación, recuperación y distribución | 🟢 `COMPLETADA` | 5, 6 | Backup restaurado en otro servidor; binarios publicados. |
-| 8 | Piloto y cierre del MVP | 🟡 `EN PROGRESO` | 7 | Prueba decisiva ejecutada por un equipo real. |
+| 0 | Project foundations | 🟢 `COMPLETED` | — | Workspace builds in CI and base ADRs accepted. |
+| 1 | NuGet compatibility spike | 🟢 `COMPLETED` | 0 | Real `dotnet` publishes and restores against the server; Rust/C# decision ratified. |
+| 2 | Domain core and persistence | 🟢 `COMPLETED` | 1 | Consistent, immutable publication resistant to crashes. |
+| 3 | Complete NuGet V3 surface | 🟢 `COMPLETED` | 2 | Matrix of tested clients green. |
+| 4 | Identity, authentication and authorization | 🟢 `COMPLETED` | 2 | Feeds isolated on all endpoints; revocable tokens. |
+| 5 | Hardening against packages and abuse | 🟢 `COMPLETED` | 3, 4 | Malicious ZIP/XML rejected; version blocking operational. |
+| 6 | Administrative API and `onepack` CLI | 🟢 `COMPLETED` | 4 | Complete registry operation from the terminal. |
+| 7 | Operations, recovery and distribution | 🟢 `COMPLETED` | 5, 6 | Backup restored on another server; binaries published. |
+| 8 | Pilot and MVP closeout | 🟡 `IN PROGRESS` | 7 | Decisive test executed by a real team. |
 
 ```mermaid
 flowchart LR
-    F0[0 Fundaciones] --> F1[1 Spike NuGet]
-    F1 --> F2[2 Dominio y persistencia]
-    F2 --> F3[3 NuGet V3 completo]
-    F2 --> F4[4 Identidad y permisos]
-    F3 --> F5[5 Endurecimiento]
+    F0[0 Foundations] --> F1[1 NuGet spike]
+    F1 --> F2[2 Domain and persistence]
+    F2 --> F3[3 Complete NuGet V3]
+    F2 --> F4[4 Identity and permissions]
+    F3 --> F5[5 Hardening]
     F4 --> F5
-    F4 --> F6[6 API admin y CLI]
-    F5 --> F7[7 Operación y distribución]
+    F4 --> F6[6 Admin API and CLI]
+    F5 --> F7[7 Operations and distribution]
     F6 --> F7
-    F7 --> F8[8 Piloto]
+    F7 --> F8[8 Pilot]
 ```
 
-Las fases 3 y 4 pueden avanzar en paralelo. La fase 6 puede avanzar en paralelo con la 5.
+Phases 3 and 4 can advance in parallel. Phase 6 can advance in parallel with 5.
 
 ---
 
-## Fase 0 — Fundaciones del proyecto
+## Phase 0 — Project foundations
 
-**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37174401011](https://github.com/Khr0x/onepack/actions/runs/37174401011).
-**Depende de:** —
+**Status:** 🟢 `COMPLETED` — evidence: [CI run 37174401011](https://github.com/Khr0x/onepack/actions/runs/37174401011).
+**Depends on:** —
 **ADRs:** [ADR-001](adr-mvp.md#adr-001), [ADR-003](adr-mvp.md#adr-003), [ADR-019](adr-mvp.md#adr-019)
 
-### Objetivo
-Dejar un repositorio donde cualquier cambio se compila, se prueba y se revisa de forma reproducible, y donde las decisiones base están registradas.
+### Objective
+Leave a repository where any change builds, is tested and is reviewed reproducibly, and where the base decisions are recorded.
 
-### Entregables
-- [x] Workspace Cargo con crates vacíos: `core`, `nuget`, `storage`, `api-client`, `server`, `cli` (paquetes `onepack-*`). Fronteras de ADR-003 verificadas por `scripts/check-crate-deps.sh`.
-- [x] Estructura de carpetas: `migrations/`, `tests/{integration,conformance-dotnet,security,recovery}`, `packaging/{systemd,container}`, `docs/`.
-- [x] CI (`.github/workflows/ci.yml`, runners `ubuntu-24.04`): `cargo fmt --check`, `clippy -D warnings`, `cargo test`, fronteras entre crates, `cargo deny` (licencias, advisories, fuentes). [Verde en GitHub](https://github.com/Khr0x/onepack/actions/runs/37174401011).
-- [x] Toolchain fijado (`rust-toolchain.toml`, 1.96.1); MSRV = `rust-version` 1.96, documentado en `docs/conventions.md`.
-- [x] Job de CI con SDK .NET 8 que empaqueta las fixtures de `tests/conformance-dotnet/fixtures` (sin ser dependencia del servidor). [Verde en GitHub](https://github.com/Khr0x/onepack/actions/runs/37174401011).
-- [x] Convenciones en `docs/conventions.md`: formato de errores, prefijos de códigos, códigos de salida provisionales del CLI, commits y ramas.
-- [x] Nombres de binarios confirmados: `onepackd` (servidor) y `onepack` (CLI).
-- [x] ADR-001, ADR-003 y ADR-019 en `Aceptado` (2026-10-03); ADR-002 sigue `Condicionado` hasta el gate de la Fase 1.
+### Deliverables
+- [x] Cargo workspace with empty crates: `core`, `nuget`, `storage`, `api-client`, `server`, `cli` (`onepack-*` packages). ADR-003 boundaries verified by `scripts/check-crate-deps.sh`.
+- [x] Folder structure: `migrations/`, `tests/{integration,conformance-dotnet,security,recovery}`, `packaging/{systemd,container}`, `docs/`.
+- [x] CI (`.github/workflows/ci.yml`, `ubuntu-24.04` runners): `cargo fmt --check`, `clippy -D warnings`, `cargo test`, crate boundaries, `cargo deny` (licenses, advisories, sources). [Green on GitHub](https://github.com/Khr0x/onepack/actions/runs/37174401011).
+- [x] Pinned toolchain (`rust-toolchain.toml`, 1.96.1); MSRV = `rust-version` 1.96, documented in `docs/conventions.md`.
+- [x] CI job with .NET 8 SDK that packages the fixtures in `tests/conformance-dotnet/fixtures` (without being a server dependency). [Green on GitHub](https://github.com/Khr0x/onepack/actions/runs/37174401011).
+- [x] Conventions in `docs/conventions.md`: error format, code prefixes, provisional CLI exit codes, commits and branches.
+- [x] Confirmed binary names: `onepackd` (server) and `onepack` (CLI).
+- [x] ADR-001, ADR-003 and ADR-019 `Accepted` (2026-10-03); ADR-002 remains `Conditional` until the Phase 1 gate.
 
-### Fuera de alcance
-Cualquier endpoint funcional.
+### Out of scope
+Any functional endpoint.
 
-### Gate de salida
-- Un PR de ejemplo pasa todo el pipeline de CI en Linux x86-64.
-- ADRs base en `Aceptado`.
+### Exit gate
+- A sample PR passes the entire CI pipeline on Linux x86-64.
+- Base ADRs `Accepted`.
 
 ---
 
-## Fase 1 — Spike de compatibilidad NuGet
+## Phase 1 — NuGet compatibility spike
 
-**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37176042099](https://github.com/Khr0x/onepack/actions/runs/37176042099), [informe del spike](../docs/spikes/fase-1-compatibilidad-nuget.md).
-**Depende de:** Fase 0
+**Status:** 🟢 `COMPLETED` — evidence: [CI run 37176042099](https://github.com/Khr0x/onepack/actions/runs/37176042099), [spike report](../docs/spikes/phase-1-nuget-compatibility.md).
+**Depends on:** Phase 0
 **ADRs:** [ADR-002](adr-mvp.md#adr-002), [ADR-008](adr-mvp.md#adr-008), [ADR-009](adr-mvp.md#adr-009), [ADR-019](adr-mvp.md#adr-019)
 
-### Objetivo
-Reducir el mayor riesgo técnico **antes** de invertir en administración, permisos o CLI: demostrar que un servidor Rust mínimo es aceptado por clientes NuGet reales. Esta fase es el punto de decisión para ratificar o revertir Rust frente a C#.
+### Objective
+Reduce the greatest technical risk **before** investing in administration, permissions or CLI: demonstrate that a minimal Rust server is accepted by real NuGet clients. This phase is the decision point to ratify or revert Rust versus C#.
 
-### Entregables
-- [x] Servidor Axum mínimo con un feed fijo (`--feed`), sin autenticación, almacenamiento provisional en disco (`crates/server`).
-- [x] `index.json` (service index) con solo los recursos implementados; URLs construidas desde `--public-url` (ADR-018).
-- [x] `PackagePublish/2.0.0`: `PUT` multipart; `X-NuGet-ApiKey` se acepta sin validar. Acepta `/v2/package` y `/v2/package/` (el cliente añade la barra final).
-- [x] `PackageBaseAddress/3.0.0`: lista de versiones en orden NuGet, descarga de `.nupkg` (bytes originales) y `.nuspec`.
-- [x] Lectura del `.nuspec` desde el ZIP: id, versión y dependencias por framework (`crates/nuget/src/package.rs`).
-- [x] Normalización de id y versión NuGet (`crates/nuget/src/{id,version}.rs`).
-- [x] Suite de conformidad: corpus de 168 casos generado con `NuGet.Versioning` 7.9.0 y verificado en CI (`scripts/version-corpus.sh --check`, `crates/nuget/tests/version_corpus.rs`).
-- [x] Prueba E2E `scripts/e2e-dotnet.sh`: `dotnet pack` → `dotnet nuget push` → `dotnet restore` con caché aislada → `dotnet run`.
-- [x] Informe del spike: [docs/spikes/fase-1-compatibilidad-nuget.md](../docs/spikes/fase-1-compatibilidad-nuget.md).
+### Deliverables
+- [x] Minimal Axum server with a fixed feed (`--feed`), no authentication, provisional storage on disk (`crates/server`).
+- [x] `index.json` (service index) with only the implemented resources; URLs built from `--public-url` (ADR-018).
+- [x] `PackagePublish/2.0.0`: multipart `PUT`; `X-NuGet-ApiKey` is accepted without validation. Accepts `/v2/package` and `/v2/package/` (the client appends the trailing slash).
+- [x] `PackageBaseAddress/3.0.0`: version list in NuGet order, `.nupkg` download (original bytes) and `.nuspec`.
+- [x] `.nuspec` reading from the ZIP: id, version and dependencies per framework (`crates/nuget/src/package.rs`).
+- [x] NuGet id and version normalization (`crates/nuget/src/{id,version}.rs`).
+- [x] Conformance suite: corpus of 168 cases generated with `NuGet.Versioning` 7.9.0 and verified in CI (`scripts/version-corpus.sh --check`, `crates/nuget/tests/version_corpus.rs`).
+- [x] E2E test `scripts/e2e-dotnet.sh`: `dotnet pack` → `dotnet nuget push` → `dotnet restore` with an isolated cache → `dotnet run`.
+- [x] Spike report: [docs/spikes/phase-1-nuget-compatibility.md](../docs/spikes/phase-1-nuget-compatibility.md).
 
-### Pruebas bloqueantes
-| Escenario | Resultado esperado |
+### Blocking tests
+| Scenario | Expected result |
 |---|---|
-| Push y restore con `dotnet` SDK actual | Éxito con caché vacía. |
-| Versiones `1.0`, `1.0.0`, `1.0.0.0` | Tratadas como la misma identidad. |
-| Prerelease y metadatos de build | Normalización idéntica a `NuGet.Versioning`. |
-| Paquete con dependencias por framework | El restore resuelve la dependencia transitiva. |
+| Push and restore with the current `dotnet` SDK | Success with an empty cache. |
+| Versions `1.0`, `1.0.0`, `1.0.0.0` | Treated as the same identity. |
+| Prerelease and build metadata | Normalization identical to `NuGet.Versioning`. |
+| Package with dependencies per framework | Restore resolves the transitive dependency. |
 
-### Gate de salida
-- E2E verde en CI.
-- Divergencias de normalización = 0 sobre el corpus de casos.
-- ADR-002 pasa de `Condicionado` a `Aceptado` (Rust) **o** se reemplaza por un ADR a favor de C#. Si se cambia de stack, se reescribe este roadmap desde la Fase 2.
+### Exit gate
+- E2E green in CI.
+- Normalization divergences = 0 over the case corpus.
+- ADR-002 moves from `Conditional` to `Accepted` (Rust) **or** is replaced by an ADR in favor of C#. If the stack changes, this roadmap is rewritten from Phase 2.
 
 ---
 
-## Fase 2 — Núcleo de dominio y persistencia
+## Phase 2 — Domain core and persistence
 
-**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028).
-**Depende de:** Fase 1
+**Status:** 🟢 `COMPLETED` — evidence: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028).
+**Depends on:** Phase 1
 **ADRs:** [ADR-004](adr-mvp.md#adr-004), [ADR-005](adr-mvp.md#adr-005), [ADR-006](adr-mvp.md#adr-006), [ADR-007](adr-mvp.md#adr-007), [ADR-020](adr-mvp.md#adr-020)
 
-### Objetivo
-Convertir el spike en un núcleo durable: varios feeds, versiones inmutables, publicación consistente aunque el proceso caiga.
+### Objective
+Turn the spike into a durable core: several feeds, immutable versions, consistent publication even if the process crashes.
 
-### Entregables
-- [x] Esquema SQLite con migraciones SQLx embebidas (`migrations/0001_initial.sql`, tablas `STRICT`): `feed`, `package`, `package_version`, `blob`, `audit_event`.
-- [x] `UNIQUE(feed_id, normalized_package_id, normalized_version)` en la base.
-- [x] SQLite en WAL, `synchronous=FULL`, `busy_timeout` de 5 s, `foreign_keys`; pool de escritura de una conexión y pool de lectura separado.
-- [x] `BlobStore` en filesystem (`crates/storage/src/blobs.rs`): `blobs/sha256/ab/cd/<hash>` y `staging/`, con deduplicación.
-- [x] Flujo de publicación: streaming a staging con hash incremental → inspección desde el archivo → `fsync` del archivo → rename atómico → `fsync` de directorios → transacción de metadatos + auditoría.
-- [x] Ninguna transacción SQLite abierta durante la subida; la subida no se carga en memoria.
-- [x] Conflicto de identidad → `409`; el dominio indica si el contenido es idéntico (`PublishError::Conflict { identical }`) para `--skip-existing-identical`.
-- [x] Limpieza de staging y blobs huérfanos con periodo de gracia (`--gc-grace-secs`), al arrancar y periódicamente.
-- [x] Verificación al arranque: base inicializada, migraciones pendientes o esquema más nuevo, escritura en el directorio de datos, aviso de poco espacio libre.
-- [x] Migraciones forward-only con `onepackd migrate` y copia `VACUUM INTO` previa si ya había datos (ADR-020).
-- [x] Separación de crates respetada: `core` sin dependencias externas; `storage` sin `nuget` ni `axum`.
-- [x] Gestión de feeds local con `onepackd feed create|list` (la gestión remota llega con la API en la Fase 6).
+### Deliverables
+- [x] SQLite schema with embedded SQLx migrations (`migrations/0001_initial.sql`, `STRICT` tables): `feed`, `package`, `package_version`, `blob`, `audit_event`.
+- [x] `UNIQUE(feed_id, normalized_package_id, normalized_version)` in the database.
+- [x] SQLite in WAL, `synchronous=FULL`, `busy_timeout` of 5 s, `foreign_keys`; single-connection write pool and separate read pool.
+- [x] `BlobStore` on filesystem (`crates/storage/src/blobs.rs`): `blobs/sha256/ab/cd/<hash>` and `staging/`, with deduplication.
+- [x] Publication flow: streaming to staging with incremental hash → inspection from the file → `fsync` of the file → atomic rename → `fsync` of directories → metadata + audit transaction.
+- [x] No SQLite transaction open during the upload; the upload is not loaded into memory.
+- [x] Identity conflict → `409`; the domain indicates whether the content is identical (`PublishError::Conflict { identical }`) for `--skip-existing-identical`.
+- [x] Staging and orphan blob cleanup with a grace period (`--gc-grace-secs`), on startup and periodically.
+- [x] Startup verification: database initialized, pending migrations or newer schema, write access to the data directory, low free space warning.
+- [x] Forward-only migrations with `onepackd migrate` and a prior `VACUUM INTO` copy if data already existed (ADR-020).
+- [x] Crate separation respected: `core` without external dependencies; `storage` without `nuget` or `axum`.
+- [x] Local feed management with `onepackd feed create|list` (remote management arrives with the API in Phase 6).
 
-### Pruebas bloqueantes
-| Escenario | Resultado esperado | Prueba |
+### Blocking tests
+| Scenario | Expected result | Test |
 |---|---|---|
-| Dos publicaciones simultáneas de la misma identidad | Solo una confirmada; la otra recibe `409`; sin sobrescritura. | `storage/tests/store.rs` (8 tareas), `server/tests/nuget_api.rs` (6 por HTTP) |
-| Kill del proceso durante la subida | No aparece una versión parcialmente disponible. | `server/tests/recovery.rs` (SIGKILL a mitad de subida) |
-| Kill entre persistir blob y confirmar BD | Blob huérfano detectado y limpiado tras el periodo de gracia. | `server/tests/recovery.rs` (`abort` inyectado, feature `fault-injection`) |
-| Disco lleno durante la subida | Error controlado; ningún metadato apunta a un blob inexistente. | `tests/recovery/disk-full.sh` (tmpfs de 8 MiB, solo Linux/CI) |
-| Reinicio tras publicar | Bytes descargados idénticos (hash) a los publicados. | `server/tests/recovery.rs` |
-| Mismo paquete en dos feeds | Dos identidades independientes; blob puede deduplicarse. | `storage/tests/store.rs`, `server/tests/nuget_api.rs` |
+| Two simultaneous publications of the same identity | Only one confirmed; the other receives `409`; no overwrite. | `storage/tests/store.rs` (8 tasks), `server/tests/nuget_api.rs` (6 over HTTP) |
+| Process kill during the upload | No partially available version appears. | `server/tests/recovery.rs` (SIGKILL mid-upload) |
+| Kill between persisting the blob and committing the DB | Orphan blob detected and cleaned after the grace period. | `server/tests/recovery.rs` (injected `abort`, `fault-injection` feature) |
+| Disk full during the upload | Controlled error; no metadata points to a nonexistent blob. | `tests/recovery/disk-full.sh` (8 MiB tmpfs, Linux/CI only) |
+| Restart after publishing | Downloaded bytes identical (hash) to the published ones. | `server/tests/recovery.rs` |
+| Same package in two feeds | Two independent identities; blob can be deduplicated. | `storage/tests/store.rs`, `server/tests/nuget_api.rs` |
 
-### Gate de salida
-Todas las pruebas bloqueantes automatizadas (tests de los crates y `tests/recovery`) y verdes en CI.
+### Exit gate
+All blocking tests automated (crate tests and `tests/recovery`) and green in CI.
 
 ---
 
-## Fase 3 — Superficie NuGet V3 completa
+## Phase 3 — Complete NuGet V3 surface
 
-**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Las celdas manuales de IDE quedan diferidas al piloto (Fase 8).
-**Depende de:** Fase 2
+**Status:** 🟢 `COMPLETED` — evidence: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Manual IDE cells are deferred to the pilot (Phase 8).
+**Depends on:** Phase 2
 **ADRs:** [ADR-009](adr-mvp.md#adr-009), [ADR-013](adr-mvp.md#adr-013), [ADR-019](adr-mvp.md#adr-019)
 
-### Objetivo
-Implementar todos los recursos anunciados con sus requisitos reales y publicar una matriz de clientes comprobados.
+### Objective
+Implement all announced resources with their real requirements and publish a matrix of tested clients.
 
-### Entregables
-- [x] `RegistrationsBaseUrl/3.6.0`: índice, páginas (64 versiones; inline hasta 128) y hojas; grupos de dependencias por framework con `registration` de cada dependencia; rangos; `listed` (`crates/nuget/src/v3.rs`).
-- [x] `SearchQueryService`: `q` (términos, `id:`, `packageid:`), `skip`, `take`, `prerelease`, `semVerLevel`, `packageType`; orden estable por relevancia e id.
-- [x] `SearchAutocompleteService`: ids (`q`) y versiones de un id (`id`).
-- [x] `DELETE` (unlist) y `POST` (relist) en `PackagePublish`, con permiso de publicación sobre el id y auditoría.
-- [x] Versiones no listadas: fuera de búsqueda y autocompletado, presentes en flat container y registros (`listed: false`) y descargables.
-- [x] SemVer 2.0.0 filtrado según `semVerLevel` (por defecto, solo SemVer 1.0.0).
-- [x] URLs absolutas solo desde `public_url`; test con `Host` y `X-Forwarded-*` manipulados y E2E detrás de nginx con TLS.
-- [x] Metadatos del `.nuspec` (título, autores, etiquetas, licencia, icono, readme, tipos de paquete…) guardados al publicar (migración 0003) y rellenados al arrancar para versiones anteriores.
-- [x] Corpus de paquetes creado con `dotnet pack`: multi-target con dependencias (`Dependent`), rango de dependencia (`Ranged`), prerelease SemVer 2.0.0 con metadatos extensos, icono y readme (`Rich`), y tres versiones de `Basic`.
-- [x] Matriz de clientes comprobados en [docs/compatibility.md](../docs/compatibility.md): todas las celdas automáticas en verde; las de IDE (manuales) diferidas al piloto.
+### Deliverables
+- [x] `RegistrationsBaseUrl/3.6.0`: index, pages (64 versions; inline up to 128) and leaves; dependency groups per framework with each dependency's `registration`; ranges; `listed` (`crates/nuget/src/v3.rs`).
+- [x] `SearchQueryService`: `q` (terms, `id:`, `packageid:`), `skip`, `take`, `prerelease`, `semVerLevel`, `packageType`; stable order by relevance and id.
+- [x] `SearchAutocompleteService`: ids (`q`) and versions of an id (`id`).
+- [x] `DELETE` (unlist) and `POST` (relist) in `PackagePublish`, with publish permission on the id and auditing.
+- [x] Unlisted versions: out of search and autocomplete, present in the flat container and registrations (`listed: false`) and downloadable.
+- [x] SemVer 2.0.0 filtered according to `semVerLevel` (by default, SemVer 1.0.0 only).
+- [x] Absolute URLs only from `public_url`; test with tampered `Host` and `X-Forwarded-*` and E2E behind nginx with TLS.
+- [x] `.nuspec` metadata (title, authors, tags, license, icon, readme, package types…) saved on publish (migration 0003) and backfilled on startup for earlier versions.
+- [x] Package corpus created with `dotnet pack`: multi-target with dependencies (`Dependent`), dependency range (`Ranged`), SemVer 2.0.0 prerelease with extensive metadata, icon and readme (`Rich`), and three versions of `Basic`.
+- [x] Client matrix in [docs/compatibility.md](../docs/compatibility.md): all automatic cells green; IDE (manual) cells deferred to the pilot.
 
-### Matriz de clientes objetivo (mínimo)
-| Cliente | Plataforma | Operaciones | Prueba |
+### Target client matrix (minimum)
+| Client | Platform | Operations | Test |
 |---|---|---|---|
-| `dotnet` CLI (SDK 10 LTS y 8 LTS anterior) | Linux, macOS, Windows | push, restore, search, list | `scripts/e2e-dotnet.sh` (Linux SDK 8 y 10, macOS SDK 10), `e2e-windows.ps1` (SDK 8) |
+| `dotnet` CLI (SDK 10 LTS and previous 8 LTS) | Linux, macOS, Windows | push, restore, search, list | `scripts/e2e-dotnet.sh` (Linux SDK 8 and 10, macOS SDK 10), `e2e-windows.ps1` (SDK 8) |
 | `nuget.exe` | Windows | push, restore, search | `tests/conformance-dotnet/e2e-windows.ps1` |
-| Visual Studio / Rider | Windows / macOS | navegación y restore (manual, documentado) | manual |
-| CI (GitHub Actions / Azure Pipelines) | Linux | restore y push con credenciales inyectadas | jobs de GitHub Actions; Azure Pipelines sin entorno |
+| Visual Studio / Rider | Windows / macOS | browsing and restore (manual, documented) | manual |
+| CI (GitHub Actions / Azure Pipelines) | Linux | restore and push with injected credentials | GitHub Actions jobs; Azure Pipelines without environment |
 
-### Pruebas bloqueantes
-| Escenario | Resultado esperado | Prueba |
+### Blocking tests
+| Scenario | Expected result | Test |
 |---|---|---|
-| Versión no listada | No aparece en búsqueda; sigue restaurable por versión exacta. | `server/tests/catalog.rs`, E2E (`dotnet nuget delete`) |
-| Búsqueda paginada con prerelease y SemVer2 | Resultados coherentes con el protocolo. | `server/tests/catalog.rs`, E2E (`dotnet package search`, `nuget.exe search`) |
-| Dependencia transitiva con rango | `dotnet restore` resuelve la versión correcta. | E2E: `Ranged` → `Basic` 1.1.0 entre 1.0.0, 1.1.0 y 2.0.0; `nuget.exe install` |
-| Detrás de reverse proxy con TLS | URLs del service index correctas. | E2E con nginx + TLS (`ONEPACK_E2E_TLS=1`) y test con cabeceras manipuladas |
+| Unlisted version | Does not appear in search; remains restorable by exact version. | `server/tests/catalog.rs`, E2E (`dotnet nuget delete`) |
+| Paginated search with prerelease and SemVer2 | Results consistent with the protocol. | `server/tests/catalog.rs`, E2E (`dotnet package search`, `nuget.exe search`) |
+| Transitive dependency with range | `dotnet restore` resolves the correct version. | E2E: `Ranged` → `Basic` 1.1.0 among 1.0.0, 1.1.0 and 2.0.0; `nuget.exe install` |
+| Behind a reverse proxy with TLS | Correct service index URLs. | E2E with nginx + TLS (`ONEPACK_E2E_TLS=1`) and test with tampered headers |
 
-### Gate de salida
-Matriz de clientes con todas las celdas automatizables en verde en CI y las manuales documentadas con fecha y versión.
+### Exit gate
+Client matrix with all automatable cells green in CI and manual ones documented with date and version.
 
 ---
 
-## Fase 4 — Identidad, autenticación y autorización
+## Phase 4 — Identity, authentication and authorization
 
-**Estatus:** 🟢 `COMPLETADA` — evidencia: [CI run 37182166437](https://github.com/Khr0x/onepack/actions/runs/37182166437).
-**Depende de:** Fase 2 (paralelizable con Fase 3)
+**Status:** 🟢 `COMPLETED` — evidence: [CI run 37182166437](https://github.com/Khr0x/onepack/actions/runs/37182166437).
+**Depends on:** Phase 2 (parallelizable with Phase 3)
 **ADRs:** [ADR-010](adr-mvp.md#adr-010), [ADR-011](adr-mvp.md#adr-011), [ADR-012](adr-mvp.md#adr-012)
 
-### Objetivo
-Autenticación obligatoria y permisos por feed aplicados en **todos** los endpoints, incluidos metadatos, `HEAD` y respuestas condicionales.
+### Objective
+Mandatory authentication and per-feed permissions applied on **all** endpoints, including metadata, `HEAD` and conditional responses.
 
-### Entregables
-- [x] Entidades `principal` (usuario / servicio), `token`, `feed_grant` y `grant_publish_pattern` (`migrations/0002_identity.sql`).
-- [x] Tokens opacos `opk_<id>_<secreto>` (256 bits), almacenados como verificador SHA-256 y mostrados una sola vez (`crates/storage/src/tokens.rs`).
-- [x] Expiración obligatoria (90 días por defecto), revocación inmediata y `last_used_at` escrito como máximo cada 5 minutos por token.
-- [x] Roles por feed: Reader ⊂ Publisher ⊂ Maintainer; Administrator global (`crates/core/src/auth.rs`).
-- [x] Restricción de publicación por patrón de id (`Hemia.Payments.*`), comprobada al conocer el id del paquete.
-- [x] Mecanismos de autenticación por superficie (ver la precisión en ADR-011):
-  - [x] API admin: solo `Authorization: Bearer`.
-  - [x] NuGet: Basic con el token como contraseña, o `X-NuGet-ApiKey`; `401` con `WWW-Authenticate: Basic`.
-  - [x] Publicación NuGet: `X-NuGet-ApiKey` (o Basic, que el cliente envía tras el `401`).
-- [x] Middleware de autenticación único y global (`crates/server/src/auth.rs`), que cubre también rutas inexistentes; los handlers solo obtienen un feed mediante `authorized_feed`, que autoriza a la vez.
-- [x] `onepackd init`: migra, crea el administrador y escribe la credencial inicial en `initial-admin-token` (`0600`, directorio `0700`); sin contraseña por defecto.
-- [x] Respuesta `404` idéntica para feeds inexistentes y feeds sin permiso de lectura.
-- [x] Auditoría de fallos de autenticación, principals, tokens, grants, publicaciones y denegaciones, con el actor.
-- [x] Secretos fuera de los logs: las trazas HTTP no registran cabeceras y los rechazos solo registran el id del token.
-- [x] Gestión local: `onepackd principal create`, `token create|revoke`, `grant set|remove` (la API remota llega en la Fase 6).
-- [x] `GET /api/v1/whoami`: identidad y permisos de la credencial.
+### Deliverables
+- [x] `principal` (user / service), `token`, `feed_grant` and `grant_publish_pattern` entities (`migrations/0002_identity.sql`).
+- [x] Opaque tokens `opk_<id>_<secret>` (256 bits), stored as a SHA-256 verifier and shown only once (`crates/storage/src/tokens.rs`).
+- [x] Mandatory expiration (90 days by default), immediate revocation and `last_used_at` written at most every 5 minutes per token.
+- [x] Roles per feed: Reader ⊂ Publisher ⊂ Maintainer; global Administrator (`crates/core/src/auth.rs`).
+- [x] Publication restriction by id pattern (`Hemia.Payments.*`), checked when the package id is known.
+- [x] Authentication mechanisms per surface (see the clarification in ADR-011):
+  - [x] Admin API: only `Authorization: Bearer`.
+  - [x] NuGet: Basic with the token as password, or `X-NuGet-ApiKey`; `401` with `WWW-Authenticate: Basic`.
+  - [x] NuGet publish: `X-NuGet-ApiKey` (or Basic, which the client sends after the `401`).
+- [x] Single global authentication middleware (`crates/server/src/auth.rs`), which also covers nonexistent routes; handlers only obtain a feed through `authorized_feed`, which authorizes at the same time.
+- [x] `onepackd init`: migrates, creates the administrator and writes the initial credential to `initial-admin-token` (`0600`, `0700` directory); no default password.
+- [x] Identical `404` response for nonexistent feeds and feeds without read permission.
+- [x] Auditing of authentication failures, principals, tokens, grants, publications and denials, with the actor.
+- [x] Secrets out of logs: HTTP traces do not record headers and rejections only record the token id.
+- [x] Local management: `onepackd principal create`, `token create|revoke`, `grant set|remove` (the remote API arrives in Phase 6).
+- [x] `GET /api/v1/whoami`: identity and permissions of the credential.
 
-### Pruebas bloqueantes
-| Escenario | Resultado esperado | Prueba |
+### Blocking tests
+| Scenario | Expected result | Test |
 |---|---|---|
-| Token revocado | La siguiente solicitud recibe `401`. | `server/tests/auth.rs`, E2E con `dotnet` |
-| Token expirado | `401`; no se renueva implícitamente. | `server/tests/auth.rs`, `storage/tests/identity.rs` |
-| Lectura entre feeds sin permiso | Ninguna filtración vía búsqueda, autocompletado, registros, flat container, `.nuspec` o `HEAD`. | `server/tests/auth.rs` (todas las rutas existentes; búsqueda y registros se cubrirán al añadirlos en la Fase 3) |
-| Publisher fuera de su prefijo | `403` con código `AUTH_PREFIX_DENIED`. | `server/tests/auth.rs` |
-| Reader intenta publicar o hacer unlist | `403`. | `server/tests/auth.rs` (publicar y unlist) |
-| Logs tras flujo completo | No contienen ningún token. | `server/tests/recovery.rs` (`RUST_LOG=trace`), E2E con `dotnet` |
-| `dotnet restore` con credenciales por `NuGetPackageSourceCredentials_*` | Éxito. | `scripts/e2e-dotnet.sh` |
+| Revoked token | The next request receives `401`. | `server/tests/auth.rs`, E2E with `dotnet` |
+| Expired token | `401`; it is not renewed implicitly. | `server/tests/auth.rs`, `storage/tests/identity.rs` |
+| Cross-feed read without permission | No leak via search, autocomplete, registrations, flat container, `.nuspec` or `HEAD`. | `server/tests/auth.rs` (all existing routes; search and registrations will be covered when added in Phase 3) |
+| Publisher outside its prefix | `403` with code `AUTH_PREFIX_DENIED`. | `server/tests/auth.rs` |
+| Reader tries to publish or unlist | `403`. | `server/tests/auth.rs` (publish and unlist) |
+| Logs after a complete flow | They do not contain any token. | `server/tests/recovery.rs` (`RUST_LOG=trace`), E2E with `dotnet` |
+| `dotnet restore` with credentials via `NuGetPackageSourceCredentials_*` | Success. | `scripts/e2e-dotnet.sh` |
 
-### Gate de salida
-Test de cobertura de rutas: el 100 % de rutas registradas exige autenticación salvo la lista explícita de rutas públicas (vacía; `anonymous_read` no está implementado).
+### Exit gate
+Route coverage test: 100% of registered routes require authentication except the explicit public route list (empty; `anonymous_read` is not implemented).
 
 ---
 
-## Fase 5 — Endurecimiento frente a paquetes y abuso
+## Phase 5 — Hardening against packages and abuse
 
-**Estatus:** 🟢 `COMPLETADA`
-**Depende de:** Fases 3 y 4
+**Status:** 🟢 `COMPLETED`
+**Depends on:** Phases 3 and 4
 **ADRs:** [ADR-013](adr-mvp.md#adr-013), [ADR-014](adr-mvp.md#adr-014), [ADR-018](adr-mvp.md#adr-018)
 
-### Objetivo
-Tratar cada `.nupkg` como contenido no confiable y proteger el servicio frente a saturación.
+### Objective
+Treat every `.nupkg` as untrusted content and protect the service against saturation.
 
-### Entregables
-- [x] Límites configurables: tamaño comprimido, número de entradas ZIP, tamaño descomprimido por entrada y total, tamaño del `.nuspec`, profundidad XML, tiempo de inspección.
-- [x] Parser XML sin DTD ni entidades externas.
-- [x] Rechazo de rutas peligrosas (`..`, absolutas, nombres reservados) sin extraer a disco.
-- [x] Inspección con concurrencia limitada (semáforo) separada del pool que atiende descargas.
-- [x] Rate limiting por principal e IP; límite de subidas concurrentes (`max_concurrent_uploads`).
-- [x] Cuotas por feed (almacenamiento total, número de versiones).
-- [x] Estado `availability: available | blocked` independiente de `listed`; descargas bloqueadas devuelven error explícito.
-- [x] Auditoría de bloqueo/desbloqueo con motivo.
-- [x] Documentación: el registro no analiza malware ni valida confianza de firmas; un bloqueo no borra copias ya descargadas.
+### Deliverables
+- [x] Configurable limits: compressed size, number of ZIP entries, uncompressed size per entry and total, `.nuspec` size, XML depth, inspection time.
+- [x] XML parser without DTD or external entities.
+- [x] Rejection of dangerous paths (`..`, absolute, reserved names) without extracting to disk.
+- [x] Inspection with limited concurrency (semaphore) separate from the pool serving downloads.
+- [x] Rate limiting per principal and IP; concurrent upload limit (`max_concurrent_uploads`).
+- [x] Quotas per feed (total storage, number of versions).
+- [x] `availability: available | blocked` state independent of `listed`; blocked downloads return an explicit error.
+- [x] Auditing of block/unblock with reason.
+- [x] Documentation: the registry does not analyze malware or validate signature trust; a block does not delete copies already downloaded.
 
-Evidencia: suite [`tests/security`](../tests/security/main.rs), paso de bloqueo con `dotnet restore` en `scripts/e2e-dotnet.sh`, y [docs/security.md](../docs/security.md) (límites, códigos de error y revisión manual).
+Evidence: [`tests/security`](../tests/security/main.rs) suite, blocking step with `dotnet restore` in `scripts/e2e-dotnet.sh`, and [docs/security.md](../docs/security.md) (limits, error codes and manual review).
 
-### Pruebas bloqueantes
-| Escenario | Resultado esperado |
+### Blocking tests
+| Scenario | Expected result |
 |---|---|
-| ZIP bomb | Rechazo controlado dentro del presupuesto de memoria/tiempo. |
-| XML bomb (billion laughs) | Rechazo controlado. |
-| Entrada con path traversal | Rechazo; nada escrito fuera de staging. |
-| Ráfaga de subidas | Degradación controlada (`429`/`503`), sin crecimiento ilimitado de tareas. |
-| Versión bloqueada | `restore` falla con mensaje claro; sigue visible para administradores. |
-| Cuota excedida | `403`/`413` con código específico; nada persistido. |
+| ZIP bomb | Controlled rejection within the memory/time budget. |
+| XML bomb (billion laughs) | Controlled rejection. |
+| Entry with path traversal | Rejection; nothing written outside staging. |
+| Upload burst | Controlled degradation (`429`/`503`), without unlimited task growth. |
+| Blocked version | `restore` fails with a clear message; it remains visible to administrators. |
+| Quota exceeded | `403`/`413` with a specific code; nothing persisted. |
 
-### Gate de salida
-Suite `tests/security` verde en CI y revisión manual de seguridad documentada.
+### Exit gate
+`tests/security` suite green in CI and documented manual security review.
 
 ---
 
-## Fase 6 — API administrativa y CLI `onepack`
+## Phase 6 — Administrative API and `onepack` CLI
 
-**Estatus:** 🟢 `COMPLETADA`
-**Depende de:** Fase 4 (paralelizable con Fase 5)
+**Status:** 🟢 `COMPLETED`
+**Depends on:** Phase 4 (parallelizable with Phase 5)
 **ADRs:** [ADR-015](adr-mvp.md#adr-015), [ADR-016](adr-mvp.md#adr-016)
 
-### Objetivo
-Que el registro se opere por completo desde terminal, tanto por personas como por pipelines.
+### Objective
+Make the registry fully operable from the terminal, both by people and by pipelines.
 
-### Entregables — API `/api/v1`
-- [x] Endpoints de feeds, principals, tokens, grants, paquetes (listar, inspeccionar, unlist/relist, block/unblock), auditoría.
-- [x] Endpoint de capacidades y versión para negociación con el CLI.
-- [x] Errores con código estable, mensaje, acción sugerida y `request_id`.
-- [x] Paginación por cursor.
-- [x] Contrato definido en `api-client` y compartido por servidor y CLI.
+### Deliverables — `/api/v1` API
+- [x] Feeds, principals, tokens, grants, packages (list, inspect, unlist/relist, block/unblock), auditing endpoints.
+- [x] Capabilities and version endpoint for negotiation with the CLI.
+- [x] Errors with a stable code, message, suggested action and `request_id`.
+- [x] Cursor pagination.
+- [x] Contract defined in `api-client` and shared by server and CLI.
 
-### Entregables — CLI
+### Deliverables — CLI
 - [x] `onepack context add|list|use|remove`.
-- [x] `onepack login|logout` con entrada sin eco o `--token-stdin`; almacenamiento en keychain del SO; error explícito si no hay keychain (sin fallback silencioso a texto plano).
+- [x] `onepack login|logout` with no-echo input or `--token-stdin`; OS keychain storage; explicit error if there is no keychain (no silent plain-text fallback).
 - [x] `onepack feed create|list|show|configure`.
 - [x] `onepack principal create|list|disable`, `onepack token create|list|revoke`, `onepack grant add|remove|list`.
-- [x] `onepack package list|inspect|push|unlist|relist|block|unblock`, con `--skip-existing-identical`.
+- [x] `onepack package list|inspect|push|unlist|relist|block|unblock`, with `--skip-existing-identical`.
 - [x] `onepack audit list`.
-- [x] `onepack nuget init --dry-run`: genera/actualiza `NuGet.Config` con `packageSourceMapping`, preserva lo existente, muestra diff, no escribe secretos.
-- [x] `onepack exec --feed X -- <comando>`: inyecta `NuGetPackageSourceCredentials_*` solo en el entorno del proceso hijo.
-- [x] `onepack doctor`: DNS, TLS, autenticación, permisos, service index, `NuGet.Config`, source mapping.
-- [x] Transversal: `--json` estable, códigos de salida documentados, `--no-input`, timeouts, datos a stdout y diagnóstico a stderr, confirmación en operaciones destructivas, autocompletado de shell.
-- [x] Reintentos solo en operaciones idempotentes.
+- [x] `onepack nuget init --dry-run`: generates/updates `NuGet.Config` with `packageSourceMapping`, preserves what exists, shows the diff, writes no secrets.
+- [x] `onepack exec --feed X -- <command>`: injects `NuGetPackageSourceCredentials_*` only into the child process environment.
+- [x] `onepack doctor`: DNS, TLS, authentication, permissions, service index, `NuGet.Config`, source mapping.
+- [x] Cross-cutting: stable `--json`, documented exit codes, `--no-input`, timeouts, data to stdout and diagnostics to stderr, confirmation on destructive operations, shell autocompletion.
+- [x] Retries only on idempotent operations.
 
-Evidencia: API en [docs/api.md](../docs/api.md) (contratos en `crates/api-client`), CLI en [docs/cli.md](../docs/cli.md), pruebas `crates/server/tests/admin_api.rs` y `crates/cli/tests/cli.rs` (incluye snapshot del esquema `--json` y servidor N-1), y `scripts/e2e-cli.sh` con `dotnet` real. Guía: [docs/guide-zero-to-ci.md](../docs/guide-zero-to-ci.md).
+Evidence: API in [docs/api.md](../docs/api.md) (contracts in `crates/api-client`), CLI in [docs/cli.md](../docs/cli.md), tests `crates/server/tests/admin_api.rs` and `crates/cli/tests/cli.rs` (includes `--json` schema snapshot and N-1 server), and `scripts/e2e-cli.sh` with real `dotnet`. Guide: [docs/guide-zero-to-ci.md](../docs/guide-zero-to-ci.md).
 
-### Pruebas bloqueantes
-| Escenario | Resultado esperado |
+### Blocking tests
+| Scenario | Expected result |
 |---|---|
-| Flujo completo sin UI: feed → principal CI → token → grant → push → restore | Éxito usando solo `onepack` y `dotnet`. |
-| `onepack exec -- dotnet restore` | Restaura; el token no aparece en archivos ni en el entorno del shell padre. |
-| `nuget init` sobre `NuGet.Config` existente | Conserva fuentes previas; diff mostrado antes de aplicar. |
-| `doctor` con token sin permiso de publicación | Reporta `AUTH_SCOPE_MISSING` con acción requerida, sin mostrar el secreto. |
-| CLI versión N contra servidor N-1 | Funciona o falla con mensaje de capacidad ausente. |
-| Salida `--json` | Validada contra snapshot de esquema. |
+| Complete flow without UI: feed → CI principal → token → grant → push → restore | Success using only `onepack` and `dotnet`. |
+| `onepack exec -- dotnet restore` | Restores; the token does not appear in files or in the parent shell environment. |
+| `nuget init` over an existing `NuGet.Config` | Preserves previous sources; diff shown before applying. |
+| `doctor` with a token without publish permission | Reports `AUTH_SCOPE_MISSING` with the required action, without showing the secret. |
+| CLI version N against N-1 server | Works or fails with a missing-capability message. |
+| `--json` output | Validated against the schema snapshot. |
 
-### Gate de salida
-Guía "de cero a restore en CI" en `docs/` ejecutada literalmente por alguien que no escribió el código.
+### Exit gate
+"From zero to restore in CI" guide in `docs/` executed literally by someone who did not write the code.
 
 
-> Cierre (2026-10-04): la guía se ejecutó literalmente en local y su flujo está automatizado en `scripts/e2e-cli.sh` (verde en CI). La ejecución por alguien que no escribió el código se difiere al piloto de la Fase 8 por decisión del usuario.
+> Closeout (2026-10-04): the guide was executed literally locally and its flow is automated in `scripts/e2e-cli.sh` (green in CI). Execution by someone who did not write the code is deferred to the Phase 8 pilot by user decision.
 ---
 
-## Fase 7 — Operación, recuperación y distribución
+## Phase 7 — Operations, recovery and distribution
 
-**Estatus:** 🟢 `COMPLETADA`
-**Depende de:** Fases 5 y 6
+**Status:** 🟢 `COMPLETED`
+**Depends on:** Phases 5 and 6
 **ADRs:** [ADR-017](adr-mvp.md#adr-017), [ADR-018](adr-mvp.md#adr-018), [ADR-020](adr-mvp.md#adr-020)
 
-### Objetivo
-Que el servicio se pueda instalar, actualizar, observar y recuperar de forma predecible.
+### Objective
+Make the service installable, upgradable, observable and recoverable predictably.
 
-### Entregables — Recuperación
-- [x] Modo mantenimiento: pausa mutaciones y limpieza de blobs.
-- [x] `onepackd backup`: copia consistente de la base (`VACUUM INTO`, ver precisión en ADR-017) + blobs referenciados verificados + manifiesto con hashes. La configuración del servicio no vive en el directorio de datos: se documenta guardarla aparte.
-- [x] `onepackd restore` sobre directorio vacío, con verificación del manifiesto.
-- [x] `onepackd check`: integridad BD ↔ blobs (faltantes, huérfanos, hashes incorrectos).
-- [x] Migraciones: versión de esquema, comprobación previa (`migrate --check`), backup automático antes de migrar, forward-only.
+### Deliverables — Recovery
+- [x] Maintenance mode: pauses mutations and blob cleanup.
+- [x] `onepackd backup`: consistent database copy (`VACUUM INTO`, see clarification in ADR-017) + verified referenced blobs + manifest with hashes. Service configuration does not live in the data directory: it is documented to store it separately.
+- [x] `onepackd restore` over an empty directory, with manifest verification.
+- [x] `onepackd check`: DB ↔ blobs integrity (missing, orphaned, incorrect hashes).
+- [x] Migrations: schema version, prior check (`migrate --check`), automatic backup before migrating, forward-only.
 
-### Entregables — Observabilidad
-- [x] Logs estructurados JSON con `request_id`.
-- [x] Endpoint de métricas (requests, latencias, subidas, rechazos, espacio en disco).
-- [x] `/healthz` (vivo) y `/readyz` (BD y almacenamiento accesibles).
+### Deliverables — Observability
+- [x] Structured JSON logs with `request_id`.
+- [x] Metrics endpoint (requests, latencies, uploads, rejections, disk space).
+- [x] `/healthz` (live) and `/readyz` (DB and storage accessible).
 
-### Entregables — Distribución
-- [-] Binarios servidor: Linux x86-64 y ARM64 (estáticos, musl). Workflow `release.yml` listo; primera ejecución diferida a la Fase 8.
-- [-] Binarios CLI: Linux, macOS (x86-64/ARM64), Windows. Mismo workflow; primera ejecución diferida a la Fase 8.
-- [x] Unidad systemd con hardening (`ProtectSystem`, `NoNewPrivileges`, usuario dedicado).
-- [x] Imagen de contenedor opcional (no root, volumen de datos).
-- [x] Ejemplos de reverse proxy (Nginx/Caddy) que **no** sirven blobs directamente.
-- [-] Checksums y firma de los artefactos de release (SHA-256 + cosign keyless, verificada en el propio workflow). Primera ejecución diferida a la Fase 8.
+### Deliverables — Distribution
+- [-] Server binaries: Linux x86-64 and ARM64 (static, musl). `release.yml` workflow ready; first run deferred to Phase 8.
+- [-] CLI binaries: Linux, macOS (x86-64/ARM64), Windows. Same workflow; first run deferred to Phase 8.
+- [x] systemd unit with hardening (`ProtectSystem`, `NoNewPrivileges`, dedicated user).
+- [x] Optional container image (non-root, data volume).
+- [x] Reverse proxy examples (Nginx/Caddy) that do **not** serve blobs directly.
+- [-] Checksums and signature of release artifacts (SHA-256 + keyless cosign, verified in the workflow itself). First run deferred to Phase 8.
 
-### Entregables — Rendimiento
-- [x] Benchmark reproducible en 2 vCPU / 1 GB / SSD (`scripts/bench.py --docker`, job *Benchmark* del CI).
-- [x] Medición de objetivos: arranque < 2 s, RSS en reposo < 100 MiB, p95 metadatos < 50 ms, memoria acotada en transferencias.
-- [x] Reporte con resultados reales (los objetivos no cumplidos se documentan, no se ocultan).
+### Deliverables — Performance
+- [x] Reproducible benchmark on 2 vCPU / 1 GB / SSD (`scripts/bench.py --docker`, CI *Benchmark* job).
+- [x] Goal measurement: startup < 2 s, idle RSS < 100 MiB, metadata p95 < 50 ms, bounded memory in transfers.
+- [x] Report with real results (goals not met are documented, not hidden).
 
-Evidencia: `crates/storage/tests/ops.rs`, `crates/server/tests/operations.rs`, `scripts/e2e-recovery.sh` (backup en Linux → restore en macOS en el CI), `tests/ops/` (systemd, contenedor, proxies), [docs/performance.md](../docs/performance.md) y [docs/runbooks/](../docs/runbooks/).
+Evidence: `crates/storage/tests/ops.rs`, `crates/server/tests/operations.rs`, `scripts/e2e-recovery.sh` (backup on Linux → restore on macOS in CI), `tests/ops/` (systemd, container, proxies), [docs/performance.md](../docs/performance.md) and [docs/runbooks/](../docs/runbooks/).
 
-### Pruebas bloqueantes
-| Escenario | Resultado esperado |
+### Blocking tests
+| Scenario | Expected result |
 |---|---|
-| Backup → restore en otro servidor → `dotnet restore` | El proyecto restaura sus dependencias. |
-| Blob eliminado manualmente | `onepackd check` lo detecta y lo reporta. |
-| Actualización N-1 → N con migración | Datos intactos; backup previo generado. |
-| Reinicio por systemd tras crash | Servicio vuelve a `ready` sin intervención. |
+| Backup → restore on another server → `dotnet restore` | The project restores its dependencies. |
+| Blob manually deleted | `onepackd check` detects and reports it. |
+| Upgrade N-1 → N with migration | Data intact; prior backup generated. |
+| Restart by systemd after a crash | Service returns to `ready` without intervention. |
 
-### Gate de salida
-Prueba de recuperación ejecutada en infraestructura distinta de la original y documentada en `docs/runbooks/`.
+### Exit gate
+Recovery test executed on infrastructure different from the original and documented in `docs/runbooks/`.
 
 
-> Cierre (2026-10-04): gate superado en CI, con backup en Linux y restore + `dotnet restore` en macOS (otra máquina y otro sistema operativo). Por decisión del usuario, se difieren a la Fase 8 la primera ejecución de `release.yml` y la transcripción a `docs/performance.md` de los resultados del benchmark en contenedor (2 vCPU / 1 GiB), que están en el resumen del job *Benchmark* del CI.
+> Closeout (2026-10-04): gate passed in CI, with backup on Linux and restore + `dotnet restore` on macOS (another machine and another operating system). By user decision, the first run of `release.yml` and the transcription of the container benchmark results (2 vCPU / 1 GiB) to `docs/performance.md` are deferred to Phase 8; those results are in the CI *Benchmark* job summary.
 ---
 
-## Fase 8 — Piloto y cierre del MVP
+## Phase 8 — Pilot and MVP closeout
 
-**Estatus:** 🟡 `EN PROGRESO` — rama `feature/phase-8-pilot`. Material del piloto en [docs/pilot](../docs/pilot/README.md).
-**Depende de:** Fase 7
+**Status:** 🟡 `IN PROGRESS` — branch `feature/phase-8-pilot`. Pilot material in [docs/pilot](../docs/pilot/README.md).
+**Depends on:** Phase 7
 
-### Objetivo
-Validar con un equipo real que el producto resuelve el problema y ejecutar la prueba decisiva.
+### Objective
+Validate with a real team that the product solves the problem and execute the decisive test.
 
-### Entregables
-- [x] Prueba decisiva automatizada de punta a punta ([`scripts/e2e-acceptance.sh`](../scripts/e2e-acceptance.sh)): instalar, configurar, publicar, restaurar desde CI, revocar y rotar la credencial, bloquear una versión y recuperar desde backup, sin UI ni acceso a la base de datos. En CI (SDK 8 y 10, Linux y macOS) y en `release.yml` contra los binarios de release.
-- [x] Material del piloto: [plan](../docs/pilot/README.md), [registro de fricciones](../docs/pilot/friction-log.md), [ejercicio de incidente](../docs/runbooks/incident-drill.md) y [procedimiento de release](../docs/runbooks/release.md).
-- [x] Licencia del proyecto: [Apache License 2.0](../LICENSE), declarada en los crates (`license = "Apache-2.0"`), incluida en los archivos de release y en la imagen de contenedor.
-- [ ] Equipo piloto identificado (p. ej., un equipo de Hemia) con al menos una librería y un pipeline de CI.
-- [ ] Instalación hecha por el equipo piloto siguiendo solo la documentación.
-- [ ] Uso en builds y publicaciones habituales durante un periodo acordado (p. ej. 2–4 semanas).
-- [ ] Ejercicio de incidente: revocar credencial de CI, bloquear una versión, restaurar desde backup.
-- [ ] Verificación manual con Visual Studio y Rider (diferida desde la Fase 3), anotada en `docs/compatibility.md`.
-- [ ] Ejecución literal de la guía [de cero a restore en CI](../docs/guide-zero-to-ci.md) por alguien que no escribió el código (diferida desde la Fase 6).
-- [x] Primera ejecución de `release.yml` (binarios, checksums y firma): [dry run 37891824376](https://github.com/Khr0x/onepack/actions/runs/37891824376). Candidata `88467a9` validada en [dry run 39068572157](https://github.com/Khr0x/onepack/actions/runs/39068572157), con firma comprobada fuera de Actions y aceptación de los binarios descargados en Linux ARM64. La promoción sigue bloqueada por F-002: `cargo deny check` actualizado falla (OP-036 / OP-045).
-- [x] Revalidación del 2026-10-29: candidata `f84978b`, [dry run 40900732673](https://github.com/Khr0x/onepack/actions/runs/40900732673) con 9 jobs correctos, 7 checksums y firma comprobados fuera de Actions, aceptación y CLI de los binarios descargados aprobadas en Linux ARM64 limpio. F-002 está corregido en el artefacto nuevo; la promoción continúa bloqueada por cuatro avisos nuevos de cargo-deny, F-003/OP-046 (TLS) y F-004/OP-047 (Tokio). Evidencia en Obsidian: `OP-036-Resultados-2026-10-29`; ver [fricciones actuales](../docs/pilot/friction-log.md#current-candidate-validation--2026-10-29). No se publica release ni se cierra el piloto.
-- [x] Resultados del benchmark en contenedor (2 vCPU / 1 GiB) del job *Benchmark* anotados en [docs/performance.md](../docs/performance.md): [CI run 38917726054](https://github.com/Khr0x/onepack/actions/runs/38917726054), commit `88467a9`, ejecución del 2026-10-16; objetivos, cifras y limitaciones documentados (OP-002).
-- [x] Actualización de dependencias del 2026-11-16: commits locales `bc78dc4` (`rustls-webpki` 0.103.17, `webpki-roots`/`webpki-root-certs` 1.0.12, Tokio 1.54.1) y `1a50859` (`sqlx 0.9.1` pin temporal y `libsqlite3-sys` 0.39.1) resuelven F-003/F-004/F-005. `cargo deny` pasa; también fmt, Clippy, 151 tests, fronteras, E2E Linux de TLS/keychain, aceptación y disco lleno. Retirar el pin y `allow-git` al publicar sqlx 0.9.1. Falta la candidata nueva con CI y artefacto firmado; sin push ni release. Ver [fricciones actuales](../docs/pilot/friction-log.md#dependency-gate-update--2026-11-16).
-- [ ] Registro de fricciones, errores y peticiones; clasificación en "bloqueante MVP" / "post-MVP".
-- [ ] Corrección de todos los bloqueantes MVP.
-- [ ] Retrospectiva y actualización del orden de evolución (credential provider, S3, proxy…).
+### Deliverables
+- [x] Automated end-to-end decisive test ([`scripts/e2e-acceptance.sh`](../scripts/e2e-acceptance.sh)): install, configure, publish, restore from CI, revoke and rotate the credential, block a version and recover from backup, without UI or database access. In CI (SDK 8 and 10, Linux and macOS) and in `release.yml` against the release binaries.
+- [x] Pilot material: [plan](../docs/pilot/README.md), [friction log](../docs/pilot/friction-log.md), [incident exercise](../docs/runbooks/incident-drill.md) and [release procedure](../docs/runbooks/release.md).
+- [x] Project license: [Apache License 2.0](../LICENSE), declared in the crates (`license = "Apache-2.0"`), included in release files and in the container image.
+- [ ] Pilot team identified (e.g., a Hemia team) with at least one library and one CI pipeline.
+- [ ] Installation done by the pilot team following only the documentation.
+- [ ] Use in usual builds and publications during an agreed period (e.g. 2–4 weeks).
+- [ ] Incident exercise: revoke CI credential, block a version, restore from backup.
+- [ ] Manual verification with Visual Studio and Rider (deferred from Phase 3), noted in `docs/compatibility.md`.
+- [ ] Literal execution of the [from zero to restore in CI](../docs/guide-zero-to-ci.md) guide by someone who did not write the code (deferred from Phase 6).
+- [x] First run of `release.yml` (binaries, checksums and signature): [dry run 37891824376](https://github.com/Khr0x/onepack/actions/runs/37891824376). Candidate `88467a9` validated in [dry run 39068572157](https://github.com/Khr0x/onepack/actions/runs/39068572157), with signature verified outside Actions and acceptance of the downloaded binaries on Linux ARM64. Promotion remains blocked by F-002: updated `cargo deny check` fails (OP-036 / OP-045).
+- [x] Revalidation of 2026-10-29: candidate `f84978b`, [dry run 40900732673](https://github.com/Khr0x/onepack/actions/runs/40900732673) with 9 correct jobs, 7 checksums and signature verified outside Actions, acceptance and CLI of the downloaded binaries approved on clean Linux ARM64. F-002 is fixed in the new artifact; promotion remains blocked by four new cargo-deny warnings, F-003/OP-046 (TLS) and F-004/OP-047 (Tokio). Evidence in Obsidian: `OP-036-Resultados-2026-10-29`; see [current frictions](../docs/pilot/friction-log.md#current-candidate-validation--2026-10-29). No release is published and the pilot is not closed.
+- [x] Container benchmark results (2 vCPU / 1 GiB) from the *Benchmark* job noted in [docs/performance.md](../docs/performance.md): [CI run 38917726054](https://github.com/Khr0x/onepack/actions/runs/38917726054), commit `88467a9`, run of 2026-10-16; goals, figures and limitations documented (OP-002).
+- [x] Dependency update of 2026-11-16: local commits `bc78dc4` (`rustls-webpki` 0.103.17, `webpki-roots`/`webpki-root-certs` 1.0.12, Tokio 1.54.1) and `1a50859` (`sqlx 0.9.1` temporary pin and `libsqlite3-sys` 0.39.1) resolve F-003/F-004/F-005. `cargo deny` passes; also fmt, Clippy, 151 tests, boundaries, Linux E2E of TLS/keychain, acceptance and disk-full. Remove the pin and `allow-git` when publishing sqlx 0.9.1. The new candidate with CI and a signed artifact is still missing; no push or release. See [current frictions](../docs/pilot/friction-log.md#dependency-gate-update--2026-11-16).
+- [ ] Friction, error and request log; classification into "MVP blocking" / "post-MVP".
+- [ ] Fix all MVP blockers.
+- [ ] Retrospective and update of the evolution order (credential provider, S3, proxy…).
 
-### Criterios de cierre del MVP
-- [ ] La prueba decisiva se ejecuta completa sin UI ni edición manual de BD.
-- [ ] Cero incidencias abiertas de pérdida o corrupción de datos.
-- [ ] Cero filtraciones entre feeds conocidas.
-- [ ] Matriz de clientes y documentación de operación actualizadas.
-- [ ] Release `v0.1.0` etiquetada con binarios firmados.
+### MVP close criteria
+- [ ] The decisive test runs completely without UI or manual DB editing.
+- [ ] Zero open data loss or corruption incidents.
+- [ ] Zero known cross-feed leaks.
+- [ ] Client matrix and operations documentation updated.
+- [ ] `v0.1.0` release tagged with signed binaries.
 
 ---
 
-## Fuera del MVP (referencia)
+## Outside the MVP (reference)
 
-Registrado para evitar que entre por la puerta de atrás. Cualquier inclusión requiere un ADR nuevo.
+Recorded to prevent it from entering through the back door. Any inclusion requires a new ADR.
 
-| Funcionalidad | Etapa prevista |
+| Feature | Planned stage |
 |---|---|
-| Credential provider NuGet, importación de paquetes, almacenamiento S3 | Primera evolución |
-| Proxy/caché de nuget.org con reglas de procedencia | Segunda evolución |
-| npm | Tercera evolución |
-| Símbolos, PyPI, SSO, interfaz web | Según demanda |
-| PostgreSQL, multinodo, alta disponibilidad | Solo con necesidad demostrada |
+| NuGet credential provider, package import, S3 storage | First evolution |
+| nuget.org proxy/cache with provenance rules | Second evolution |
+| npm | Third evolution |
+| Symbols, PyPI, SSO, web interface | As demanded |
+| PostgreSQL, multinode, high availability | Only with demonstrated need |
 
 ---
 
-## Registro de cambios de estatus
+## Status change log
 
-| Fecha | Fase | De | A | Nota / evidencia |
+| Date | Phase | From | To | Note / evidence |
 |---|---|---|---|---|
-| 2026-10-03 | 0 | `NO INICIADA` | `EN DISEÑO` | Roadmap y ADRs iniciales redactados. |
-| 2026-10-03 | 0 | `EN DISEÑO` | `EN PROGRESO` | ADR-001, 003 y 019 aceptados; binarios `onepackd`/`onepack`. |
-| 2026-10-03 | 0 | `EN PROGRESO` | `EN VALIDACIÓN` | Entregables implementados; checks verdes en local. Pendiente: CI en GitHub. |
-| 2026-10-04 | 0 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37174401011](https://github.com/Khr0x/onepack/actions/runs/37174401011). Runner fijado en `ubuntu-24.04` (con `ubuntu-latest` los jobs no recibían runner). |
-| 2026-10-04 | 1 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 0) completada. |
-| 2026-10-04 | 1 | `EN DISEÑO` | `EN PROGRESO` | ADR-008 y ADR-009 aceptados. |
-| 2026-10-04 | 1 | `EN PROGRESO` | `EN VALIDACIÓN` | Corpus sin divergencias y E2E verde en local. Pendiente: CI en GitHub. |
-| 2026-10-04 | 1 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37176042099](https://github.com/Khr0x/onepack/actions/runs/37176042099) (corpus + E2E con dotnet). ADR-002 aceptado (Rust). PR Khr0x/onepack#2. |
-| 2026-10-04 | 2 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 1) completada. |
-| 2026-10-04 | 2 | `EN DISEÑO` | `EN PROGRESO` | ADR-004, 005, 006, 007 y 020 aceptados. |
-| 2026-10-04 | 2 | `EN PROGRESO` | `EN VALIDACIÓN` | 37 tests y E2E con dotnet verdes en local. Pendiente: CI (incluye disco lleno en Linux). |
-| 2026-10-04 | 2 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028), con tests de recuperación (`fault-injection`) y disco lleno en tmpfs. |
-| 2026-10-04 | 3 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada. |
-| 2026-10-04 | 4 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 2) completada; paralelizable con la Fase 3. |
-| 2026-10-04 | 4 | `EN DISEÑO` | `EN PROGRESO` | ADR-010, 011 y 012 aceptados. |
-| 2026-10-04 | 4 | `EN PROGRESO` | `EN VALIDACIÓN` | 66 tests y E2E autenticado con dotnet verdes en local. Pendiente: CI. |
-| 2026-10-04 | 4 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37182166437](https://github.com/Khr0x/onepack/actions/runs/37182166437), con cobertura de rutas, aislamiento entre feeds y E2E autenticado. |
-| 2026-10-04 | 6 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 4) completada; paralelizable con la Fase 5. |
-| 2026-10-04 | 3 | `EN DISEÑO` | `EN PROGRESO` | ADR-013 aceptado. |
-| 2026-10-04 | 3 | `EN PROGRESO` | `EN VALIDACIÓN` | Tests y E2E con SDK 8 verdes en local. Pendiente: matriz en CI (SDK 8/10, macOS, Windows, TLS) e IDE manuales. |
-| 2026-10-04 | 3 | `EN VALIDACIÓN` | `COMPLETADA` | Matriz automática en verde: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Cerrada por decisión del usuario con las celdas manuales de IDE (Visual Studio, Rider) diferidas al piloto de la Fase 8. |
-| 2026-10-04 | 5 | `NO INICIADA` | `EN DISEÑO` | Dependencias (Fases 3 y 4) completadas. |
-| 2026-10-04 | 5 | `EN DISEÑO` | `EN PROGRESO` | ADR-014 y ADR-018 aceptados. Rama `feature/phase-5-hardening` (desde esta fase, ramas git flow en inglés). |
-| 2026-10-04 | 5 | `EN PROGRESO` | `EN VALIDACIÓN` | Suite `tests/security` (16 pruebas) y E2E con bloqueo verdes en local; revisión manual en `docs/security.md`. Pendiente: CI. |
-| 2026-10-04 | 5 | `EN VALIDACIÓN` | `COMPLETADA` | Gate superado: [CI run 37232454014](https://github.com/Khr0x/onepack/actions/runs/37232454014), con el paso "Security suite" y el E2E de bloqueo en toda la matriz (SDK 8/10, Linux con TLS, macOS, Windows). Revisión manual de seguridad en `docs/security.md`. PR Khr0x/onepack#6. |
-| 2026-10-04 | 6 | `EN DISEÑO` | `EN PROGRESO` | ADR-015 y ADR-016 aceptados. Rama `feature/phase-6-admin-api-cli`. |
-| 2026-10-04 | 6 | `EN PROGRESO` | `EN VALIDACIÓN` | API `/api/v1` y CLI completos; 142 tests, `e2e-cli.sh` y la guía ejecutados en local (SDK 8). Pendiente: CI y que la guía la ejecute literalmente alguien que no escribió el código. |
-| 2026-10-04 | 6 | `EN VALIDACIÓN` | `COMPLETADA` | CI en verde: [CI run 37236552774](https://github.com/Khr0x/onepack/actions/runs/37236552774), con `e2e-cli.sh` en Linux (SDK 8 y 10) y macOS (SDK 8 y 10). Cerrada por decisión del usuario con la ejecución de la guía por un tercero diferida al piloto de la Fase 8. PR Khr0x/onepack#7. |
-| 2026-10-04 | 7 | `NO INICIADA` | `EN DISEÑO` | Dependencias (Fases 5 y 6) completadas. |
-| 2026-10-04 | 7 | `EN DISEÑO` | `EN PROGRESO` | ADR-017 aceptado. Firma de releases: SHA-256 + cosign keyless. Rama `feature/phase-7-operations`. |
-| 2026-10-04 | 7 | `EN PROGRESO` | `COMPLETADA` | CI en verde: [CI run 37247176082](https://github.com/Khr0x/onepack/actions/runs/37247176082), 11 jobs: recuperación Linux → macOS con `dotnet restore`, systemd con reinicio tras SIGKILL, contenedor, proxies y benchmark. Cerrada por decisión del usuario; se difieren a la Fase 8 la primera ejecución de `release.yml` y los números del benchmark en contenedor. PR Khr0x/onepack#8. |
-| 2026-10-04 | 8 | `NO INICIADA` | `EN DISEÑO` | Dependencia (Fase 7) completada. |
-| 2026-10-04 | 8 | `EN DISEÑO` | `EN PROGRESO` | Sin ADRs nuevos. Rama `feature/phase-8-pilot`: prueba decisiva automatizada y material del piloto. Primera fricción (F-001, bloqueante) corregida: `onepack exec` comprueba la credencial antes de lanzar `dotnet`. Licencia Apache-2.0 por decisión del usuario. |
+| 2026-10-03 | 0 | `NOT STARTED` | `IN DESIGN` | Initial roadmap and ADRs drafted. |
+| 2026-10-03 | 0 | `IN DESIGN` | `IN PROGRESS` | ADR-001, 003 and 019 accepted; `onepackd`/`onepack` binaries. |
+| 2026-10-03 | 0 | `IN PROGRESS` | `IN VALIDATION` | Deliverables implemented; checks green locally. Pending: CI on GitHub. |
+| 2026-10-04 | 0 | `IN VALIDATION` | `COMPLETED` | Gate passed: [CI run 37174401011](https://github.com/Khr0x/onepack/actions/runs/37174401011). Runner pinned to `ubuntu-24.04` (with `ubuntu-latest` the jobs did not receive a runner). |
+| 2026-10-04 | 1 | `NOT STARTED` | `IN DESIGN` | Dependency (Phase 0) completed. |
+| 2026-10-04 | 1 | `IN DESIGN` | `IN PROGRESS` | ADR-008 and ADR-009 accepted. |
+| 2026-10-04 | 1 | `IN PROGRESS` | `IN VALIDATION` | Corpus without divergences and E2E green locally. Pending: CI on GitHub. |
+| 2026-10-04 | 1 | `IN VALIDATION` | `COMPLETED` | Gate passed: [CI run 37176042099](https://github.com/Khr0x/onepack/actions/runs/37176042099) (corpus + E2E with dotnet). ADR-002 accepted (Rust). PR Khr0x/onepack#2. |
+| 2026-10-04 | 2 | `NOT STARTED` | `IN DESIGN` | Dependency (Phase 1) completed. |
+| 2026-10-04 | 2 | `IN DESIGN` | `IN PROGRESS` | ADR-004, 005, 006, 007 and 020 accepted. |
+| 2026-10-04 | 2 | `IN PROGRESS` | `IN VALIDATION` | 37 tests and E2E with dotnet green locally. Pending: CI (includes disk-full on Linux). |
+| 2026-10-04 | 2 | `IN VALIDATION` | `COMPLETED` | Gate passed: [CI run 37180525028](https://github.com/Khr0x/onepack/actions/runs/37180525028), with recovery tests (`fault-injection`) and disk-full on tmpfs. |
+| 2026-10-04 | 3 | `NOT STARTED` | `IN DESIGN` | Dependency (Phase 2) completed. |
+| 2026-10-04 | 4 | `NOT STARTED` | `IN DESIGN` | Dependency (Phase 2) completed; parallelizable with Phase 3. |
+| 2026-10-04 | 4 | `IN DESIGN` | `IN PROGRESS` | ADR-010, 011 and 012 accepted. |
+| 2026-10-04 | 4 | `IN PROGRESS` | `IN VALIDATION` | 66 tests and authenticated E2E with dotnet green locally. Pending: CI. |
+| 2026-10-04 | 4 | `IN VALIDATION` | `COMPLETED` | Gate passed: [CI run 37182166437](https://github.com/Khr0x/onepack/actions/runs/37182166437), with route coverage, feed isolation and authenticated E2E. |
+| 2026-10-04 | 6 | `NOT STARTED` | `IN DESIGN` | Dependency (Phase 4) completed; parallelizable with Phase 5. |
+| 2026-10-04 | 3 | `IN DESIGN` | `IN PROGRESS` | ADR-013 accepted. |
+| 2026-10-04 | 3 | `IN PROGRESS` | `IN VALIDATION` | Tests and E2E with SDK 8 green locally. Pending: matrix in CI (SDK 8/10, macOS, Windows, TLS) and manual IDEs. |
+| 2026-10-04 | 3 | `IN VALIDATION` | `COMPLETED` | Automatic matrix green: [CI run 37185158143](https://github.com/Khr0x/onepack/actions/runs/37185158143). Closed by user decision with the manual IDE cells (Visual Studio, Rider) deferred to the Phase 8 pilot. |
+| 2026-10-04 | 5 | `NOT STARTED` | `IN DESIGN` | Dependencies (Phases 3 and 4) completed. |
+| 2026-10-04 | 5 | `IN DESIGN` | `IN PROGRESS` | ADR-014 and ADR-018 accepted. Branch `feature/phase-5-hardening` (from this phase on, git flow branches in English). |
+| 2026-10-04 | 5 | `IN PROGRESS` | `IN VALIDATION` | `tests/security` suite (16 tests) and E2E with blocking green locally; manual review in `docs/security.md`. Pending: CI. |
+| 2026-10-04 | 5 | `IN VALIDATION` | `COMPLETED` | Gate passed: [CI run 37232454014](https://github.com/Khr0x/onepack/actions/runs/37232454014), with the "Security suite" step and the blocking E2E across the whole matrix (SDK 8/10, Linux with TLS, macOS, Windows). Manual security review in `docs/security.md`. PR Khr0x/onepack#6. |
+| 2026-10-04 | 6 | `IN DESIGN` | `IN PROGRESS` | ADR-015 and ADR-016 accepted. Branch `feature/phase-6-admin-api-cli`. |
+| 2026-10-04 | 6 | `IN PROGRESS` | `IN VALIDATION` | `/api/v1` API and CLI complete; 142 tests, `e2e-cli.sh` and the guide executed locally (SDK 8). Pending: CI and literal execution of the guide by someone who did not write the code. |
+| 2026-10-04 | 6 | `IN VALIDATION` | `COMPLETED` | CI green: [CI run 37236552774](https://github.com/Khr0x/onepack/actions/runs/37236552774), with `e2e-cli.sh` on Linux (SDK 8 and 10) and macOS (SDK 8 and 10). Closed by user decision with third-party execution of the guide deferred to the Phase 8 pilot. PR Khr0x/onepack#7. |
+| 2026-10-04 | 7 | `NOT STARTED` | `IN DESIGN` | Dependencies (Phases 5 and 6) completed. |
+| 2026-10-04 | 7 | `IN DESIGN` | `IN PROGRESS` | ADR-017 accepted. Release signing: SHA-256 + keyless cosign. Branch `feature/phase-7-operations`. |
+| 2026-10-04 | 7 | `IN PROGRESS` | `COMPLETED` | CI green: [CI run 37247176082](https://github.com/Khr0x/onepack/actions/runs/37247176082), 11 jobs: Linux → macOS recovery with `dotnet restore`, systemd with restart after SIGKILL, container, proxies and benchmark. Closed by user decision; the first run of `release.yml` and the container benchmark numbers are deferred to Phase 8. PR Khr0x/onepack#8. |
+| 2026-10-04 | 8 | `NOT STARTED` | `IN DESIGN` | Dependency (Phase 7) completed. |
+| 2026-10-04 | 8 | `IN DESIGN` | `IN PROGRESS` | No new ADRs. Branch `feature/phase-8-pilot`: automated decisive test and pilot material. First friction (F-001, blocking) fixed: `onepack exec` checks the credential before launching `dotnet`. Apache-2.0 license by user decision. |

@@ -1,95 +1,95 @@
-# Especificación de conformidad PyPI — hosting privado v2 (OP-027)
+# PyPI conformance specification — private hosting v2 (OP-027)
 
-> Tarea OP-027. Depende de OP-020 y OP-021 (verificadas). Entrega los contratos que OP-033
-> (adaptador), OP-034 (CLI/guías) y OP-035 (verificación mixta) necesitan; no implementa nada.
+> Task OP-027. Depends on OP-020 and OP-021 (verified). Delivers the contracts that OP-033
+> (adapter), OP-034 (CLI/guides) and OP-035 (mixed verification) need; implements nothing.
 >
-> Fuentes: `roadmap/adr-v2.md` (ADR-021…026), `roadmap/npm-v2.md` (referencia de estilo),
-> `docs/security.md`, `docs/compatibility.md`, `docs/api.md` y el código de
-> `crates/server/src` y `crates/core/src`.
+> Sources: `roadmap/adr-v2.md` (ADR-021…026), `roadmap/npm-v2.md` (style reference),
+> `docs/security.md`, `docs/compatibility.md`, `docs/api.md` and the code in
+> `crates/server/src` and `crates/core/src`.
 >
-> Baseline consultado: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
-> Fecha: 2026-10-19. Estado: **aceptado**. Revisión del 2026-10-19 por el mantenedor
-> (instrucción en la sesión de trabajo); matriz, contratos y decisiones de primer corte
-> aceptados sin cambios de alcance. La implementación corresponde a OP-033, OP-034 y OP-035.
+> Baseline consulted: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
+> Date: 2026-10-19. Status: **accepted**. Review on 2026-10-19 by the maintainer
+> (instruction in the work session); matrix, contracts and first-cut decisions
+> accepted without scope changes. Implementation corresponds to OP-033, OP-034 and OP-035.
 
-## 1. Alcance
+## 1. Scope
 
-Habilitar publicación privada con **twine** y consumo con **pip** contra un feed `pypi`:
-índice simple (HTML PEP 503 y JSON PEP 691), upload de wheels y sdists, múltiples archivos
-por versión, integridad por SHA-256, autenticación por token, inspección sin ejecutar código y
-errores estables, reutilizando roles, cuotas, auditoría y almacenamiento existentes.
+Enable private publication with **twine** and consumption with **pip** against a `pypi` feed:
+simple index (PEP 503 HTML and PEP 691 JSON), upload of wheels and sdists, multiple files
+per version, SHA-256 integrity, token authentication, inspection without running code and
+stable errors, reusing existing roles, quotas, auditing and storage.
 
-**Fuera de alcance:** proxy o espejo de PyPI; ejecutar `setup.py`, backends PEP 517 o hooks de
-build en el servidor; API JSON de PyPI; endpoints de *yank*; *search*; uploads solo de
-metadatos; `.zip` como sdist y `.egg`; poetry, uv, PDM u otros clientes no listados (no se
-verifican ni se anuncian). Documentado como limitación con condición de revisión en la
-sección 11.
+**Out of scope:** PyPI proxy or mirror; running `setup.py`, PEP 517 backends or build hooks on
+the server; PyPI JSON API; *yank* endpoints; *search*; metadata-only uploads;
+`.zip` as sdist and `.egg`; poetry, uv, PDM or other unlisted clients (not verified or
+announced). Documented as a limitation with a review condition in
+section 11.
 
-## 2. Matriz de conformidad inicial (AC-01)
+## 2. Initial conformance matrix (AC-01)
 
-Versiones candidatas; el patch exacto y la versión de Python se fijan al preparar OP-033 y una
-fila solo se publica como verificada si pasa el E2E de la sección 12.
+Candidate versions; the exact patch and Python version are fixed when preparing OP-033 and a
+row is only published as verified if it passes the E2E in section 12.
 
-| Herramienta | Rol en la matriz |
+| Tool | Role in the matrix |
 |---|---|
-| pip 25.x | consumo con `--no-cache-dir`, índice privado |
-| pip 24.x | compatibilidad con la línea anterior |
-| twine 6.x | publicación de wheel y sdist |
+| pip 25.x | consumption with `--no-cache-dir`, private index |
+| pip 24.x | compatibility with the previous line |
+| twine 6.x | wheel and sdist publication |
 
-Al preparar OP-033 se fijan los patch y se añade la versión mayor vigente si ya existe; no se
-anuncia una herramienta que no haya pasado el E2E en CI. `uv`, poetry y PDM no se verifican.
+When preparing OP-033, patches are fixed and the current major version is added if it already
+exists; a tool that has not passed the E2E in CI is not announced. `uv`, poetry and PDM are not verified.
 
-| # | Flujo | Ejemplo | Qué comprueba |
+| # | Flow | Example | What it checks |
 |---|---|---|---|
-| F1 | Upload sdist | `twine upload --repository-url ... dist/hemia_core-1.0.0.tar.gz` | Multipart, metadatos, identidad |
-| F2 | Upload wheel | `twine upload ... dist/hemia_core-1.0.0-py3-none-any.whl` | ZIP, `METADATA`, tags |
-| F3 | Varios archivos | sdist + wheel de la misma versión | `version_file` múltiple |
-| F4 | Archivo añadido después | wheel nueva en una versión ya publicada | Alta sin duplicar versión |
-| F5 | Install wheel | `pip install hemia-core --index-url ... --no-cache-dir` | Índice JSON/HTML + descarga + hash |
-| F6 | Install sdist | `pip install --no-binary :all: hemia-core ...` | Build local del sdist (no en el servidor) |
-| F7 | Dependencia privada | `hemia-app` con `Requires-Dist: hemia-lib` | Resolución desde el mismo índice |
-| F8 | Hashes | `requirements.txt` con `--hash=sha256:...` y `--require-hashes` | Integridad verificada por pip |
-| F9 | Prerelease | `pip install hemia-core --pre` | Orden PEP 440 |
-| F10 | Reintento idéntico | Segundo `twine upload` del mismo archivo | `200 OK` idempotente |
-| F11 | Bytes distintos | Mismo filename, contenido cambiado | `409 VERSION_FILE_CONFLICT` + auditoría |
-| F12 | Auth adversa | sin token, revocado, reader publicando, nombre fuera de prefijo | 401/403/404 según la sección 4 |
-| F13 | Aislamiento | token con grant solo en el feed A contra el feed B | 404 sin revelar |
-| F14 | Versión bloqueada | `pip install pkg==version_bloqueada` | Archivo fuera del índice y `410` |
+| F1 | sdist upload | `twine upload --repository-url ... dist/hemia_core-1.0.0.tar.gz` | Multipart, metadata, identity |
+| F2 | wheel upload | `twine upload ... dist/hemia_core-1.0.0-py3-none-any.whl` | ZIP, `METADATA`, tags |
+| F3 | Several files | sdist + wheel of the same version | Multiple `version_file` |
+| F4 | File added later | new wheel in an already published version | Add without duplicating version |
+| F5 | wheel install | `pip install hemia-core --index-url ... --no-cache-dir` | JSON/HTML index + download + hash |
+| F6 | sdist install | `pip install --no-binary :all: hemia-core ...` | Local sdist build (not on the server) |
+| F7 | Private dependency | `hemia-app` with `Requires-Dist: hemia-lib` | Resolution from the same index |
+| F8 | Hashes | `requirements.txt` with `--hash=sha256:...` and `--require-hashes` | Integrity verified by pip |
+| F9 | Prerelease | `pip install hemia-core --pre` | PEP 440 ordering |
+| F10 | Identical retry | Second `twine upload` of the same file | Idempotent `200 OK` |
+| F11 | Different bytes | Same filename, changed content | `409 VERSION_FILE_CONFLICT` + auditing |
+| F12 | Adversarial auth | no token, revoked, reader publishing, name outside prefix | 401/403/404 according to section 4 |
+| F13 | Isolation | token with a grant only on feed A against feed B | 404 without disclosure |
+| F14 | Blocked version | `pip install pkg==blocked_version` | File outside the index and `410` |
 
-## 3. Superficie HTTP
+## 3. HTTP surface
 
-Base: `{public_url}/pypi/{feed}` (ADR-018). El formato del feed debe ser `pypi`; si es de otro
-formato, la ruta responde `404` como `FEED_NOT_FOUND` (ADR-024).
+Base: `{public_url}/pypi/{feed}` (ADR-018). The feed format must be `pypi`; if it is of another
+format, the route responds `404` as `FEED_NOT_FOUND` (ADR-024).
 
-| Método | Ruta | Operación |
+| Method | Route | Operation |
 |---|---|---|
-| GET | `/pypi/{feed}/simple/` | Raíz del índice: todos los proyectos (HTML o JSON) |
-| GET | `/pypi/{feed}/simple/{project}/` | Página de proyecto (HTML PEP 503 o JSON PEP 691) |
-| GET, HEAD | `/pypi/{feed}/packages/{filename}` | Descarga de un archivo de distribución |
-| POST | `/pypi/{feed}/` y `/pypi/{feed}` | Upload de twine (multipart) |
-| — | `/pypi/{feed}/pypi/{project}/json` | No implementado (API JSON) |
-| — | Yank | No implementado: sin PEP 592 en el primer corte |
-| — | Search | No implementado |
+| GET | `/pypi/{feed}/simple/` | Index root: all projects (HTML or JSON) |
+| GET | `/pypi/{feed}/simple/{project}/` | Project page (PEP 503 HTML or PEP 691 JSON) |
+| GET, HEAD | `/pypi/{feed}/packages/{filename}` | Download of a distribution file |
+| POST | `/pypi/{feed}/` and `/pypi/{feed}` | twine upload (multipart) |
+| — | `/pypi/{feed}/pypi/{project}/json` | Not implemented (JSON API) |
+| — | Yank | Not implemented: no PEP 592 in the first cut |
+| — | Search | Not implemented |
 
-Detalles de ruta:
+Route details:
 
-- El `{project}` de la URL se acepta en cualquier forma que normalice al mismo proyecto
-  (PEP 503); la respuesta usa siempre el nombre normalizado. La barra final es la forma
-  canónica y también se acepta sin ella.
-- Se registran ambas variantes del POST para que twine no dependa de redirecciones.
-- `{filename}` es único dentro del feed porque codifica nombre normalizado y versión; aun así
-  el handler resuelve por proyecto + versión + archivo, no por texto libre.
-- Sin compresión de respuesta en el primer corte (`identity`), igual que NuGet y npm.
+- The `{project}` in the URL is accepted in any form that normalizes to the same project
+  (PEP 503); the response always uses the normalized name. The trailing slash is the canonical
+  form and is also accepted without it.
+- Both POST variants are registered so twine does not depend on redirects.
+- `{filename}` is unique within the feed because it encodes the normalized name and version; even so,
+  the handler resolves by project + version + file, not by free text.
+- No response compression in the first cut (`identity`), like NuGet and npm.
 
-## 4. Autenticación y autorización (AC-02)
+## 4. Authentication and authorization (AC-02)
 
-La superficie PyPI acepta **solo** `Authorization: Basic` con el token en la contraseña; el
-usuario es informativo (`__token__` por convención de las herramientas). pip y twine usan este
-mecanismo; no se acepta `X-NuGet-ApiKey` ni `Bearer` en esta superficie. Esto implica añadir
-`Surface::PyPi` a la clasificación de rutas, a `credential()` y al renderizado de errores, y
-la etiqueta `pypi` en métricas (ADR-024).
+The PyPI surface accepts **only** `Authorization: Basic` with the token in the password; the
+user is informative (`__token__` by tool convention). pip and twine use this
+mechanism; `X-NuGet-ApiKey` and `Bearer` are not accepted on this surface. This implies adding
+`Surface::PyPi` to the route classification, to `credential()` and to error rendering, and
+the `pypi` label in metrics (ADR-024).
 
-Todas las peticiones siguen autenticadas; no hay lectura anónima. Configuración del cliente:
+All requests remain authenticated; there is no anonymous read. Client configuration:
 
 ```ini
 # ~/.config/pip/pip.conf
@@ -108,104 +108,104 @@ username = __token__
 password = ${ONEPACK_TOKEN}
 ```
 
-| Caso | Resultado |
+| Case | Result |
 |---|---|
-| Token ausente, expirado, revocado o mal formado | `401 AUTH_REQUIRED` + `WWW-Authenticate: Basic realm="onepack"` |
-| Token válido sin grant en el feed | `404 FEED_NOT_FOUND` (no revela feed, proyecto ni archivo; ADR-012) |
-| `reader` intenta publicar | `403 AUTH_SCOPE_MISSING` |
-| `publisher` publica un nombre fuera de sus prefijos | `403 AUTH_PREFIX_DENIED` |
-| `reader`/`publisher`/`maintainer` leen | Permitido según rol acumulativo |
-| `maintainer` o admin | Publicación y bloqueo vía API administrativa |
+| Missing, expired, revoked or malformed token | `401 AUTH_REQUIRED` + `WWW-Authenticate: Basic realm="onepack"` |
+| Valid token without a grant on the feed | `404 FEED_NOT_FOUND` (does not reveal feed, project or file; ADR-012) |
+| `reader` tries to publish | `403 AUTH_SCOPE_MISSING` |
+| `publisher` publishes a name outside its prefixes | `403 AUTH_PREFIX_DENIED` |
+| `reader`/`publisher`/`maintainer` read | Allowed according to cumulative role |
+| `maintainer` or admin | Publication and blocking via the administrative API |
 
-Reglas adicionales:
+Additional rules:
 
-- Lectura: `Access::Read` del feed. Índice, página de proyecto y descarga comparten decisión;
-  un error nunca incluye nombres de proyectos ni de archivos de otros feeds.
-- Publicación: `Access::Publish` + patrón del grant sobre el `package_key` (nombre
-  normalizado; ADR-022). Ejemplos: `hemia-*` cubre `hemia-core`, `hemia.logging` normaliza a
+- Read: `Access::Read` on the feed. Index, project page and download share the decision;
+  an error never includes project or file names from other feeds.
+- Publication: `Access::Publish` + grant pattern on `package_key` (normalized
+  name; ADR-022). Examples: `hemia-*` covers `hemia-core`, `hemia.logging` normalizes to
   `hemia-logging`.
-- La revocación surte efecto en la siguiente petición; pip puede guardar credenciales en
-  netrc/keyring, así que la documentación recordará refrescarlas tras revocar.
-- TLS: pip y twine envían credenciales por HTTPS. El despliegue exige HTTPS en el proxy
-  inverso y `public_url` HTTPS; el servidor no confía en `X-Forwarded-For` (ADR-018).
+- Revocation takes effect on the next request; pip may store credentials in
+  netrc/keyring, so the documentation will remind users to refresh them after revoking.
+- TLS: pip and twine send credentials over HTTPS. Deployment requires HTTPS at the reverse
+  proxy and an HTTPS `public_url`; the server does not trust `X-Forwarded-For` (ADR-018).
 
-## 5. Identidad, versiones y conflictos
+## 5. Identity, versions and conflicts
 
-Reglas del adaptador (ADR-022); la implementación reproducirá PEP 503, PEP 508 y PEP 440 con
-corpus de conformidad.
+Adapter rules (ADR-022); the implementation will reproduce PEP 503, PEP 508 and PEP 440 with a
+conformance corpus.
 
-| Regla | Detalle |
+| Rule | Detail |
 |---|---|
-| Normalización de nombre | PEP 503: minúsculas y runs de `-`, `_`, `.` → `-` |
-| Forma válida del nombre | PEP 508: letras, dígitos y `-_.` en el interior, empieza y termina alfanumérico; ≤ 100 caracteres por política del registro |
-| `package_key` | Nombre normalizado |
-| Versión | PEP 440 canónica: epoch, release, pre (`a`/`b`/`rc`), post, dev y local (`+local`) |
-| Identidad de versión (`version_key`) | Cadena canónica completa, incluido epoch y local; dos textos que comparan igual pero difieren (`1.0` y `1.0.0`) son identidades distintas |
-| Orden | PEP 440; `is_prerelease` para pre y dev |
-| Archivos | No crean identidad: se agregan a la versión; `{filename}` es su clave dentro del feed |
+| Name normalization | PEP 503: lowercase and runs of `-`, `_`, `.` → `-` |
+| Valid name form | PEP 508: letters, digits and `-_.` inside, starts and ends alphanumeric; ≤ 100 characters per registry policy |
+| `package_key` | Normalized name |
+| Version | Canonical PEP 440: epoch, release, pre (`a`/`b`/`rc`), post, dev and local (`+local`) |
+| Version identity (`version_key`) | Full canonical string, including epoch and local; two texts that compare equal but differ (`1.0` and `1.0.0`) are different identities |
+| Ordering | PEP 440; `is_prerelease` for pre and dev |
+| Files | They do not create identity: they are added to the version; `{filename}` is their key within the feed |
 
-| Publicación | Nombre / versión | Resultado |
+| Publication | Name / version | Result |
 |---|---|---|
-| `Zope.Interface` `5.0` | `zope-interface` / `5.0` | Aceptada con nombre normalizado |
-| `hemia.core` `1.0rc1` | `hemia-core` / `1.0rc1` | Aceptada, prerelease |
-| `hemia-core` `1.0.post1` | `hemia-core` / `1.0.post1` | Distinta de `1.0`; aceptada |
-| `hemia-core` `1!2.0` | `hemia-core` / `1!2.0` | Epoch canónico; aceptada |
-| `hemia-core` `1.0+ubuntu.1` | `hemia-core` / `1.0+ubuntu.1` | Distinta de `1.0`; aceptada |
-| `hemia-core` `v1.0` | `hemia-core` / `1.0` | Aceptada; el prefijo `v` se normaliza |
-| `hemia-core` `1.0.0` tras `1.0` | `hemia-core` / `1.0.0` | Identidad distinta; aceptada (comparan igual, no son la misma versión) |
-| `Hemía` | — | Rechazada: nombre no ASCII |
+| `Zope.Interface` `5.0` | `zope-interface` / `5.0` | Accepted with normalized name |
+| `hemia.core` `1.0rc1` | `hemia-core` / `1.0rc1` | Accepted, prerelease |
+| `hemia-core` `1.0.post1` | `hemia-core` / `1.0.post1` | Different from `1.0`; accepted |
+| `hemia-core` `1!2.0` | `hemia-core` / `1!2.0` | Canonical epoch; accepted |
+| `hemia-core` `1.0+ubuntu.1` | `hemia-core` / `1.0+ubuntu.1` | Different from `1.0`; accepted |
+| `hemia-core` `v1.0` | `hemia-core` / `1.0` | Accepted; the `v` prefix is normalized |
+| `hemia-core` `1.0.0` after `1.0` | `hemia-core` / `1.0.0` | Different identity; accepted (they compare equal, they are not the same version) |
+| `Hemía` | — | Rejected: non-ASCII name |
 
-## 6. Publicación (upload)
+## 6. Publication (upload)
 
-twine envía `POST` multipart a la URL del repositorio:
+twine sends a multipart `POST` to the repository URL:
 
-- `:action = file_upload` y `protocol_version = 1`; cualquier otra acción se rechaza con
+- `:action = file_upload` and `protocol_version = 1`; any other action is rejected with
   `400 PUBLISH_BODY_INVALID`.
-- `name`, `version`, `filetype` (`sdist` o `bdist_wheel`) y `pyversion`, validados contra el
-  archivo. Los campos de core metadata (resumen, clasificadores, `requires_dist`,
-  `requires_python`, etc.) se aceptan como entrada, pero **la fuente autoritativa es la
-  metadata dentro del archivo** (`METADATA` o `PKG-INFO`); los campos del formulario solo se
-  validan y los desconocidos se ignoran.
-- `content` con el archivo y su nombre. `sha256_digest` opcional: si viene, debe coincidir con
-  el calculado; `md5_digest` y demás se ignoran.
+- `name`, `version`, `filetype` (`sdist` or `bdist_wheel`) and `pyversion`, validated against the
+  file. Core metadata fields (summary, classifiers, `requires_dist`,
+  `requires_python`, etc.) are accepted as input, but **the authoritative source is the
+  metadata inside the file** (`METADATA` or `PKG-INFO`); form fields are only
+  validated and unknown ones are ignored.
+- `content` with the file and its name. Optional `sha256_digest`: if present, it must match
+  the computed one; `md5_digest` and others are ignored.
 
-Procesamiento acotado:
+Bounded processing:
 
-1. El multipart se recorre en streaming hacia `staging/`; el archivo `content` usa el límite
-   comprimido compartido `max_package_bytes` (100 MiB) y los campos de texto un tope de 1 MiB
-   en conjunto.
-2. La inspección de la sección 8 valida el archivo y extrae la metadata.
-3. El blob entra por SHA-256 y se persiste una fila de `version_file` con `kind = wheel` o
-   `sdist` y el filename original (ADR-023). No se necesitan tablas nuevas.
+1. The multipart is traversed in streaming into `staging/`; the `content` file uses the shared
+   compressed limit `max_package_bytes` (100 MiB) and text fields a cap of 1 MiB
+   in total.
+2. The inspection in section 8 validates the file and extracts the metadata.
+3. The blob enters by SHA-256 and a `version_file` row is persisted with `kind = wheel` or
+   `sdist` and the original filename (ADR-023). No new tables are needed.
 
-Reglas de archivos:
+File rules:
 
-- Una versión se crea con su primer archivo; los siguientes se agregan a la misma versión si
-  su filename no existe.
-- **Reintento idéntico:** mismo filename y mismo SHA-256 → `200 OK` idempotente, sin escritura
-  nueva y con la misma semántica que ADR-007. Es el caso de un `twine upload` reintentado.
-- **Conflicto:** mismo filename con bytes distintos → `409 VERSION_FILE_CONFLICT`, auditado
-  (`package.publish`, `denied`). twine puede evitar el reintento con `--skip-existing`, que
-  consulta el índice; el registro no delega la decisión en el cliente.
-- La cuota y la auditoría se aplican como en NuGet/npm; el `created_at` de la versión no
-  cambia al añadir archivos.
-- No se ejecuta `setup.py`, backend PEP 517 ni hook alguno; el registro solo lee y valida.
+- A version is created with its first file; subsequent ones are added to the same version if
+  their filename does not exist.
+- **Identical retry:** same filename and same SHA-256 → idempotent `200 OK`, without a new
+  write and with the same semantics as ADR-007. This is the case of a retried `twine upload`.
+- **Conflict:** same filename with different bytes → `409 VERSION_FILE_CONFLICT`, audited
+  (`package.publish`, `denied`). twine can avoid the retry with `--skip-existing`, which
+  queries the index; the registry does not delegate the decision to the client.
+- Quota and auditing are applied as in NuGet/npm; the version's `created_at` does not
+  change when files are added.
+- No `setup.py`, PEP 517 backend or hook is executed; the registry only reads and validates.
 
-## 7. Lectura
+## 7. Read
 
-Página de proyecto en HTML (PEP 503):
+Project page in HTML (PEP 503):
 
 ```html
 <a href="{public_url}/pypi/{feed}/packages/{filename}#sha256={hex}"
    data-requires-python="&gt;=3.9">{filename}</a>
 ```
 
-- Un ancla por archivo, con `#sha256=` obligatorio para que pip verifique.
-- `data-requires-python` se copia escapado de la metadata si existe; `data-yanked` no se usa
-  en el primer corte.
-- La raíz `/simple/` lista los proyectos (nombre normalizado) enlazando a su página.
+- One anchor per file, with `#sha256=` mandatory so pip can verify.
+- `data-requires-python` is copied escaped from the metadata if it exists; `data-yanked` is not used
+  in the first cut.
+- The `/simple/` root lists the projects (normalized name) linking to their page.
 
-Página de proyecto en JSON (PEP 691, `Accept: application/vnd.pypi.simple.v1+json`):
+Project page in JSON (PEP 691, `Accept: application/vnd.pypi.simple.v1+json`):
 
 ```json
 {
@@ -223,148 +223,148 @@ Página de proyecto en JSON (PEP 691, `Accept: application/vnd.pypi.simple.v1+js
 }
 ```
 
-pip negocia JSON y cae a HTML si no lo entiende; ambos se sirven desde el mismo estado.
+pip negotiates JSON and falls back to HTML if it does not understand it; both are served from the same state.
 
-- Descarga: `application/octet-stream`, soporte de `HEAD`, sin rangos, sin compresión.
-- Versión bloqueada (ADR-013): sus archivos **se omiten del índice** y la descarga directa
-  responde `410 PACKAGE_BLOCKED`. Es una decisión distinta de NuGet a propósito: en pip, un
-  yanked seguiría instalándose con un pin exacto, y el bloqueo debe impedirlo. La versión
-  sigue visible por la API administrativa.
-- `data-dist-info-metadata` (PEP 658) no se implementa; pip cae a descargar la wheel para leer
-  la metadata, que es el comportamiento correcto sin esa extensión.
+- Download: `application/octet-stream`, `HEAD` support, no ranges, no compression.
+- Blocked version (ADR-013): its files **are omitted from the index** and direct download
+  responds `410 PACKAGE_BLOCKED`. This is deliberately different from NuGet: in pip, a
+  yanked version would still be installed with an exact pin, and blocking must prevent that. The version
+  remains visible through the administrative API.
+- `data-dist-info-metadata` (PEP 658) is not implemented; pip falls back to downloading the wheel to read
+  the metadata, which is the correct behavior without that extension.
 
-## 8. Validación de ZIP/tar y metadatos (AC-03)
+## 8. ZIP/tar and metadata validation (AC-03)
 
-La inspección corre como las de NuGet/npm: en el pool bloqueante, con semáforo propio y plazo
-(ADR-014). Se reutilizan las reglas de rutas ya probadas, adaptadas al tipo de archivo.
+Inspection runs like NuGet/npm's: in the blocking pool, with its own semaphore and deadline
+(ADR-014). The already tested path rules are reused, adapted to the file type.
 
-| Límite | Por defecto |
+| Limit | Default |
 |---|---|
-| Tamaño comprimido | `max_package_bytes` compartido (100 MiB) |
-| Tamaño descomprimido total | 512 MiB |
-| Entradas ZIP (wheel) | 20 000 |
-| Entradas tar (sdist) | 50 000 |
+| Compressed size | shared `max_package_bytes` (100 MiB) |
+| Total uncompressed size | 512 MiB |
+| ZIP entries (wheel) | 20,000 |
+| tar entries (sdist) | 50,000 |
 | `METADATA` / `PKG-INFO` | 1 MiB |
-| Tiempo de inspección | 30 s |
-| Inspecciones simultáneas | las de NuGet |
+| Inspection time | 30 s |
+| Simultaneous inspections | those of NuGet |
 
 **Wheel (ZIP):**
 
-- Mismas reglas que el `.nupkg` (Fase 5): número de entradas, tamaños declarados, rutas
-  peligrosas, duplicados sin distinguir mayúsculas, enlaces simbólicos y entradas cifradas.
-- Debe existir exactamente un `{name}-{version}.dist-info/METADATA` que corresponda al
-  filename y a la URL; la metadata se parsea con topes y sin ejecutar nada.
-- El filename cumple PEP 427 (distribución escapada con `_`, versión PEP 440, tags); los
-  componentes se validan con corpus en OP-033.
+- Same rules as the `.nupkg` (Phase 5): number of entries, declared sizes, dangerous
+  paths, case-insensitive duplicates, symbolic links and encrypted entries.
+- Exactly one `{name}-{version}.dist-info/METADATA` must exist and correspond to the
+  filename and the URL; the metadata is parsed with caps and without executing anything.
+- The filename complies with PEP 427 (distribution escaped with `_`, PEP 440 version, tags); the
+  components are validated with a corpus in OP-033.
 
 **Sdist (`*.tar.gz`):**
 
-- Mismas reglas que el tarball npm: gzip de un solo miembro, solo archivos y directorios, sin
-  symlinks, hardlinks, dispositivos, FIFOs, sparse ni entradas cifradas.
-- Un único directorio raíz `{name}-{version}/` con `PKG-INFO` dentro; se rechaza cualquier
-  ruta absoluta, `..`, con caracteres de control o fuera de ese directorio.
+- Same rules as the npm tarball: single-member gzip, only files and directories, no
+  symlinks, hardlinks, devices, FIFOs, sparse or encrypted entries.
+- A single root directory `{name}-{version}/` with `PKG-INFO` inside; any
+  absolute path, `..`, control characters or path outside that directory is rejected.
 
-**Metadatos:**
+**Metadata:**
 
-- `name` y `version` normalizados/canonicalizados deben coincidir con el filename, la URL y
-  los campos del formulario; `Requires-Python` alimenta el índice y `Summary`/clasificadores
-  alimentan `search_text`.
-- Los artefactos peligrosos se rechazan sin persistir y se auditan con su código.
+- Normalized/canonicalized `name` and `version` must match the filename, the URL and
+  the form fields; `Requires-Python` feeds the index and `Summary`/classifiers
+  feed `search_text`.
+- Dangerous artifacts are rejected without persisting and audited with their code.
 
-Fixtures adversos previstos (OP-033): wheel con traversal, ZIP bomb, entradas duplicadas,
-symlink y entrada cifrada; sdist con traversal, symlink, hardlink, gzip bomb y 50 001
-entradas; filename o metadata que no coinciden con nombre/versión; `METADATA` ausente,
-sobredimensionada o con JSON/RFC 822 inválido; `sha256_digest` que miente; archivo mayor que
-el límite; acción distinta de `file_upload`.
+Adversarial fixtures planned (OP-033): wheel with traversal, ZIP bomb, duplicate entries,
+symlink and encrypted entry; sdist with traversal, symlink, hardlink, gzip bomb and 50,001
+entries; filename or metadata that do not match name/version; missing `METADATA`,
+oversized or with invalid JSON/RFC 822; `sha256_digest` that lies; file larger than
+the limit; action other than `file_upload`.
 
-## 9. Errores
+## 9. Errors
 
-Formato de error de la superficie PyPI: JSON `{"error": "<CODE>: <mensaje>", "reason":
-"<mensaje>", "code": "<CODE>"}`; el prefijo estable es el mismo `CODE` de las demás
-superficies y twine/pip muestran el texto.
+PyPI surface error format: JSON `{"error": "<CODE>: <message>", "reason":
+"<message>", "code": "<CODE>"}`; the stable prefix is the same `CODE` as the other
+surfaces and twine/pip display the text.
 
-| Código | HTTP | Cuándo |
+| Code | HTTP | When |
 |---|---|---|
-| `AUTH_REQUIRED` | 401 | Token ausente, inválido, expirado o revocado |
-| `FEED_NOT_FOUND` | 404 | Feed inexistente, sin grant o de otro formato |
-| `AUTH_SCOPE_MISSING` | 403 | Rol insuficiente para la operación |
-| `AUTH_PREFIX_DENIED` | 403 | Nombre fuera de los prefijos del grant |
-| `PACKAGE_NOT_FOUND` | 404 | Proyecto, versión o archivo inexistente con acceso al feed |
-| `PUBLISH_BODY_INVALID` | 400 | Acción, campos o formulario que no cumplen la sección 6 |
-| `FILENAME_MISMATCH` | 400 | Filename que no corresponde al nombre/versión |
-| `WHEEL_INVALID` | 400 | ZIP inválido, `METADATA` ausente o incoherente |
-| `SDIST_INVALID` | 400 | tar.gz inválido o estructura inesperada |
-| `PACKAGE_UNSAFE_PATH` | 400 | Ruta o entrada peligrosa o duplicada |
-| `METADATA_INVALID` | 400 | Metadata ilegible, incoherente o sobredimensionada |
-| `VERSION_FILE_CONFLICT` | 409 | Mismo filename con bytes distintos |
-| `PACKAGE_LIMIT_EXCEEDED` | 413 | Se supera un límite de inspección o el plazo |
-| `PACKAGE_TOO_LARGE` | 413 | Se supera el tamaño comprimido |
-| `FEED_QUOTA_VERSIONS` | 403 | Cuota de versiones superada |
-| `FEED_QUOTA_STORAGE` | 413 | Cuota de almacenamiento superada |
-| `PACKAGE_BLOCKED` | 410 | Descarga de un archivo de versión bloqueada |
-| `UPLOADS_BUSY` | 503 | Sin plazas de subida |
-| `UPLOAD_TIMEOUT` | 408 | Subida agotó el plazo |
-| `RATE_LIMITED` | 429 | Límite por principal o IP |
-| `INTERNAL` | 500 | Error no clasificado |
+| `AUTH_REQUIRED` | 401 | Missing, invalid, expired or revoked token |
+| `FEED_NOT_FOUND` | 404 | Nonexistent feed, without grant or of another format |
+| `AUTH_SCOPE_MISSING` | 403 | Insufficient role for the operation |
+| `AUTH_PREFIX_DENIED` | 403 | Name outside the grant prefixes |
+| `PACKAGE_NOT_FOUND` | 404 | Nonexistent project, version or file with feed access |
+| `PUBLISH_BODY_INVALID` | 400 | Action, fields or form that do not comply with section 6 |
+| `FILENAME_MISMATCH` | 400 | Filename that does not correspond to name/version |
+| `WHEEL_INVALID` | 400 | Invalid ZIP, missing or inconsistent `METADATA` |
+| `SDIST_INVALID` | 400 | Invalid tar.gz or unexpected structure |
+| `PACKAGE_UNSAFE_PATH` | 400 | Dangerous or duplicate path or entry |
+| `METADATA_INVALID` | 400 | Unreadable, inconsistent or oversized metadata |
+| `VERSION_FILE_CONFLICT` | 409 | Same filename with different bytes |
+| `PACKAGE_LIMIT_EXCEEDED` | 413 | An inspection limit or the deadline is exceeded |
+| `PACKAGE_TOO_LARGE` | 413 | The compressed size is exceeded |
+| `FEED_QUOTA_VERSIONS` | 403 | Version quota exceeded |
+| `FEED_QUOTA_STORAGE` | 413 | Storage quota exceeded |
+| `PACKAGE_BLOCKED` | 410 | Download of a file from a blocked version |
+| `UPLOADS_BUSY` | 503 | No upload slots |
+| `UPLOAD_TIMEOUT` | 408 | Upload exhausted the deadline |
+| `RATE_LIMITED` | 429 | Limit per principal or IP |
+| `INTERNAL` | 500 | Unclassified error |
 
-## 10. Procedencia y dependency confusion (REQ-03)
+## 10. Provenance and dependency confusion (REQ-03)
 
-pip no tiene registries por scope como npm: resuelve todos los proyectos contra los índices
-configurados. Si se combina `--extra-index-url` con PyPI, un nombre privado colisionable puede
-resolverse desde el índice público (o al revés). Reglas del primer corte:
+pip does not have scoped registries like npm: it resolves all projects against the configured
+indexes. If `--extra-index-url` is combined with PyPI, a collidable private name can be
+resolved from the public index (or vice versa). First-cut rules:
 
-- La guía oficial usa **solo** `index-url` apuntando al feed privado; para dependencias
-  públicas se decide de forma explícita (publicarlas en el feed o combinarlas a conciencia).
-- El registro no puede impedir una configuración insegura del cliente; la documentación
-  (`docs/compatibility.md`, `docs/security.md`) advertirá el riesgo y mostrará la
-  configuración recomendada.
-- Los patrones de publicación por prefijo y la auditoría de uploads reducen la apropiación de
-  nombres dentro del feed; no sustituyen la política de nombres del usuario.
-- `pip` no consulta ningún índice público por sí solo: si el usuario no configura
-  `extra-index-url`, la resolución es solo privada.
+- The official guide uses **only** `index-url` pointing to the private feed; for public
+  dependencies it is decided explicitly (publish them to the feed or combine them deliberately).
+- The registry cannot prevent an insecure client configuration; the documentation
+  (`docs/compatibility.md`, `docs/security.md`) will warn about the risk and show the
+  recommended configuration.
+- Publication patterns by prefix and upload auditing reduce name squatting
+  within the feed; they do not replace the user's naming policy.
+- `pip` does not query any public index on its own: if the user does not configure
+  `extra-index-url`, resolution is private only.
 
-## 11. Estados, retirada y yank (decisión aceptada)
+## 11. States, withdrawal and yank (accepted decision)
 
-- **Sin `yank` (PEP 592) en el primer corte.** No se implementa el endpoint ni
-  `data-yanked`. La retirada efectiva es el bloqueo administrativo existente (ADR-013), que
-  omite archivos del índice y responde `410`.
-- **No hay borrado de archivos ni versiones** (ADR-005): la inmutabilidad se aplica por
-  filename, no por versión completa. Añadir otro archivo a una versión existente es válido;
-  repetir un filename con bytes distintos se rechaza y se audita.
-- La decisión de idempotencia del reintento idéntico es la de ADR-007 aplicada por archivo;
-  no se traslada la inmutabilidad de versión NuGet a la versión Python, que puede tener varias
-  distribuciones.
-- Condición de revisión: si el piloto pide yank, se abre una tarea de evolución con su
-  migración antes de ampliar el alcance.
+- **No `yank` (PEP 592) in the first cut.** Neither the endpoint nor
+  `data-yanked` is implemented. Effective withdrawal is the existing administrative block (ADR-013), which
+  omits files from the index and responds `410`.
+- **There is no deletion of files or versions** (ADR-005): immutability is applied per
+  filename, not per complete version. Adding another file to an existing version is valid;
+  repeating a filename with different bytes is rejected and audited.
+- The idempotency decision for the identical retry is ADR-007 applied per file;
+  NuGet version immutability is not transferred to the Python version, which can have several
+  distributions.
+- Review condition: if the pilot requests yank, an evolution task is opened with its
+  migration before expanding the scope.
 
-## 12. Pruebas y handoff
+## 12. Tests and handoff
 
-- **Corpus de identidad:** nombres PEP 508/503 y versiones PEP 440 (epoch, pre, post, dev,
-  local, `v` prefijo, comparaciones `1.0`/`1.0.0`), con casos límite de filename de wheel.
-- **Unitarias del adaptador:** multipart, extracción de `METADATA`/`PKG-INFO`, integridad,
-  orden, render HTML y JSON del índice.
-- **Integración de servidor:** auth por superficie, 401/403/404, reintento idéntico,
-  `VERSION_FILE_CONFLICT`, cuotas y auditoría, aislamiento entre feeds.
-- **Seguridad:** fixtures adversos de la sección 8, sin persistencia.
-- **E2E real:** guion `scripts/e2e-pypi.sh` (patrón de `scripts/e2e-dotnet.sh`) y job de CI con
-  la matriz de la sección 2: F1–F14 con pip y twine reales, caché vacía y dependencia privada.
-- **Docs a actualizar al implementar:** `docs/security.md` (límites, errores y fixtures
-  Python), `docs/compatibility.md` (matriz pip/twine y advertencia de dependency confusion),
-  `docs/cli.md` o la guía de uso (`.pypirc`, `pip.conf`). La spec no las modifica todavía.
-- **Handoff:** OP-033 crea `onepack-pypi` (ADR-026), registra las rutas aprobadas y reutiliza
-  `version_file` sin migración nueva; OP-034 decide los comandos y guías; OP-035 verifica el
-  registro mixto. Ninguna dependencia de Python entra en `core`, `storage` ni el runtime.
+- **Identity corpus:** PEP 508/503 names and PEP 440 versions (epoch, pre, post, dev,
+  local, `v` prefix, `1.0`/`1.0.0` comparisons), with wheel filename edge cases.
+- **Adapter unit tests:** multipart, `METADATA`/`PKG-INFO` extraction, integrity,
+  ordering, HTML and JSON index rendering.
+- **Server integration:** per-surface auth, 401/403/404, identical retry,
+  `VERSION_FILE_CONFLICT`, quotas and auditing, isolation between feeds.
+- **Security:** adversarial fixtures from section 8, without persistence.
+- **Real E2E:** `scripts/e2e-pypi.sh` script (pattern of `scripts/e2e-dotnet.sh`) and CI job with
+  the matrix from section 2: F1–F14 with real pip and twine, empty cache and private dependency.
+- **Docs to update when implementing:** `docs/security.md` (limits, errors and
+  Python fixtures), `docs/compatibility.md` (pip/twine matrix and dependency confusion warning),
+  `docs/cli.md` or the usage guide (`.pypirc`, `pip.conf`). The spec does not modify them yet.
+- **Handoff:** OP-033 creates `onepack-pypi` (ADR-026), registers the approved routes and reuses
+  `version_file` without a new migration; OP-034 decides the commands and guides; OP-035 verifies the
+  mixed registry. No Python dependency enters `core`, `storage` or the runtime.
 
-## 13. Verificación de esta especificación
+## 13. Verification of this specification
 
-- AC-01: contrato de upload, índice y descargas de las secciones 3, 6 y 7; fixtures de wheel,
-  sdist, prerelease y dependencia privada en las secciones 2 y 12.
-- AC-02: decisión de archivos de la sección 11 (añadir otro archivo; bytes distintos
-  rechazados y auditados) y auth sin filtración de metadatos de la sección 4.
-- AC-03: plan con pip desde caché vacía y fixtures adversos de la sección 8, incluidos los
-  accesos sin permiso de la sección 4.
-- AC-CIERRE: cerrado con la aceptación registrada del 2026-10-19, la nota OP-027 y el
-  backlog sincronizados.
+- AC-01: upload, index and download contract from sections 3, 6 and 7; wheel,
+  sdist, prerelease and private dependency fixtures in sections 2 and 12.
+- AC-02: file decision from section 11 (adding another file; different bytes
+  rejected and audited) and auth without metadata leakage from section 4.
+- AC-03: plan with pip from an empty cache and adversarial fixtures from section 8, including
+  the unauthorized accesses from section 4.
+- AC-CIERRE: closed with the recorded acceptance of 2026-10-19, the OP-027 note and the
+  backlog synchronized.
 
-Evidencia: ruta de este documento, SHA-256 del contenido aceptado, commit local `7d9d1dd`
-(entrega) y la aceptación registrada en Obsidian el 2026-10-19.
+Evidence: path of this document, SHA-256 of the accepted content, local commit `7d9d1dd`
+(delivery) and the acceptance recorded in Obsidian on 2026-10-19.
