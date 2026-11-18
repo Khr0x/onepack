@@ -1,7 +1,7 @@
 # Instalación
 
 > Fase 7. Servidor en Linux (x86-64 o ARM64) con systemd, o en contenedor. CLI en Linux, macOS y Windows.
-> Última actualización: 2026-10-04
+> Última actualización: 2026-11-17
 
 ## 1. Descargar y verificar
 
@@ -59,7 +59,15 @@ La unidad:
 
 ## 3. Contenedor
 
-[`packaging/container/Containerfile`](../../packaging/container/Containerfile): binario estático sobre `distroless/static`, usuario 65532 sin privilegios y volumen `/data`.
+Cada release publica `ghcr.io/khr0x/onepack:vX.Y.Z` para `linux/amd64` y `linux/arm64`, construida con los binarios verificados del release. El [`compose.yaml`](../../compose.yaml) del repositorio es el atajo para el quick start:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/compose.yaml
+docker compose run --rm onepackd init
+docker compose up -d
+```
+
+Para construir la imagen desde el código, [`packaging/container/Containerfile`](../../packaging/container/Containerfile) usa un binario estático sobre `distroless/static`, usuario 65532 sin privilegios y volumen `/data`:
 
 ```bash
 docker build -f packaging/container/Containerfile -t onepackd .
@@ -70,6 +78,8 @@ docker run -d --name onepackd --restart unless-stopped \
   -e ONEPACK_PUBLIC_URL=https://packages.example.com \
   -v onepack-data:/data onepackd
 ```
+
+El workflow de release también usa [`Containerfile.release`](../../packaging/container/Containerfile.release), que copia los `onepackd` ya construidos para no recompilar Rust dentro de la imagen.
 
 La imagen escucha en `0.0.0.0:8080` (API y NuGet) y `0.0.0.0:9464` (métricas y sondas): publica ese segundo puerto solo hacia la red interna. Para el backup, ejecuta `onepackd backup` en otro contenedor con el mismo volumen ([backup](backup-restore.md)).
 

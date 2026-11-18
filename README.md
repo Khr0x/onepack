@@ -50,53 +50,41 @@ The project is being built as a **multi-ecosystem registry**, starting with NuGe
 
 ## Installation
 
-### Build from source
-
-Install [rustup](https://rustup.rs) and Git. The repository pins its Rust toolchain in [`rust-toolchain.toml`](rust-toolchain.toml).
-
-```bash
-git clone https://github.com/Khr0x/onepack.git
-cd onepack
-cargo build --release -p onepack-server -p onepack-cli
-export PATH="$PWD/target/release:$PATH"
-
-onepackd --version
-onepack --version
-```
-
-`onepackd` runs the registry. Developer workstations and CI agents only need `onepack` when using its administration or credential helpers; NuGet clients connect directly to the registry.
-
-For binary installation and deployment options, see the [CLI installation guide](docs/install-cli.md) and [server installation guide](docs/runbooks/install.md).
+The recommended path is the [quick start](#quick-start): the registry runs in the published container and the CLI is installed from a signed release. For binary, systemd and reverse-proxy options, see the [CLI installation guide](docs/install-cli.md) and [server installation guide](docs/runbooks/install.md). To build from source, see [Contributing](#contributing).
 
 ## Quick start
 
-The following example runs a local registry from the repository directory after building the binaries. The commands use a bash-compatible shell.
+This starts a local registry in Docker and installs the CLI. It uses HTTP on `127.0.0.1`; use HTTPS for anything beyond local development. The commands use a bash-compatible shell.
 
-### 1. Initialize and start the registry
+> The `v0.1.0` release and its container image are published from the same repository. Until they are available, use [build from source](#contributing) or run the container locally from the repository.
+
+### 1. Start the registry
 
 ```bash
-onepackd init --data-dir ./data
-onepackd serve --data-dir ./data --public-url http://127.0.0.1:8080
+curl -fsSLO https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/compose.yaml
+docker compose run --rm onepackd init
+docker compose up -d
 ```
 
-Keep the server running. Initialization creates the data directory and writes the initial administrative token to `./data/initial-admin-token`.
+Initialization creates the data volume and writes the initial administrative token to `/data/initial-admin-token` in the container.
 
-### 2. Connect the CLI and create a feed
-
-In another terminal, from the same repository directory:
+### 2. Install the CLI and create a feed
 
 ```bash
-export PATH="$PWD/target/release:$PATH"
+curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+
 onepack context add local --url http://127.0.0.1:8080
-onepack login --token-stdin < ./data/initial-admin-token
+docker compose exec -T onepackd cat /data/initial-admin-token | onepack login --token-stdin
 onepack whoami
 onepack feed create internal
+docker compose exec onepackd rm /data/initial-admin-token
 ```
 
 `login` stores the credential in the system keychain. On a headless machine without a keychain, supply it through the environment instead:
 
 ```bash
-export ONEPACK_TOKEN="$(cat ./data/initial-admin-token)"
+export ONEPACK_TOKEN="$(docker compose exec -T onepackd cat /data/initial-admin-token)"
 onepack whoami
 onepack feed create internal
 ```
@@ -162,6 +150,22 @@ onepack doctor --feed internal
 Bug reports, documentation improvements, and focused pull requests are welcome. [Open an issue](https://github.com/Khr0x/onepack/issues) to report a reproducible problem or discuss a larger change before implementing it.
 
 For bug reports, include the onepack version, operating system, reproduction steps, and relevant output with credentials removed.
+
+### Build from source
+
+Install [rustup](https://rustup.rs) and Git. The repository pins its Rust toolchain in [`rust-toolchain.toml`](rust-toolchain.toml).
+
+```bash
+git clone https://github.com/Khr0x/onepack.git
+cd onepack
+cargo build --release -p onepack-server -p onepack-cli
+export PATH="$PWD/target/release:$PATH"
+
+onepackd --version
+onepack --version
+```
+
+`onepackd` runs the registry. Developer workstations and CI agents only need `onepack` when using its administration or credential helpers; NuGet clients connect directly to the registry.
 
 To work on the project, install rustup and the .NET 8 SDK for the conformance tests, then run:
 

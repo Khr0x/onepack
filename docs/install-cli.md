@@ -2,7 +2,25 @@
 
 > Phase 8. How to install, configure and update the CLI on a workstation, a server or a CI agent.
 > For the server (`onepackd`), see [installation](runbooks/install.md).
-> Last updated: 2026-10-08
+> Last updated: 2026-11-17
+
+## Quick install (Linux and macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+onepack --version
+```
+
+The script detects the OS and architecture, downloads the signed release archive, verifies it against `SHA256SUMS`, and installs `onepack` in `~/.local/bin` by default. Useful variables:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | ONEPACK_VERSION=0.1.0 sh
+curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | ONEPACK_INSTALL_DIR=/usr/local/bin sh
+curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | ONEPACK_INSTALL_SERVER=1 sh
+```
+
+Para instalar en `/usr/local/bin`, ejecuta el script con permisos suficientes (`sudo`). Los binarios de macOS todavía no están notarizados; Gatekeeper puede bloquearlos hasta que el proceso de release añada notarización. Para una descarga manual, verificación de checksum/Sigstore y autocompletado, continúa abajo.
 
 ## Supported platforms
 
