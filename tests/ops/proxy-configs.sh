@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Valida la sintaxis de los ejemplos de reverse proxy con las imágenes oficiales de Nginx y
-# Caddy (Fase 7).
+# Validates the syntax of the reverse proxy examples with the official Nginx and
+# Caddy images (Phase 7).
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 certs=$(mktemp -d)

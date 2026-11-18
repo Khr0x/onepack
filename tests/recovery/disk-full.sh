@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Prueba bloqueante de la Fase 2: disco lleno durante una subida.
-# Esperado: error controlado (507), nada en staging, ningún metadato apunta a un blob
-# inexistente y el servicio sigue funcionando cuando hay espacio.
+# Phase 2 blocking test: disk full during an upload.
+# Expected: controlled error (507), nothing in staging, no metadata pointing to a
+# nonexistent blob, and the service keeps working once there is space.
 #
-# Requiere Linux y sudo (monta un tmpfs pequeño como directorio de datos).
+# Requires Linux and sudo (mounts a small tmpfs as the data directory).
 set -euo pipefail
 
 if [ "$(uname -s)" != "Linux" ]; then
-  echo "disk-full: se omite (requiere Linux para montar tmpfs)"
+  echo "disk-full: skipped (requires Linux to mount tmpfs)"
   exit 0
 fi
 
@@ -31,7 +31,7 @@ cleanup() {
 trap cleanup EXIT
 
 fail() {
-  echo "disk-full FALLÓ: $*" >&2
+  echo "disk-full FAILED: $*" >&2
   cat "$work/server.log" >&2 || true
   exit 1
 }
@@ -54,7 +54,7 @@ for _ in $(seq 1 50); do
   sleep 0.2
 done
 
-# Paquetes con contenido incompresible: uno no cabe en el tmpfs y otro sí.
+# Packages with incompressible content: one does not fit in the tmpfs and the other does.
 python3 - "$work" <<'EOF'
 import os, sys, zipfile
 work = sys.argv[1]
@@ -66,27 +66,27 @@ for name, size in [("Big", 12 * 1024 * 1024), ("Small", 64 * 1024)]:
 EOF
 
 push() {
-  # El servidor puede responder antes de recibir todo el cuerpo (p. ej. 507); curl informa
-  # entonces un error de envío aunque haya recibido el código, por eso se ignora su salida.
+  # The server may respond before receiving the whole body (e.g. 507); curl then reports
+  # a send error even though it received the code, so its output is ignored.
   curl -s -o "$work/push.out" -w '%{http_code}' -X PUT "${auth[@]}" \
     -F "package=@$1;type=application/octet-stream" "$base/nuget/internal/v2/package" || true
 }
 status() { curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$1"; }
 
 code=$(push "$work/Big.nupkg")
-[ "$code" = "507" ] || fail "subida con disco lleno devolvió $code (esperado 507): $(cat "$work/push.out")"
-echo "ok: disco lleno -> 507"
+[ "$code" = "507" ] || fail "upload with a full disk returned $code (expected 507): $(cat "$work/push.out")"
+echo "ok: full disk -> 507"
 
-[ -z "$(ls -A "$data/staging")" ] || fail "quedaron archivos en staging: $(ls "$data/staging")"
-echo "ok: staging vacío"
+[ -z "$(ls -A "$data/staging")" ] || fail "files were left in staging: $(ls "$data/staging")"
+echo "ok: empty staging"
 
-[ "$(status "$base/nuget/internal/v3/flat/big/index.json")" = "404" ] || fail "la versión fallida es visible"
-echo "ok: la versión fallida no es visible"
+[ "$(status "$base/nuget/internal/v3/flat/big/index.json")" = "404" ] || fail "the failed version is visible"
+echo "ok: the failed version is not visible"
 
 code=$(push "$work/Small.nupkg")
-[ "$code" = "201" ] || fail "tras liberar espacio la publicación devolvió $code: $(cat "$work/push.out")"
+[ "$code" = "201" ] || fail "after freeing space, publishing returned $code: $(cat "$work/push.out")"
 curl -fsS "${auth[@]}" -o "$work/Small.downloaded" "$base/nuget/internal/v3/flat/small/1.0.0/small.1.0.0.nupkg"
-cmp -s "$work/Small.nupkg" "$work/Small.downloaded" || fail "el paquete descargado no coincide"
-echo "ok: el servicio sigue operativo y sirve bytes idénticos"
+cmp -s "$work/Small.nupkg" "$work/Small.downloaded" || fail "the downloaded package does not match"
+echo "ok: the service is still operational and serves identical bytes"
 
 echo "disk-full OK"
