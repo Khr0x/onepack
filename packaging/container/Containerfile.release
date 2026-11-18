@@ -1,5 +1,5 @@
-# Imagen de onepackd para releases: usa los binarios estáticos ya construidos
-# y verificados por release.yml. El contexto debe contener:
+# onepackd image for releases: uses the static binaries already built
+# and verified by release.yml. The context must contain:
 #   linux/amd64/onepackd, linux/arm64/onepackd, LICENSE, data/.keep
 #   docker buildx build --platform linux/amd64,linux/arm64 \
 #     -f packaging/container/Containerfile.release image

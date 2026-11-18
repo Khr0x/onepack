@@ -1,3 +1,3 @@
 # Onepack.Fixture.Rich
 
-Paquete de prueba de onepack.
+Test package for onepack.

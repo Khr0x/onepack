@@ -1,76 +1,76 @@
-# Backup y restauración
+# Backup and restore
 
-> Fase 7 ([ADR-017](../../roadmap/adr-mvp.md#adr-017)).
-> Última actualización: 2026-10-04
+> Phase 7 ([ADR-017](../../roadmap/adr-mvp.md#adr-017)).
+> Last updated: 2026-10-04
 
-## Qué incluye
+## What it includes
 
-`onepackd backup` produce un directorio con:
+`onepackd backup` produces a directory with:
 
-- `metadata.sqlite`: copia consistente de la base (`VACUUM INTO`, dentro de una transacción de lectura);
-- `blobs/sha256/…`: los blobs que referencia esa copia, verificados contra su hash al copiarlos;
-- `manifest.json`: versión del formato y de onepackd, versión del esquema, número de feeds y versiones, y el SHA-256 y tamaño de la base y de cada blob.
+- `metadata.sqlite`: consistent copy of the database (`VACUUM INTO`, inside a read transaction);
+- `blobs/sha256/…`: the blobs referenced by that copy, verified against their hash when copied;
+- `manifest.json`: format and onepackd version, schema version, number of feeds and versions, and the SHA-256 and size of the database and of each blob.
 
-**No incluye** la configuración del servicio (`/etc/onepack/onepackd.env` o las variables del contenedor), los certificados TLS ni la credencial administrativa inicial. Guárdalos aparte; los tokens emitidos sí sobreviven, porque la base guarda sus verificadores.
+**Does not include** the service configuration (`/etc/onepack/onepackd.env` or the container variables), TLS certificates, or the initial administrative credential. Store them separately; issued tokens do survive, because the database stores their verifiers.
 
-## Hacer un backup
+## Making a backup
 
-Con el servidor en marcha:
+With the server running:
 
 ```bash
 sudo -u onepack onepackd backup --data-dir /var/lib/onepack --output /var/backups/onepack/$(date +%Y%m%d-%H%M%S)
 ```
 
-Mientras dura, el registro está en **modo mantenimiento**:
+While it lasts, the registry is in **maintenance mode**:
 
-- las lecturas (restore, búsqueda, descargas) siguen funcionando;
-- las mutaciones (publicar, unlist, bloquear, API administrativa) reciben `503 MAINTENANCE` con `Retry-After: 30`. `dotnet nuget push` no reintenta: un pipeline que publique durante el backup falla y hay que relanzarlo. Programa los backups fuera de las horas de publicación;
-- la limpieza de blobs huérfanos se pospone.
+- reads (restore, search, downloads) keep working;
+- mutations (publish, unlist, block, administrative API) receive `503 MAINTENANCE` with `Retry-After: 30`. `dotnet nuget push` does not retry: a pipeline that publishes during the backup fails and must be rerun. Schedule backups outside publishing hours;
+- orphan blob cleanup is postponed.
 
-El mantenimiento termina al acabar el backup, también si falla. Si el proceso muere a mitad, caduca solo (`--maintenance-timeout-secs`, 1 h por defecto) o se termina a mano:
+Maintenance ends when the backup finishes, also if it fails. If the process dies midway, it expires on its own (`--maintenance-timeout-secs`, 1 h by default) or is ended manually:
 
 ```bash
 sudo -u onepack onepackd maintenance status --data-dir /var/lib/onepack
 sudo -u onepack onepackd maintenance off --data-dir /var/lib/onepack
 ```
 
-`backup` falla, sin dejar nada a medias, si el destino no está vacío, si ya hay otro mantenimiento o si un blob de origen no coincide con su hash (en ese caso, ejecuta `onepackd check`).
+`backup` fails, without leaving anything half-done, if the destination is not empty, if another maintenance is already running, or if a source blob does not match its hash (in that case, run `onepackd check`).
 
-Copia el directorio resultante fuera del servidor (otro disco, otra máquina, almacenamiento de objetos). Un `tar` basta: el manifiesto permite verificarlo después.
+Copy the resulting directory off the server (another disk, another machine, object storage). A `tar` is enough: the manifest allows verifying it later.
 
-## Restaurar
+## Restore
 
-En un directorio de datos **vacío o inexistente**, con el servicio parado:
+In an **empty or nonexistent** data directory, with the service stopped:
 
 ```bash
 sudo systemctl stop onepackd
-sudo -u onepack onepackd restore --from /ruta/al/backup --data-dir /var/lib/onepack
+sudo -u onepack onepackd restore --from /path/to/backup --data-dir /var/lib/onepack
 sudo -u onepack onepackd check --data-dir /var/lib/onepack
 sudo systemctl start onepackd
 ```
 
 `restore`:
 
-1. verifica el manifiesto, la base y cada blob contra sus hashes, **antes** de copiar nada;
-2. copia y vuelve a verificar;
-3. si el backup es de una versión anterior, aplica las migraciones (con su backup previo, [ADR-020](../../roadmap/adr-mvp.md#adr-020));
-4. comprueba la integridad del resultado.
+1. verifies the manifest, the database, and each blob against their hashes, **before** copying anything;
+2. copies and verifies again;
+3. if the backup is from an older version, applies migrations (with their prior backup, [ADR-020](../../roadmap/adr-mvp.md#adr-020));
+4. checks the integrity of the result.
 
-Si algo falla, deja el directorio vacío. Rechaza un backup de un esquema más nuevo que el binario: actualiza onepackd primero.
+If something fails, it leaves the directory empty. It rejects a backup from a schema newer than the binary: upgrade onepackd first.
 
-Si el servidor restaurado tiene otra URL pública, cambia `ONEPACK_PUBLIC_URL`: las URLs del protocolo se generan siempre a partir de ella ([ADR-018](../../roadmap/adr-mvp.md#adr-018)).
+If the restored server has a different public URL, change `ONEPACK_PUBLIC_URL`: protocol URLs are always generated from it ([ADR-018](../../roadmap/adr-mvp.md#adr-018)).
 
-## Comprobar la integridad
+## Checking integrity
 
 ```bash
-sudo -u onepack onepackd check --data-dir /var/lib/onepack          # lee y verifica cada blob
-sudo -u onepack onepackd check --data-dir /var/lib/onepack --quick  # solo existencia y tamaño
+sudo -u onepack onepackd check --data-dir /var/lib/onepack          # reads and verifies each blob
+sudo -u onepack onepackd check --data-dir /var/lib/onepack --quick  # existence and size only
 ```
 
-Informa de:
+It reports:
 
-- blobs **faltantes**: esas versiones no se pueden descargar;
-- blobs **dañados**: tamaño o hash distinto;
-- huérfanos: archivos que ninguna versión referencia y que la limpieza elimina tras el periodo de gracia.
+- **missing** blobs: those versions cannot be downloaded;
+- **corrupted** blobs: size or hash mismatch;
+- orphans: files that no version references and that cleanup removes after the grace period.
 
-Sale con código distinto de 0 si hay faltantes o dañados. Las versiones afectadas aparecen como `feed/Id@versión`: restaura sus blobs desde un backup copiando los archivos `blobs/sha256/…` correspondientes.
+It exits with a non-zero code if there are missing or corrupted blobs. Affected versions appear as `feed/Id@version`: restore their blobs from a backup by copying the corresponding `blobs/sha256/…` files.

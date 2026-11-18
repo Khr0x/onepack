@@ -1,9 +1,9 @@
-# Empaquetado
+# Packaging
 
-| Directorio | Contenido | Documentación |
+| Directory | Contents | Documentation |
 |---|---|---|
-| [`systemd/`](systemd/) | Unidad endurecida y archivo de entorno de ejemplo. | [Instalación con systemd](../docs/runbooks/install.md#2-servicio-systemd) |
-| [`container/`](container/) | Imagen sin root sobre distroless, binario estático. `Containerfile` construye desde fuente; `Containerfile.release` usa los binarios verificados y publica `ghcr.io/khr0x/onepack`. | [Contenedor](../docs/runbooks/install.md#3-contenedor) |
-| [`proxy/`](proxy/) | Nginx y Caddy con TLS, sin servir blobs directamente. | [Reverse proxy](../docs/runbooks/install.md#4-reverse-proxy-y-tls) |
+| [`systemd/`](systemd/) | Hardened unit and example environment file. | [systemd installation](../docs/runbooks/install.md#2-systemd-service) |
+| [`container/`](container/) | Rootless image on distroless, static binary. `Containerfile` builds from source; `Containerfile.release` uses the verified binaries and publishes `ghcr.io/khr0x/onepack`. | [Container](../docs/runbooks/install.md#3-container) |
+| [`proxy/`](proxy/) | Nginx and Caddy with TLS, without serving blobs directly. | [Reverse proxy](../docs/runbooks/install.md#4-reverse-proxy-and-tls) |
 
-Los binarios firmados de cada versión los publica el workflow [`release.yml`](../.github/workflows/release.yml). Las pruebas de estos artefactos están en [`tests/ops/`](../tests/ops/) y se ejecutan en el CI (job *systemd, container and reverse proxy examples*).
+The signed binaries for each version are published by the [`release.yml`](../.github/workflows/release.yml) workflow. Tests for these artifacts are in [`tests/ops/`](../tests/ops/) and run in CI (job *systemd, container and reverse proxy examples*).

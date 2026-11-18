@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Multi-target con dependencia: genera grupos de dependencias por framework en el .nuspec. -->
+  <!-- Multi-target with a dependency: generates per-framework dependency groups in the .nuspec. -->
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <PackageId>Onepack.Fixture.Dependent</PackageId>
     <Version>1.0.0</Version>
     <Authors>onepack</Authors>
-    <Description>Paquete de prueba que depende de Onepack.Fixture.Basic.</Description>
+    <Description>Test package that depends on Onepack.Fixture.Basic.</Description>
   </PropertyGroup>
 
   <ItemGroup>

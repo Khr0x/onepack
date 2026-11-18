@@ -61,7 +61,7 @@ onepack whoami
 | `package inspect --feed F ID [VERSION]` | Without a version, the versions by precedence; with one, its state, SHA-256 and size. Only a Maintainer or an admin sees why a version is blocked. | read |
 | `package push --feed F FILE… [--skip-existing-identical]` | Publishes through the same route as `dotnet nuget push`. Validates the package locally before uploading. With the option, an existing version with the **same** content (SHA-256) is not an error; with different content it is. | publish |
 | `package unlist\|relist --feed F ID VERSION` | Visibility in search; does not affect downloads. | publish |
-| `package block --feed F ID VERSION --reason R [--yes]` | Prevents downloads ([security](security.md#bloqueo-de-versiones)). | Maintainer |
+| `package block --feed F ID VERSION --reason R [--yes]` | Prevents downloads ([security](security.md#version-blocking)). | Maintainer |
 | `package unblock --feed F ID VERSION --reason R` | Allows downloads again. The reason is also required and audited. | Maintainer |
 | `audit list [--feed F] [--action PREFIX] [--limit N]` | Newest first; 50 events by default. `--action` filters by prefix (`package.`, `token.create`). | admin |
 | `nuget init --feed F… --pattern P… [--config PATH] [--dry-run] [--yes]` | See [NuGet.Config](#nugetconfig-and-nuget-credentials). `--feed` and `--pattern` are repeatable. | — |
@@ -113,7 +113,7 @@ onepack audit list --action principal. --limit 20   # check that it was recorded
 
 **Leaked credential**: revoke that token (`token revoke`) and issue a new one. The full procedure, including caches and the audit log, is in the [incident drill](runbooks/incident-drill.md).
 
-**Vulnerable version**: block it so it cannot be downloaded. Blocking does not delete copies already downloaded into client caches and CI agents ([security](security.md#bloqueo-de-versiones)).
+**Vulnerable version**: block it so it cannot be downloaded. Blocking does not delete copies already downloaded into client caches and CI agents ([security](security.md#version-blocking)).
 
 ```bash
 onepack package block --feed payments Hemia.Payments 2.3.1 --reason "CVE-2026-1234" --yes

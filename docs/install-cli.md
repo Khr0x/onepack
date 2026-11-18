@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | O
 curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | ONEPACK_INSTALL_SERVER=1 sh
 ```
 
-Para instalar en `/usr/local/bin`, ejecuta el script con permisos suficientes (`sudo`). Los binarios de macOS todavía no están notarizados; Gatekeeper puede bloquearlos hasta que el proceso de release añada notarización. Para una descarga manual, verificación de checksum/Sigstore y autocompletado, continúa abajo.
+To install in `/usr/local/bin`, run the script with sufficient permissions (`sudo`). The macOS binaries are not notarized yet; Gatekeeper may block them until the release process adds notarization. For a manual download, checksum/Sigstore verification, and shell completion, continue below.
 
 ## Supported platforms
 

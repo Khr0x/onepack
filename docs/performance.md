@@ -1,94 +1,94 @@
-# Rendimiento
+# Performance
 
-> Fase 7. Resultados reales: los objetivos no cumplidos se documentan, no se ocultan.
-> Última actualización: 2026-10-16
+> Phase 7. Real results: unmet targets are documented, not hidden.
+> Last updated: 2026-10-16
 
-## Método
+## Method
 
-[`scripts/bench.py`](../scripts/bench.py) compila en release y mide:
+[`scripts/bench.py`](../scripts/bench.py) builds in release mode and measures:
 
-| Medida | Cómo |
+| Measurement | How |
 |---|---|
-| Arranque | Desde que se lanza `onepackd serve` (o `docker start`) hasta el primer `200` de `/readyz`, sondeando cada 5 ms. |
-| RSS en reposo | 3 s después de arrancar, con la base ya creada. |
-| Latencia de metadatos | Feed con 200 paquetes × 5 versiones (1.000 versiones). [`onepack-bench`](../crates/bench/src/main.rs) lanza 16 clientes concurrentes durante 15 s que piden en rueda service index, flat container, índice de registro y búsqueda, todo autenticado. Mide de extremo a extremo en el cliente. |
-| Memoria en transferencias | Subida (`onepack package push`) y descarga de un paquete grande, muestreando la memoria cada 50 ms. Se informa del crecimiento respecto a justo antes de la transferencia. |
+| Startup | From launching `onepackd serve` (or `docker start`) until the first `200` from `/readyz`, probing every 5 ms. |
+| Idle RSS | 3 s after startup, with the database already created. |
+| Metadata latency | Feed with 200 packages × 5 versions (1,000 versions). [`onepack-bench`](../crates/bench/src/main.rs) launches 16 concurrent clients for 15 s that round-robin service index, flat container, registry index, and search, all authenticated. Measures end to end at the client. |
+| Memory during transfers | Upload (`onepack package push`) and download of a large package, sampling memory every 50 ms. Reports growth relative to just before the transfer. |
 
-Hay dos modos:
+There are two modes:
 
-- **Nativo**: `scripts/bench.py`.
-- **Perfil objetivo**: `scripts/bench.py --docker` ejecuta onepackd en la [imagen](../packaging/container/Containerfile) con `--cpus 2 --memory 1g`. La memoria se lee del cgroup (memoria anónima, sin caché de páginas). El CI lo ejecuta en cada push a `main` y a mano con *Run workflow* (job *Benchmark*; no corre en los PRs) y publica el informe en el resumen del job y en el artefacto `bench-results`.
+- **Native**: `scripts/bench.py`.
+- **Target profile**: `scripts/bench.py --docker` runs onepackd in the [image](../packaging/container/Containerfile) with `--cpus 2 --memory 1g`. Memory is read from the cgroup (anonymous memory, no page cache). CI runs it on every push to `main` and manually with *Run workflow* (job *Benchmark*; it does not run on PRs) and publishes the report in the job summary and in the `bench-results` artifact.
 
-`--large-mib N` cambia el tamaño del paquete grande (200 MiB por defecto).
+`--large-mib N` changes the size of the large package (200 MiB by default).
 
-## Resultados
+## Results
 
-### Nativo, Apple M4 (10 núcleos, 24 GiB), macOS — 2026-10-04
+### Native, Apple M4 (10 cores, 24 GiB), macOS — 2026-10-04
 
-| Medida | Resultado | Objetivo | |
+| Measurement | Result | Target | |
 |---|---|---|---|
-| Arranque hasta `ready` | 0,02 s | < 2 s | ✅ |
-| RSS en reposo | 11,4 MiB | < 100 MiB | ✅ |
-| p95 metadatos (16 clientes) | 1,2 ms | < 50 ms | ✅ |
-| Memoria adicional al subir 200 MiB | +0,9 MiB | acotada | ✅ |
-| Memoria adicional al descargar 200 MiB | +0,1 MiB | acotada | ✅ |
+| Startup to `ready` | 0.02 s | < 2 s | ✅ |
+| Idle RSS | 11.4 MiB | < 100 MiB | ✅ |
+| p95 metadata (16 clients) | 1.2 ms | < 50 ms | ✅ |
+| Extra memory when uploading 200 MiB | +0.9 MiB | bounded | ✅ |
+| Extra memory when downloading 200 MiB | +0.1 MiB | bounded | ✅ |
 
-| Recurso | p50 | p95 | p99 |
+| Resource | p50 | p95 | p99 |
 |---|---|---|---|
-| service index | 0,6 ms | 0,8 ms | 0,8 ms |
-| flat container | 0,9 ms | 1,0 ms | 1,1 ms |
-| registro | 0,9 ms | 1,1 ms | 1,3 ms |
-| búsqueda | 1,0 ms | 1,3 ms | 1,5 ms |
+| service index | 0.6 ms | 0.8 ms | 0.8 ms |
+| flat container | 0.9 ms | 1.0 ms | 1.1 ms |
+| registry | 0.9 ms | 1.1 ms | 1.3 ms |
+| search | 1.0 ms | 1.3 ms | 1.5 ms |
 
-18.209 peticiones/s de metadatos sin errores. Con 1.000 versiones cargadas, el RSS en reposo es de 15,4 MiB; tras los 15 s de carga, el proceso retiene unos 49 MiB (memoria del asignador y caché de páginas de las conexiones de lectura de SQLite). La publicación de paquetes pequeños va a 78/s, de forma secuencial desde un solo cliente.
+18,209 metadata requests/s with no errors. With 1,000 versions loaded, idle RSS is 15.4 MiB; after the 15 s load, the process retains about 49 MiB (allocator memory and page cache for SQLite read connections). Publishing small packages runs at 78/s, sequentially from a single client.
 
-**La memoria no depende del tamaño del paquete.** Crecimiento durante la transferencia en ejecuciones separadas:
+**Memory does not depend on package size.** Growth during the transfer in separate runs:
 
-| Paquete | Subida | Descarga |
+| Package | Upload | Download |
 |---|---|---|
-| 50 MiB | +0,4 MiB | +0,1 MiB |
-| 200 MiB | +0,9 MiB | +0,1 MiB |
-| 400 MiB | +0,0 MiB | +5,0 MiB |
+| 50 MiB | +0.4 MiB | +0.1 MiB |
+| 200 MiB | +0.9 MiB | +0.1 MiB |
+| 400 MiB | +0.0 MiB | +5.0 MiB |
 
-La subida se escribe en staging mientras llega y la descarga se transmite desde el archivo; ninguna pasa por memoria.
+Upload is written to staging as it arrives and download is streamed from the file; neither goes through memory.
 
-### Contenedor, 2 vCPU / 1 GiB — 2026-10-16
+### Container, 2 vCPU / 1 GiB — 2026-10-16
 
-Resultados del [job *Benchmark*](https://github.com/Khr0x/onepack/actions/runs/38917726054/job/117029413791), completado correctamente en el [CI de main](https://github.com/Khr0x/onepack/actions/runs/38917726054) para el commit [`88467a94eaee4fc7345bac54fdf6fa4449a913b8`](https://github.com/Khr0x/onepack/commit/88467a94eaee4fc7345bac54fdf6fa4449a913b8). Los datos se conservan en el artefacto [`bench-results`](https://github.com/Khr0x/onepack/actions/runs/38917726054/artifacts/12053542020) (`bench-results.json`).
+Results from the [*Benchmark* job](https://github.com/Khr0x/onepack/actions/runs/38917726054/job/117029413791), completed successfully in the [main CI](https://github.com/Khr0x/onepack/actions/runs/38917726054) for commit [`88467a94eaee4fc7345bac54fdf6fa4449a913b8`](https://github.com/Khr0x/onepack/commit/88467a94eaee4fc7345bac54fdf6fa4449a913b8). Data is kept in the [`bench-results`](https://github.com/Khr0x/onepack/actions/runs/38917726054/artifacts/12053542020) artifact (`bench-results.json`).
 
-Entorno: `ubuntu-24.04`, Linux x86-64, host con 4 CPU lógicas y contenedor limitado con `--cpus 2 --memory 1g`. Comando ejecutado:
+Environment: `ubuntu-24.04`, Linux x86-64, host with 4 logical CPUs and a container limited with `--cpus 2 --memory 1g`. Command run:
 
 ```bash
 python3 scripts/bench.py --docker --out bench-results.json
 ```
 
-| Medida | Resultado | Objetivo | |
+| Measurement | Result | Target | |
 |---|---|---|---|
-| Arranque hasta `ready` | 0,16 s | < 2 s | ✅ |
-| Memoria anónima en reposo (cgroup) | 1,2 MiB | < 100 MiB | ✅ |
-| p95 metadatos (16 clientes) | 11,2 ms | < 50 ms | ✅ |
-| Memoria adicional al subir 200 MiB | +1,0 MiB | < 100 MiB adicionales | ✅ |
-| Memoria adicional al descargar 200 MiB | +0,0 MiB | < 100 MiB adicionales | ✅ |
+| Startup to `ready` | 0.16 s | < 2 s | ✅ |
+| Idle anonymous memory (cgroup) | 1.2 MiB | < 100 MiB | ✅ |
+| p95 metadata (16 clients) | 11.2 ms | < 50 ms | ✅ |
+| Extra memory when uploading 200 MiB | +1.0 MiB | < 100 MiB extra | ✅ |
+| Extra memory when downloading 200 MiB | +0.0 MiB | < 100 MiB extra | ✅ |
 
-| Recurso | p50 | p95 | p99 |
+| Resource | p50 | p95 | p99 |
 |---|---|---|---|
-| service index | 5,7 ms | 9,4 ms | 11,9 ms |
-| flat container | 7,4 ms | 11,5 ms | 13,9 ms |
-| registro | 7,6 ms | 11,8 ms | 14,6 ms |
-| búsqueda | 7,3 ms | 11,2 ms | 14,1 ms |
+| service index | 5.7 ms | 9.4 ms | 11.9 ms |
+| flat container | 7.4 ms | 11.5 ms | 13.9 ms |
+| registry | 7.6 ms | 11.8 ms | 14.6 ms |
+| search | 7.3 ms | 11.2 ms | 14.1 ms |
 
-Con 1.000 versiones cargadas: 3,4 MiB de memoria anónima; 2.125 peticiones/s de metadatos, sin errores; publicación de paquetes pequeños: 265/s. La subida de 200 MiB duró 0,9 s y la descarga 1,9 s. Se conservan los redondeos del informe original.
+With 1,000 versions loaded: 3.4 MiB of anonymous memory; 2,125 metadata requests/s, with no errors; publishing small packages: 265/s. The 200 MiB upload took 0.9 s and the download 1.9 s. Rounding from the original report is preserved.
 
-Todos los objetivos numéricos de esta ejecución se cumplieron. El job publica resultados, pero no impone los umbrales como condición de éxito del CI. La comprobación de memoria corresponde a transferencias de 200 MiB; esta ejecución no compara distintos tamaños para demostrar independencia respecto al tamaño del paquete.
+All numeric targets for this run were met. The job publishes results but does not enforce the thresholds as a CI success condition. The memory check corresponds to 200 MiB transfers; this run does not compare different sizes to demonstrate independence from package size.
 
-El script desactiva los límites de peticiones por principal y por IP durante la medición. El informe llama «RSS» a la memoria, pero en este perfil se mide memoria anónima del cgroup, sin caché de páginas; no es directamente comparable con el RSS del proceso medido en modo nativo.
+The script disables per-principal and per-IP request limits during the measurement. The report calls memory "RSS", but this profile measures cgroup anonymous memory, without page cache; it is not directly comparable with the process RSS measured in native mode.
 
-El runner no tiene un SSD dedicado ni dos CPU reservadas: el límite lo pone el cgroup sobre una VM compartida. Es una aproximación reproducible, no una medición en el hardware objetivo ni una garantía de rendimiento en otros despliegues.
+The runner has no dedicated SSD or two reserved CPUs: the limit is imposed by the cgroup on a shared VM. It is a reproducible approximation, not a measurement on target hardware or a performance guarantee in other deployments.
 
-## Lo que cambió con la medición
+## What changed with the measurement
 
-La primera medición no cumplía el objetivo de latencia: **p95 de 95 ms** con 16 clientes, y la búsqueda era aún peor (p50 de 82 ms). Con un solo cliente la búsqueda costaba 2,6 ms y el resto 0,2 ms: el problema era contención, no coste por petición. Cada búsqueda leía de SQLite las 1.000 versiones listadas y volvía a agruparlas y ordenarlas. Con varias búsquedas a la vez, el throughput bajaba de 1.265 a 484 peticiones/s.
+The first measurement did not meet the latency target: **p95 of 95 ms** with 16 clients, and search was even worse (p50 of 82 ms). With a single client, search cost 2.6 ms and the rest 0.2 ms: the problem was contention, not per-request cost. Each search read the 1,000 listed versions from SQLite and regrouped and sorted them again. With several searches at once, throughput dropped from 1,265 to 484 requests/s.
 
-Solución: un índice de búsqueda en memoria por feed ([`search_cache.rs`](../crates/server/src/search_cache.rs)), invalidado al publicar, hacer unlist/relist o bloquear desde el propio servidor, y con un TTL de 5 s para cambios hechos por otros procesos ([operación](operations.md#caché-de-búsqueda)). Resultado: p95 de 1,2 ms y unas 18.000 peticiones/s. También se probó a ampliar el pool de lectura de SQLite (8 → 16 → 32 conexiones): con la caché no mejora la latencia y aumenta la memoria retenida, así que se mantiene en 8.
+Solution: an in-memory search index per feed ([`search_cache.rs`](../crates/server/src/search_cache.rs)), invalidated on publish, unlist/relist, or block from the server itself, and with a 5 s TTL for changes made by other processes ([operation](operations.md#search-cache)). Result: p95 of 1.2 ms and about 18,000 requests/s. Expanding the SQLite read pool was also tried (8 → 16 → 32 connections): with the cache, latency does not improve and retained memory increases, so it stays at 8.
 
-Límite conocido: el índice crece con el número de versiones listadas del feed (una copia de sus metadatos por combinación de filtros prerelease/SemVer 2). Con feeds de decenas de miles de versiones habrá que medir la memoria y, si hace falta, acotar la caché.
+Known limit: the index grows with the number of listed versions in the feed (one copy of its metadata per prerelease/SemVer 2 filter combination). With feeds of tens of thousands of versions, memory will need to be measured and, if necessary, the cache bounded.

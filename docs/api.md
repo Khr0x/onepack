@@ -48,7 +48,7 @@ Lists return `{"items": [...], "next_cursor": "..." | null}`. For the next page,
 }
 ```
 
-`code` is stable. Besides those in [security](security.md#errores): `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `AUTH_PREFIX_DENIED`, `AUTH_ADMIN_REQUIRED`, `NOT_FOUND`, `FEED_EXISTS`, `PRINCIPAL_EXISTS`, `PRINCIPAL_NOT_FOUND`, `TOKEN_NOT_FOUND`, `GRANT_NOT_FOUND`, `LAST_ADMIN`, `INVALID_REQUEST`, `INVALID_NAME`, `INVALID_CURSOR` and `INTERNAL`.
+`code` is stable. Besides those in [security](security.md#errors): `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `AUTH_PREFIX_DENIED`, `AUTH_ADMIN_REQUIRED`, `NOT_FOUND`, `FEED_EXISTS`, `PRINCIPAL_EXISTS`, `PRINCIPAL_NOT_FOUND`, `TOKEN_NOT_FOUND`, `GRANT_NOT_FOUND`, `LAST_ADMIN`, `INVALID_REQUEST`, `INVALID_NAME`, `INVALID_CURSOR` and `INTERNAL`.
 
 Every response, including those on the NuGet routes, carries the `X-Request-Id` header. The same id appears in the server's trace span. The server always generates it; one sent by the client is ignored.
 

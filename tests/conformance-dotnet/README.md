@@ -1,12 +1,12 @@
-# Pruebas de conformidad con clientes .NET
+# Conformance tests with .NET clients
 
-Referencia de pruebas según [ADR-019](../../roadmap/adr-mvp.md#adr-019): los paquetes se crean con herramientas
-oficiales (`dotnet pack`) y los clientes reales (`dotnet`, `nuget.exe`) se usan para validar el servidor.
-.NET **no** es dependencia de `onepackd` en runtime.
+Test reference per [ADR-019](../../roadmap/adr-mvp.md#adr-019): packages are created with official
+tools (`dotnet pack`) and real clients (`dotnet`, `nuget.exe`) are used to validate the server.
+.NET is **not** a runtime dependency of `onepackd`.
 
-- `fixtures/`: proyectos que generan los `.nupkg` de prueba.
+- `fixtures/`: projects that generate the test `.nupkg` files.
 
-Generar los paquetes localmente:
+Build the packages locally:
 
 ```bash
 dotnet pack tests/conformance-dotnet/fixtures/Onepack.Fixture.Basic -c Release -o target/nupkgs

@@ -16,6 +16,8 @@ include incompatible changes; release notes call them out.
 
 ### Changed
 
+- Project documentation, code comments, scripts, and test messages are now
+  English-only.
 - Updated `rustls-webpki`, `webpki-roots`, `webpki-root-certs`, and Tokio.
 - Temporarily pinned `sqlx 0.9.1` from its release branch while
   `libsqlite3-sys 0.39` is unavailable on crates.io.

@@ -1,5 +1,5 @@
-// Genera el corpus de referencia de versiones NuGet (ADR-008).
-// Uso: dotnet run -- <inputs.json> <corpus.json>
+// Generates the NuGet version reference corpus (ADR-008).
+// Usage: dotnet run -- <inputs.json> <corpus.json>
 using System.Text.Json;
 using NuGet.Versioning;
 
@@ -11,9 +11,9 @@ var parsed = inputs
 
 var valid = parsed.Where(p => p.Ok).Select(p => p.Version!).ToList();
 
-// rank: número de versiones estrictamente menores según VersionComparer.Default.Compare.
-// identity: índice de la primera versión igual según VersionComparer.Default.Equals.
-// Se registran por separado porque NuGet no siempre las hace coincidir (p. ej. "1.0.0-0" y "1.0.0--0").
+// rank: number of versions strictly lower according to VersionComparer.Default.Compare.
+// identity: index of the first equal version according to VersionComparer.Default.Equals.
+// They are recorded separately because NuGet does not always make them match (e.g. "1.0.0-0" and "1.0.0--0").
 var cases = parsed.Select(p => p.Ok
     ? new Case(p.Input, true, p.Version!.ToNormalizedString(), p.Version.ToFullString(), p.Version.IsPrerelease,
         p.Version.IsSemVer2,

@@ -1,6 +1,6 @@
-# Unidad systemd de onepackd (Fase 7). Instalación: packaging/README.md.
+# onepackd systemd unit (Phase 7). Installation: packaging/README.md.
 [Unit]
-Description=onepack: registro privado de paquetes NuGet
+Description=onepack: private NuGet package registry
 Documentation=https://github.com/Khr0x/onepack
 After=network-online.target
 Wants=network-online.target
@@ -13,16 +13,16 @@ EnvironmentFile=/etc/onepack/onepackd.env
 ExecStart=/usr/local/bin/onepackd serve
 Restart=on-failure
 RestartSec=2
-# Al parar, SIGTERM: termina las peticiones en curso.
+# On stop, SIGTERM: finishes in-flight requests.
 TimeoutStopSec=30
 LimitNOFILE=65536
 
-# Datos en /var/lib/onepack, propiedad del usuario del servicio y con permisos 0700.
+# Data in /var/lib/onepack, owned by the service user and with 0700 permissions.
 StateDirectory=onepack
 StateDirectoryMode=0700
 UMask=0077
 
-# Endurecimiento: el proceso solo puede escribir en su directorio de datos.
+# Hardening: the process can only write to its data directory.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

@@ -1,23 +1,23 @@
-# Actualización de versión
+# Version upgrade
 
-> Fase 7 ([ADR-020](../../roadmap/adr-mvp.md#adr-020)). Migraciones solo hacia adelante.
-> Última actualización: 2026-10-04
+> Phase 7 ([ADR-020](../../roadmap/adr-mvp.md#adr-020)). Forward-only migrations.
+> Last updated: 2026-10-04
 
-1. **Backup** completo ([backup](backup-restore.md)):
+1. Full **backup** ([backup](backup-restore.md)):
 
    ```bash
    sudo -u onepack onepackd backup --data-dir /var/lib/onepack --output /var/backups/onepack/pre-upgrade
    ```
 
-2. **Instala** el binario nuevo, verificando su firma ([instalación](install.md#1-descargar-y-verificar)).
+2. **Install** the new binary, verifying its signature ([installation](install.md#1-download-and-verify)).
 
-3. **Comprueba** qué migraciones aplicará, sin cambiar nada:
+3. **Check** which migrations it will apply, without changing anything:
 
    ```bash
    sudo -u onepack onepackd migrate --check --data-dir /var/lib/onepack
    ```
 
-4. **Para el servicio, migra y arranca**:
+4. **Stop the service, migrate, and start**:
 
    ```bash
    sudo systemctl stop onepackd
@@ -26,14 +26,14 @@
    curl -fs http://127.0.0.1:8080/readyz
    ```
 
-   `migrate` guarda antes una copia de la base en `/var/lib/onepack/backups/`. Un servidor con migraciones pendientes no arranca: indica que hay que ejecutar `migrate`.
+   `migrate` first saves a copy of the database in `/var/lib/onepack/backups/`. A server with pending migrations does not start: it indicates that `migrate` must be run.
 
-5. **Verifica**: `onepackd check --quick` y un `dotnet restore` de un proyecto real.
+5. **Verify**: `onepackd check --quick` and a `dotnet restore` of a real project.
 
-## Volver atrás
+## Rolling back
 
-No hay migraciones hacia atrás. Para volver a la versión anterior, instala el binario anterior y restaura el backup del paso 1 en un directorio vacío ([restaurar](backup-restore.md#restaurar)). Una versión anterior se niega a abrir un esquema más nuevo, así que no hay riesgo de corromperlo por error.
+There are no backward migrations. To return to the previous version, install the previous binary and restore the backup from step 1 into an empty directory ([restore](backup-restore.md#restore)). An older version refuses to open a newer schema, so there is no risk of corrupting it by mistake.
 
-## Cómo se prueba
+## How it is tested
 
-`crates/storage/tests/ops.rs` crea un directorio con el esquema de la versión anterior (todas las migraciones menos la última) y datos, comprueba que `migrate --check` informa de la pendiente y que `migrate` la aplica, conserva los datos y deja el backup previo.
+`crates/storage/tests/ops.rs` creates a directory with the previous version's schema (all migrations except the last) and data, checks that `migrate --check` reports the pending one and that `migrate` applies it, preserves the data, and leaves the prior backup.

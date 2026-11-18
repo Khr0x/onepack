@@ -1,98 +1,98 @@
-# Seguridad frente a paquetes y abuso
+# Package and abuse security
 
-> Fase 5 ([ADR-013](../roadmap/adr-mvp.md#adr-013), [ADR-014](../roadmap/adr-mvp.md#adr-014), [ADR-018](../roadmap/adr-mvp.md#adr-018)).
-> Última actualización: 2026-10-04
+> Phase 5 ([ADR-013](../roadmap/adr-mvp.md#adr-013), [ADR-014](../roadmap/adr-mvp.md#adr-014), [ADR-018](../roadmap/adr-mvp.md#adr-018)).
+> Last updated: 2026-10-04
 
-## Qué hace y qué no hace el registro
+## What the registry does and does not do
 
-- Trata cada `.nupkg` como **contenido no confiable**: lo inspecciona con un presupuesto acotado, nunca lo extrae a disco y nunca ejecuta ni descarga nada que el paquete referencie.
-- **No analiza malware.** Un paquete que supere la inspección puede contener código malicioso.
-- **No valida la confianza de las firmas.** Los paquetes firmados se guardan y sirven byte a byte, sin comprobar el certificado.
-- **Bloquear una versión no borra las copias ya descargadas** en cachés de clientes (`~/.nuget/packages`, cachés HTTP, agentes de CI) ni en espejos. Tras un incidente hay que limpiar esas cachés por separado.
+- Treats every `.nupkg` as **untrusted content**: it inspects it with a bounded budget, never extracts it to disk, and never executes or downloads anything the package references.
+- **Does not analyze malware.** A package that passes inspection may contain malicious code.
+- **Does not validate signature trust.** Signed packages are stored and served byte for byte, without checking the certificate.
+- **Blocking a version does not delete copies already downloaded** into client caches (`~/.nuget/packages`, HTTP caches, CI agents) or mirrors. After an incident, those caches must be cleaned separately.
 
-## Inspección de paquetes
+## Package inspection
 
-Cada subida pasa por estas comprobaciones antes de guardar nada. Todas se configuran en `onepackd serve` (flag o variable de entorno):
+Every upload goes through these checks before anything is stored. All of them are configured in `onepackd serve` (flag or environment variable):
 
-| Límite | Flag | Por defecto |
+| Limit | Flag | Default |
 |---|---|---|
-| Tamaño comprimido | `--max-package-size-mib` | 100 MiB |
-| Número de entradas del ZIP | `--max-zip-entries` | 20 000 |
-| Tamaño descomprimido por entrada | `--max-entry-size-mib` | 512 MiB |
-| Tamaño descomprimido total | `--max-uncompressed-size-mib` | 2048 MiB |
-| Tamaño del `.nuspec` | `--max-nuspec-size-kib` | 1024 KiB |
-| Profundidad XML del `.nuspec` | `--max-xml-depth` | 32 |
-| Tiempo de inspección | `--inspection-timeout-secs` | 30 s |
-| Inspecciones simultáneas | `--max-concurrent-inspections` | la mitad de los núcleos |
+| Compressed size | `--max-package-size-mib` | 100 MiB |
+| Number of ZIP entries | `--max-zip-entries` | 20,000 |
+| Uncompressed size per entry | `--max-entry-size-mib` | 512 MiB |
+| Total uncompressed size | `--max-uncompressed-size-mib` | 2048 MiB |
+| `.nuspec` size | `--max-nuspec-size-kib` | 1024 KiB |
+| `.nuspec` XML depth | `--max-xml-depth` | 32 |
+| Inspection time | `--inspection-timeout-secs` | 30 s |
+| Concurrent inspections | `--max-concurrent-inspections` | half the cores |
 
-Cómo se aplican:
+How they are enforced:
 
-- El número de entradas se lee del registro de fin del ZIP (también en ZIP64) **antes** de cargar el directorio central, así que un ZIP que declara millones de entradas no reserva memoria para ellas.
-- Los tamaños descomprimidos se comprueban con los que declara el directorio central, sin descomprimir. Solo se descomprime el `.nuspec`, y su lectura se corta en el límite aunque el tamaño declarado mienta.
-- El `.nuspec` se analiza **sin DTD**: cualquier `<!DOCTYPE>` se rechaza, así que no hay entidades definidas por el documento (billion laughs) ni externas (XXE). Solo se aceptan las cinco entidades predefinidas de XML y las referencias numéricas.
-- Se rechazan rutas que serían peligrosas al extraerlas en un cliente: absolutas (`/x`, `\\x`, `C:/x`), con segmentos `.` o `..`, con caracteres de control o `:`, con nombres reservados de Windows (`CON`, `PRN`, `AUX`, `NUL`, `COM0-9`, `LPT0-9`, con o sin extensión), terminadas en punto o espacio, y con escapes `%XX` incompletos. Cada ruta se comprueba tal cual y con el escape `%XX` resuelto, porque los clientes NuGet lo deshacen al extraer.
-- También se rechazan entradas duplicadas (sin distinguir mayúsculas ni escapes), enlaces simbólicos y entradas cifradas.
-- La inspección corre en el pool de hilos bloqueantes con un semáforo propio: nunca ocupa los hilos que atienden descargas.
+- The number of entries is read from the ZIP end-of-central-directory record (also in ZIP64) **before** loading the central directory, so a ZIP that declares millions of entries does not allocate memory for them.
+- Uncompressed sizes are checked against those declared in the central directory, without decompressing. Only the `.nuspec` is decompressed, and its read is cut off at the limit even if the declared size lies.
+- The `.nuspec` is parsed **without DTD**: any `<!DOCTYPE>` is rejected, so there are no document-defined entities (billion laughs) or external ones (XXE). Only the five predefined XML entities and numeric references are accepted.
+- Paths that would be dangerous when extracted by a client are rejected: absolute (`/x`, `\\x`, `C:/x`), with `.` or `..` segments, with control characters or `:`, with Windows reserved names (`CON`, `PRN`, `AUX`, `NUL`, `COM0-9`, `LPT0-9`, with or without extension), ending in a dot or space, and with incomplete `%XX` escapes. Each path is checked as-is and with the `%XX` escape resolved, because NuGet clients undo it on extraction.
+- Duplicate entries (case-insensitive and escape-insensitive), symbolic links, and encrypted entries are also rejected.
+- Inspection runs on the blocking thread pool with its own semaphore: it never occupies the threads serving downloads.
 
-## Errores
+## Errors
 
-Las respuestas de error llevan un código estable al inicio del texto (`CÓDIGO: mensaje`) en las rutas NuGet, que los clientes muestran tal cual, y `{"error": {"code", "message"}}` en `/api/v1`.
+Error responses start with a stable code (`CODE: message`) on NuGet routes, which clients display verbatim, and use `{"error": {"code", "message"}}` on `/api/v1`.
 
-| Código | Estado | Cuándo |
+| Code | Status | When |
 |---|---|---|
-| `PACKAGE_INVALID` | 400 | ZIP o `.nuspec` inválido, DTD, entidad desconocida, entrada cifrada o enlace simbólico. |
-| `PACKAGE_UNSAFE_PATH` | 400 | Ruta peligrosa o entrada duplicada. |
-| `PACKAGE_LIMIT_EXCEEDED` | 413 | Se supera un límite de inspección o el tiempo máximo. |
-| `PACKAGE_TOO_LARGE` | 413 | Se supera el tamaño comprimido. |
-| `FEED_QUOTA_VERSIONS` | 403 | El feed alcanzó su cuota de versiones. |
-| `FEED_QUOTA_STORAGE` | 413 | El feed alcanzó su cuota de almacenamiento. |
-| `PACKAGE_BLOCKED` | 410 | Descarga de una versión bloqueada. |
-| `UPLOADS_BUSY` | 503 + `Retry-After` | No quedan plazas de subida. |
-| `UPLOAD_TIMEOUT` | 408 | La subida superó `--upload-timeout-secs`. |
-| `RATE_LIMITED` | 429 + `Retry-After` | Límite de peticiones por principal o por IP. |
+| `PACKAGE_INVALID` | 400 | Invalid ZIP or `.nuspec`, DTD, unknown entity, encrypted entry, or symbolic link. |
+| `PACKAGE_UNSAFE_PATH` | 400 | Unsafe path or duplicate entry. |
+| `PACKAGE_LIMIT_EXCEEDED` | 413 | An inspection limit or the maximum time is exceeded. |
+| `PACKAGE_TOO_LARGE` | 413 | The compressed size is exceeded. |
+| `FEED_QUOTA_VERSIONS` | 403 | The feed reached its version quota. |
+| `FEED_QUOTA_STORAGE` | 413 | The feed reached its storage quota. |
+| `PACKAGE_BLOCKED` | 410 | Download of a blocked version. |
+| `UPLOADS_BUSY` | 503 + `Retry-After` | No upload slots remain. |
+| `UPLOAD_TIMEOUT` | 408 | The upload exceeded `--upload-timeout-secs`. |
+| `RATE_LIMITED` | 429 + `Retry-After` | Request limit per principal or per IP. |
 
-Los rechazos de publicación se auditan (`package.publish`, `denied`, con el código).
+Publication rejections are audited (`package.publish`, `denied`, with the code).
 
-## Saturación
+## Saturation
 
-| Límite | Flag | Por defecto |
+| Limit | Flag | Default |
 |---|---|---|
-| Subidas simultáneas | `--max-concurrent-uploads` | 8 |
-| Tiempo máximo de una subida | `--upload-timeout-secs` | 600 s |
-| Peticiones por principal | `--principal-rate-limit` / `--principal-rate-burst` | 50/s, ráfaga de 1000 |
-| Peticiones por IP | `--ip-rate-limit` / `--ip-rate-burst` | 100/s, ráfaga de 2000 |
+| Concurrent uploads | `--max-concurrent-uploads` | 8 |
+| Maximum upload time | `--upload-timeout-secs` | 600 s |
+| Requests per principal | `--principal-rate-limit` / `--principal-rate-burst` | 50/s, burst of 1000 |
+| Requests per IP | `--ip-rate-limit` / `--ip-rate-burst` | 100/s, burst of 2000 |
 
-- La plaza de subida se toma **antes de leer el cuerpo**: una ráfaga recibe `503` sin crear archivos en staging ni tareas pendientes.
-- El límite por IP se aplica **antes de autenticar**, así que también frena la fuerza bruta de tokens. El límite por principal se aplica después.
-- La IP es la del socket. Detrás de un reverse proxy todas las peticiones comparten la IP del proxy, porque el servidor no confía en `X-Forwarded-For` ([ADR-018](../roadmap/adr-mvp.md#adr-018)). En ese despliegue conviene limitar por IP en el proxy, y subir `--ip-rate-limit` o desactivarlo con `0`.
-- Un `restore` de una solución grande hace varias peticiones por paquete. Las ráfagas por defecto lo absorben; ajústalas si los agentes de CI comparten credencial.
-- Los contadores viven en memoria y se pierden al reiniciar. Su tamaño está acotado: con más de 100 000 claves se olvidan los clientes inactivos.
+- The upload slot is acquired **before reading the body**: a burst receives `503` without creating staging files or pending tasks.
+- The per-IP limit is applied **before authentication**, so it also throttles token brute force. The per-principal limit is applied afterwards.
+- The IP is the socket IP. Behind a reverse proxy, all requests share the proxy IP because the server does not trust `X-Forwarded-For` ([ADR-018](../roadmap/adr-mvp.md#adr-018)). In that deployment, enforce the IP limit at the proxy, and raise `--ip-rate-limit` or disable it with `0`.
+- A `restore` of a large solution makes several requests per package. The default bursts absorb it; tune them if CI agents share a credential.
+- Counters live in memory and are lost on restart. Their size is bounded: with more than 100,000 keys, inactive clients are forgotten.
 
-## Cuotas por feed
+## Per-feed quotas
 
 ```bash
 onepackd feed quota internal --max-storage-mib 10240 --max-versions 5000 --data-dir ./data
 onepackd feed show internal --data-dir ./data
 ```
 
-`0` significa sin límite. El uso es la suma lógica de los tamaños de las versiones: dos versiones con el mismo contenido cuentan dos veces, aunque en disco se guarde una sola copia. Una cuota nueva no afecta a lo ya publicado aunque lo supere. Si una publicación superaría la cuota, no se guarda nada y se audita con el código.
+`0` means no limit. Usage is the logical sum of version sizes: two versions with the same content count twice, even if only one copy is stored on disk. A new quota does not affect what is already published even if it exceeds it. If a publication would exceed the quota, nothing is stored and it is audited with the code.
 
-## Bloqueo de versiones
+## Version blocking
 
-`availability` es independiente de `listed` ([ADR-013](../roadmap/adr-mvp.md#adr-013)):
+`availability` is independent of `listed` ([ADR-013](../roadmap/adr-mvp.md#adr-013)):
 
-| | Búsqueda | Flat container y registros | Descarga |
+| | Search | Flat container and registries | Download |
 |---|---|---|---|
-| `listed=false` | no | sí (`listed: false`) | sí |
-| `blocked` | no | sí, anunciada como obsoleta | `410 PACKAGE_BLOCKED` |
+| `listed=false` | no | yes (`listed: false`) | yes |
+| `blocked` | no | yes, advertised as deprecated | `410 PACKAGE_BLOCKED` |
 
-La versión bloqueada se mantiene en los metadatos a propósito: así `restore` falla con un error explícito, en vez de resolver en silencio otra versión o decir que no existe. Los clientes .NET muestran la frase de estado:
+The blocked version is kept in the metadata on purpose: this way `restore` fails with an explicit error, instead of silently resolving another version or saying it does not exist. .NET clients show the status phrase:
 
 ```text
 Response status code does not indicate success: 410 (PACKAGE_BLOCKED - version blocked by the registry).
 ```
 
-Bloquear y desbloquear requiere rol Maintainer (o administrador) y un motivo, que queda en la auditoría (`package.block`, `package.unblock`). El motivo no se publica en los metadatos NuGet; solo lo ve quien puede mantener el feed:
+Blocking and unblocking require the Maintainer role (or administrator) and a reason, which is recorded in the audit (`package.block`, `package.unblock`). The reason is not published in the NuGet metadata; only those who can maintain the feed see it:
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
@@ -102,61 +102,61 @@ curl -H "Authorization: Bearer $TOKEN" \
   https://packages.example.com/api/v1/feeds/internal/packages/hemia.core/1.0.0
 ```
 
-Con el CLI:
+With the CLI:
 
 ```bash
 onepack package block --feed internal Hemia.Core 1.0.0 --reason "CVE-2026-0001"
 onepack package inspect --feed internal Hemia.Core 1.0.0
-onepack package unblock --feed internal Hemia.Core 1.0.0 --reason "parche publicado"
+onepack package unblock --feed internal Hemia.Core 1.0.0 --reason "published patch"
 ```
 
-Sin servidor en marcha, o con acceso solo al directorio de datos:
+Without a running server, or with access only to the data directory:
 
 ```bash
 onepackd package block --feed internal --id Hemia.Core --version 1.0.0 --reason "CVE-2026-0001" --data-dir ./data
-onepackd package unblock --feed internal --id Hemia.Core --version 1.0.0 --reason "parche publicado" --data-dir ./data
+onepackd package unblock --feed internal --id Hemia.Core --version 1.0.0 --reason "published patch" --data-dir ./data
 ```
 
-## Suite de seguridad
+## Security suite
 
-`tests/security` genera en cada ejecución los artefactos maliciosos y comprueba que se rechazan sin persistir nada:
+`tests/security` generates the malicious artifacts on every run and verifies that they are rejected without persisting anything:
 
 ```bash
 cargo test -p onepack-server --test security
 ```
 
-| Escenario | Prueba |
+| Scenario | Test |
 |---|---|
-| ZIP bomb con tamaños falseados (~4 GiB por entrada) | `zip_bomb_with_forged_sizes_is_rejected_without_decompressing` |
-| ZIP bomb real (12 MiB de ceros en menos de 200 KiB) | `zip_bomb_with_real_compression_is_rejected` |
-| `.nuspec` de 16 MiB, con tamaño honesto y falseado | `oversized_nuspec_is_cut_at_the_limit` |
-| Demasiadas entradas | `too_many_entries_are_rejected` |
+| ZIP bomb with forged sizes (~4 GiB per entry) | `zip_bomb_with_forged_sizes_is_rejected_without_decompressing` |
+| Real ZIP bomb (12 MiB of zeros in less than 200 KiB) | `zip_bomb_with_real_compression_is_rejected` |
+| 16 MiB `.nuspec`, with honest and forged size | `oversized_nuspec_is_cut_at_the_limit` |
+| Too many entries | `too_many_entries_are_rejected` |
 | Billion laughs | `billion_laughs_is_rejected` |
-| XXE y entidades sin definir | `external_entities_are_never_resolved` |
-| 10 000 niveles de anidamiento | `deeply_nested_xml_is_rejected` |
-| Path traversal, rutas absolutas, nombres reservados, ADS | `path_traversal_is_rejected_and_nothing_is_written_outside_staging` |
-| Entradas duplicadas | `duplicate_entries_are_rejected` |
-| Ráfaga de subidas | `upload_burst_degrades_with_503_without_queueing` |
-| Subida que no termina | `stalled_upload_times_out` |
-| Límite por principal y por IP | `requests_are_rate_limited_per_principal`, `requests_are_rate_limited_per_ip_before_authentication` |
-| Versión bloqueada | `blocked_version_cannot_be_downloaded_but_stays_visible` y el paso de bloqueo de `scripts/e2e-dotnet.sh` con `dotnet restore` real |
-| Cuotas | `version_quota_rejects_with_specific_code`, `storage_quota_rejects_with_specific_code` |
+| XXE and undefined entities | `external_entities_are_never_resolved` |
+| 10,000 nesting levels | `deeply_nested_xml_is_rejected` |
+| Path traversal, absolute paths, reserved names, ADS | `path_traversal_is_rejected_and_nothing_is_written_outside_staging` |
+| Duplicate entries | `duplicate_entries_are_rejected` |
+| Upload burst | `upload_burst_degrades_with_503_without_queueing` |
+| Upload that never finishes | `stalled_upload_times_out` |
+| Per-principal and per-IP limit | `requests_are_rate_limited_per_principal`, `requests_are_rate_limited_per_ip_before_authentication` |
+| Blocked version | `blocked_version_cannot_be_downloaded_but_stays_visible` and the blocking step of `scripts/e2e-dotnet.sh` with a real `dotnet restore` |
+| Quotas | `version_quota_rejects_with_specific_code`, `storage_quota_rejects_with_specific_code` |
 
-## Revisión manual de seguridad (Fase 5)
+## Manual security review (Phase 5)
 
-Revisión hecha sobre el código de la rama `feature/phase-5-hardening`, el 2026-10-04.
+Review performed on the code of the `feature/phase-5-hardening` branch on 2026-10-04.
 
-| Área | Comprobación | Resultado |
+| Area | Check | Result |
 |---|---|---|
-| Lectura del ZIP | Solo se descomprime el `.nuspec`, con `take(límite + 1)`; el resto se valida con el directorio central (`by_index_raw`). | Correcto. |
-| Memoria del directorio central | El número de entradas se valida antes de `ZipArchive::new`. El tamaño del directorio central está acotado por el tamaño comprimido. | Correcto. |
-| Escritura en disco | La subida va a `staging/` con un nombre que genera el servidor y pasa a `blobs/sha256/...` por hash. Ningún nombre de entrada del ZIP llega al sistema de archivos. | Correcto. |
-| XML | `DocType` se rechaza antes de procesar entidades. Las entidades generales solo resuelven las predefinidas. Profundidad y tamaño acotados. | Correcto. |
-| Segmentos de URL | Id y versión se normalizan con los parsers NuGet antes de usarse en consultas; los valores inválidos son `404`. | Correcto (Fase 3). |
-| Tiempo | La inspección comprueba un plazo en cada entrada y en cada evento XML. La subida tiene su propio plazo. | Correcto. Riesgo residual: una sola lectura bloqueante lenta del disco no se interrumpe. |
-| Concurrencia | Plazas de subida con `try_acquire` (sin cola) y semáforo de inspección. Los rechazos no crean archivos. | Correcto. |
-| Rate limiting | Cubo de fichas en memoria con número de claves acotado. Por IP antes de autenticar. | Correcto. Riesgo residual: detrás de un proxy el límite por IP es global (documentado). |
-| Bloqueo | Comprobado en el handler de descarga para `.nupkg` y `.nuspec`, para cualquier rol. El motivo no se expone en NuGet. | Correcto. |
-| Cuotas | Comprobación previa y dentro de la transacción del único escritor, así que dos publicaciones concurrentes no superan la cuota juntas. | Correcto. Si la cuota se supera entre la comprobación previa y la transacción, el blob queda huérfano y lo recoge la limpieza. |
-| Secretos en logs | Los motivos de bloqueo y los códigos se registran; los tokens no (E2E lo comprueba también con el token administrativo). | Correcto. |
-| Fuera de alcance | Antimalware, verificación de firmas, cuarentena automática, límites por IP de proxies de confianza. | Documentado arriba. |
+| ZIP reading | Only the `.nuspec` is decompressed, with `take(limit + 1)`; the rest is validated against the central directory (`by_index_raw`). | Correct. |
+| Central directory memory | The number of entries is validated before `ZipArchive::new`. The central directory size is bounded by the compressed size. | Correct. |
+| Disk writes | The upload goes to `staging/` with a server-generated name and moves to `blobs/sha256/...` by hash. No ZIP entry name reaches the filesystem. | Correct. |
+| XML | `DocType` is rejected before processing entities. General entities only resolve the predefined ones. Depth and size are bounded. | Correct. |
+| URL segments | Id and version are normalized with the NuGet parsers before being used in queries; invalid values are `404`. | Correct (Phase 3). |
+| Time | Inspection checks a deadline on every entry and on every XML event. Upload has its own deadline. | Correct. Residual risk: a single slow blocking disk read cannot be interrupted. |
+| Concurrency | Upload slots with `try_acquire` (no queue) and an inspection semaphore. Rejections do not create files. | Correct. |
+| Rate limiting | In-memory token bucket with a bounded number of keys. Per IP before authentication. | Correct. Residual risk: behind a proxy, the per-IP limit is global (documented). |
+| Blocking | Checked in the download handler for `.nupkg` and `.nuspec`, for any role. The reason is not exposed in NuGet. | Correct. |
+| Quotas | Pre-check and inside the single writer's transaction, so two concurrent publications cannot exceed the quota together. | Correct. If the quota is exceeded between the pre-check and the transaction, the blob is left orphaned and cleanup collects it. |
+| Secrets in logs | Block reasons and codes are logged; tokens are not (E2E also checks this with the administrative token). | Correct. |
+| Out of scope | Antimalware, signature verification, automatic quarantine, IP limits for trusted proxies. | Documented above. |
