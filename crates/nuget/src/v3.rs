@@ -1,6 +1,6 @@
-//! Documentos del protocolo NuGet V3: registros (`RegistrationsBaseUrl/3.6.0`), búsqueda
-//! (`SearchQueryService`) y autocompletado (`SearchAutocompleteService`). Funciones puras: el
-//! servidor resuelve permisos y datos, aquí solo se da forma al protocolo (ADR-009).
+//! NuGet V3 protocol documents: registrations (`RegistrationsBaseUrl/3.6.0`), search
+//! (`SearchQueryService`), and autocomplete (`SearchAutocompleteService`). Pure functions: the
+//! server resolves permissions and data; here only the protocol is shaped (ADR-009).
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -10,14 +10,14 @@ use serde_json::{Map, Value, json};
 
 use crate::{NuGetVersion, PackageManifest};
 
-/// Versiones por página de registro.
+/// Versions per registration page.
 pub const PAGE_SIZE: usize = 64;
-/// Hasta este número de versiones, las páginas van incluidas en el índice.
+/// Up to this number of versions, pages are included in the index.
 pub const INLINE_LIMIT: usize = 128;
 pub const MAX_TAKE: usize = 1000;
 pub const DEFAULT_TAKE: usize = 20;
 
-/// URLs base del feed, sin barra final.
+/// Feed base URLs, without trailing slash.
 pub struct FeedUrls {
     pub registration: String,
     pub flat: String,
@@ -60,10 +60,10 @@ impl FeedUrls {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Metadatos almacenados
+// Stored metadata
 // ---------------------------------------------------------------------------------------------
 
-/// Documento de metadatos que se guarda con cada versión (claves de `catalogEntry`).
+/// Metadata document stored with each version (`catalogEntry` keys).
 pub fn catalog_metadata(m: &PackageManifest) -> Value {
     let md = &m.metadata;
     let mut doc = Map::new();
@@ -139,7 +139,7 @@ pub fn catalog_metadata(m: &PackageManifest) -> Value {
     Value::Object(doc)
 }
 
-/// Texto, en minúsculas, sobre el que busca `SearchQueryService`.
+/// Lowercase text that `SearchQueryService` searches on.
 pub fn search_text(m: &PackageManifest) -> String {
     let md = &m.metadata;
     [
@@ -190,10 +190,10 @@ fn list_field(md: &Map<String, Value>, key: &str) -> Vec<String> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Orden de versiones
+// Version order
 // ---------------------------------------------------------------------------------------------
 
-/// Ordena por precedencia NuGet (ascendente). Las versiones no parseables quedan al principio.
+/// Sorts by NuGet precedence (ascending). Unparseable versions go first.
 pub fn sort_versions(versions: &mut [PublishedVersion]) {
     versions.sort_by(|a, b| {
         match (
@@ -209,7 +209,7 @@ pub fn sort_versions(versions: &mut [PublishedVersion]) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Registros
+// Registrations
 // ---------------------------------------------------------------------------------------------
 
 fn catalog_entry(urls: &FeedUrls, v: &PublishedVersion) -> Value {
@@ -249,8 +249,8 @@ fn catalog_entry(urls: &FeedUrls, v: &PublishedVersion) -> Value {
             .unwrap_or(Value::Bool(false)),
     );
     entry.insert("listed".into(), Value::Bool(v.listed));
-    // Una versión bloqueada (ADR-013) se anuncia como obsoleta para que el IDE lo muestre
-    // antes de que falle la descarga. El motivo no se publica: puede ser sensible.
+    // A blocked version (ADR-013) is announced as deprecated so that the IDE shows it
+    // before the download fails. The reason is not published: it may be sensitive.
     if v.blocked {
         entry.insert(
             "deprecation".into(),
@@ -327,7 +327,7 @@ fn page(urls: &FeedUrls, chunk: &[PublishedVersion], inline: bool) -> Value {
     page
 }
 
-/// Índice de registro de un paquete. Incluye versiones no listadas con `listed: false`.
+/// Registration index for a package. Includes unlisted versions with `listed: false`.
 pub fn registration_index(urls: &FeedUrls, versions: &[PublishedVersion]) -> Option<Value> {
     let mut versions = versions.to_vec();
     sort_versions(&mut versions);
@@ -345,7 +345,7 @@ pub fn registration_index(urls: &FeedUrls, versions: &[PublishedVersion]) -> Opt
     }))
 }
 
-/// Página de registro identificada por sus límites (`lower`/`upper`, claves de versión).
+/// Registration page identified by its bounds (`lower`/`upper`, version keys).
 pub fn registration_page(
     urls: &FeedUrls,
     versions: &[PublishedVersion],
@@ -360,7 +360,7 @@ pub fn registration_page(
         .map(|chunk| page(urls, chunk, true))
 }
 
-/// Hoja de registro de una versión.
+/// Registration leaf for a version.
 pub fn registration_leaf(urls: &FeedUrls, v: &PublishedVersion) -> Value {
     json!({
         "@id": urls.leaf(v),
@@ -374,7 +374,7 @@ pub fn registration_leaf(urls: &FeedUrls, v: &PublishedVersion) -> Value {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Búsqueda y autocompletado
+// Search and autocomplete
 // ---------------------------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Default)]
@@ -385,9 +385,9 @@ pub struct SearchQuery {
     pub package_type: Option<String>,
 }
 
-/// Versiones listadas de un feed agrupadas por paquete (claves en orden) y con las versiones
-/// ordenadas por precedencia. Construirlo cuesta; reutilizarlo entre búsquedas es barato, así
-/// que el servidor lo guarda en caché.
+/// Listed versions of a feed grouped by package (keys in order) and with versions
+/// sorted by precedence. Building it is expensive; reusing it across searches is cheap, so
+/// the server caches it.
 #[derive(Debug, Clone, Default)]
 pub struct SearchIndex {
     packages: Vec<(String, Vec<PublishedVersion>)>,
@@ -400,7 +400,7 @@ impl SearchIndex {
         }
     }
 
-    /// Versiones de un paquete, en orden ascendente.
+    /// Versions of a package, in ascending order.
     pub fn versions_of(&self, package_key: &str) -> &[PublishedVersion] {
         self.packages
             .binary_search_by(|(key, _)| key.as_str().cmp(package_key))
@@ -408,7 +408,7 @@ impl SearchIndex {
     }
 }
 
-/// Agrupa por paquete (claves en orden) con las versiones ordenadas por precedencia.
+/// Groups by package (keys in order) with versions sorted by precedence.
 fn by_package(versions: Vec<PublishedVersion>) -> BTreeMap<String, Vec<PublishedVersion>> {
     let mut packages: BTreeMap<String, Vec<PublishedVersion>> = BTreeMap::new();
     for v in versions {
@@ -438,7 +438,7 @@ fn has_package_type(latest: &PublishedVersion, wanted: Option<&str>) -> bool {
     names.iter().any(|n| n.eq_ignore_ascii_case(wanted))
 }
 
-/// Relevancia: id exacto > id que empieza por la consulta > id que contiene un término > resto.
+/// Relevance: exact id > id starting with the query > id containing a term > the rest.
 fn score(package_key: &str, q: &str, terms: &[String]) -> u8 {
     if q.is_empty() {
         0
@@ -453,10 +453,10 @@ fn score(package_key: &str, q: &str, terms: &[String]) -> u8 {
     }
 }
 
-/// Busca entre versiones ya filtradas por listado, prerelease y SemVer 2.0.0.
+/// Searches among versions already filtered by listing, prerelease, and SemVer 2.0.0.
 ///
-/// Sintaxis: términos libres (todos deben aparecer en id, título, etiquetas, autores, resumen o
-/// descripción), `id:texto` (el id contiene) y `packageid:Id` (id exacto).
+/// Syntax: free terms (all must appear in id, title, tags, authors, summary, or
+/// description), `id:text` (the id contains) and `packageid:Id` (exact id).
 pub fn search(urls: &FeedUrls, index: &SearchIndex, query: &SearchQuery) -> Value {
     let q = query.q.trim().to_lowercase();
     let mut exact_id = None;
@@ -533,7 +533,7 @@ fn search_result(urls: &FeedUrls, package_key: &str, versions: &[PublishedVersio
     })
 }
 
-/// Ids de paquete que contienen la consulta; primero los que empiezan por ella.
+/// Package ids containing the query; those starting with it first.
 pub fn autocomplete_ids(index: &SearchIndex, query: &SearchQuery) -> Value {
     let q = query.q.trim().to_lowercase();
     let mut ids: Vec<(bool, &str, &str)> = index
@@ -562,7 +562,7 @@ pub fn autocomplete_ids(index: &SearchIndex, query: &SearchQuery) -> Value {
     json!({ "totalHits": total, "data": data })
 }
 
-/// Versiones de un id, ya en orden ascendente (`SearchIndex::versions_of`).
+/// Versions of an id, already in ascending order (`SearchIndex::versions_of`).
 pub fn autocomplete_versions(versions: &[PublishedVersion]) -> Value {
     let data: Vec<&str> = versions.iter().map(|v| v.version.as_str()).collect();
     json!({ "totalHits": data.len(), "data": data })

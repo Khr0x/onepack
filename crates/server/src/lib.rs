@@ -1,4 +1,4 @@
-//! Servidor `onepackd`: composición de la aplicación HTTP.
+//! `onepackd` server: HTTP application composition.
 
 pub mod admin_api;
 pub mod auth;
@@ -24,7 +24,7 @@ use tower_http::trace::TraceLayer;
 pub use limits::{Limits, RateLimit};
 
 pub struct AppState {
-    /// URL pública explícita: base de todas las URLs absolutas (ADR-018).
+    /// Explicit public URL: base for all absolute URLs (ADR-018).
     pub public_url: String,
     pub store: Arc<Store>,
     pub limits: Limits,
@@ -40,8 +40,8 @@ pub fn app(store: Arc<Store>, public_url: &str, limits: Limits) -> Router {
     app_with_ops(store, public_url, limits).0
 }
 
-/// La aplicación y el router del listener de operación (`/metrics`, sondas), que comparten
-/// estado.
+/// The application and the operation listener router (`/metrics`, probes), which share
+/// state.
 pub fn app_with_ops(store: Arc<Store>, public_url: &str, limits: Limits) -> (Router, Router) {
     let max_package_bytes = limits.max_package_bytes;
     let state = Arc::new(AppState {
@@ -66,7 +66,7 @@ pub fn app_with_ops(store: Arc<Store>, public_url: &str, limits: Limits) -> (Rou
             "/nuget/{feed}/v3/flat/{id}/{version}/{file}",
             get(nuget_api::flat_file),
         )
-        // El cliente NuGet hace el PUT sobre el @id de PackagePublish con barra final.
+        // The NuGet client issues the PUT against the PackagePublish @id with a trailing slash.
         .route("/nuget/{feed}/v2/package", put(nuget_api::publish))
         .route("/nuget/{feed}/v2/package/", put(nuget_api::publish))
         .route(
@@ -149,28 +149,28 @@ pub fn app_with_ops(store: Arc<Store>, public_url: &str, limits: Limits) -> (Rou
             post(admin_api::unblock),
         )
         .route("/api/v1/audit", get(admin_api::list_audit))
-        // Margen sobre el tamaño del paquete para las cabeceras multipart; el límite exacto
-        // del paquete lo aplica el staging.
+        // Margin over the package size for the multipart headers; the exact package
+        // limit is enforced by staging.
         .layer(DefaultBodyLimit::max(
             max_package_bytes as usize + 64 * 1024,
         ))
-        // Dentro de la autenticación: en mantenimiento, las mutaciones reciben 503 (ADR-017).
+        // Inside authentication: during maintenance, mutations receive 503 (ADR-017).
         .layer(middleware::from_fn_with_state(
             state.clone(),
             ops::maintenance_guard,
         ))
-        // `layer` (no `route_layer`): también cubre rutas inexistentes, así que nada responde
-        // sin autenticar y una ruta nueva queda protegida por defecto.
+        // `layer` (not `route_layer`): it also covers nonexistent routes, so nothing responds
+        // unauthenticated and a new route is protected by default.
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_auth,
         ))
-        // Antes de autenticar: también frena ráfagas de credenciales inválidas.
+        // Before authenticating: it also throttles bursts of invalid credentials.
         .layer(middleware::from_fn_with_state(
             state.clone(),
             limits::limit_by_ip,
         ))
-        // Las trazas HTTP registran método y ruta, nunca cabeceras: los tokens no llegan al log.
+        // HTTP traces record method and route, never headers: tokens do not reach the log.
         .layer(TraceLayer::new_for_http().make_span_with(
             |req: &axum::http::Request<axum::body::Body>| {
                 tracing::info_span!(
@@ -182,19 +182,19 @@ pub fn app_with_ops(store: Arc<Store>, public_url: &str, limits: Limits) -> (Rou
             },
         ))
         .layer(middleware::from_fn(ops::track))
-        // La más externa: también los rechazos por límite de IP llevan request_id.
+        // The outermost one: IP-limit rejections also carry a request_id.
         .layer(middleware::from_fn(request_id::assign))
         .with_state(state.clone());
     (router, ops::ops_router(state))
 }
 
-/// Limpieza periódica de staging y blobs huérfanos (ADR-006). La primera pasada es inmediata,
-/// así que también recupera lo que dejó una caída anterior.
+/// Periodic cleanup of staging and orphaned blobs (ADR-006). The first pass is immediate,
+/// so it also recovers what a previous crash left behind.
 pub async fn gc_loop(store: Arc<Store>, interval: Duration, grace: Duration) {
     let mut ticker = tokio::time::interval(interval);
     loop {
         ticker.tick().await;
-        // Durante un backup (ADR-017) no se borra nada.
+        // During a backup (ADR-017) nothing is deleted.
         match store.maintenance().await {
             Ok(Some(_)) => {
                 tracing::info!("cleanup postponed: maintenance in progress");
@@ -220,8 +220,8 @@ pub async fn gc_loop(store: Arc<Store>, interval: Duration, grace: Duration) {
     }
 }
 
-/// Rellena los metadatos de versiones publicadas antes de la migración 0003 leyendo el
-/// `.nuspec` de su blob. Es idempotente: sin versiones pendientes no hace nada.
+/// Fills in the metadata of versions published before migration 0003 by reading the
+/// `.nuspec` from their blob. It is idempotent: with no pending versions it does nothing.
 pub async fn backfill_metadata(
     store: &Store,
     limits: &InspectionLimits,

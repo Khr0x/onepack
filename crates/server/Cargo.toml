@@ -1,6 +1,6 @@
 [package]
 name = "onepack-server"
-description = "Servidor onepack (onepackd)."
+description = "onepack server (onepackd)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -28,7 +28,7 @@ tokio-util = { version = "0.7.19", features = ["io"] }
 base64 = "0.23.1"
 
 [features]
-# Puntos de fallo para las pruebas de recuperación. Nunca en builds de release.
+# Fault injection points for recovery tests. Never in release builds.
 fault-injection = ["onepack-storage/fault-injection"]
 
 [lints]
@@ -39,7 +39,7 @@ name = "onepackd"
 path = "src/main.rs"
 
 [[test]]
-# Suite de seguridad de la Fase 5 (ADR-014): artefactos maliciosos sintéticos y abuso.
+# Phase 5 security suite (ADR-014): synthetic malicious artifacts and abuse.
 name = "security"
 path = "../../tests/security/main.rs"
 

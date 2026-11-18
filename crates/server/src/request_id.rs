@@ -1,5 +1,5 @@
-//! Identificador por petición (ADR-015): va en la cabecera `X-Request-Id`, en los errores de
-//! `/api/v1` y en el span `request` de las trazas, para cruzar lo que ve el cliente con el log.
+//! Per-request identifier (ADR-015): it goes in the `X-Request-Id` header, in `/api/v1`
+//! errors, and in the `request` span of traces, to correlate what the client sees with the log.
 
 use axum::extract::Request;
 use axum::http::HeaderValue;
@@ -12,14 +12,14 @@ tokio::task_local! {
     static REQUEST_ID: String;
 }
 
-/// Id de la petición en curso, si la hay.
+/// Id of the current request, if any.
 pub fn current() -> Option<String> {
     REQUEST_ID.try_with(Clone::clone).ok()
 }
 
 fn generate() -> String {
     let mut bytes = [0u8; 8];
-    // Sin entropía del sistema el id sigue sirviendo para correlacionar; no es un secreto.
+    // Without system entropy the id is still useful for correlation; it is not a secret.
     if getrandom::fill(&mut bytes).is_err() {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -29,7 +29,7 @@ fn generate() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Se genera siempre en el servidor: un id que llega del cliente no se usa.
+/// It is always generated on the server: an id that arrives from the client is not used.
 pub async fn assign(req: Request, next: Next) -> Response {
     let id = generate();
     let mut res = REQUEST_ID.scope(id.clone(), next.run(req)).await;

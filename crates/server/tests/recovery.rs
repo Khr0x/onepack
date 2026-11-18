@@ -1,5 +1,5 @@
-//! Pruebas de recuperación con el binario `onepackd` real: caídas abruptas (SIGKILL / abort)
-//! y reinicios (Fase 2, ADR-006).
+//! Recovery tests with the real `onepackd` binary: abrupt crashes (SIGKILL / abort)
+//! and restarts (Phase 2, ADR-006).
 
 use std::io::{Cursor, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -21,10 +21,10 @@ fn onepackd(args: &[&str], data: &Path) {
         .stdout(Stdio::null())
         .status()
         .unwrap();
-    assert!(status.success(), "onepackd {args:?} falló");
+    assert!(status.success(), "onepackd {args:?} failed");
 }
 
-/// Inicializa el directorio de datos y devuelve la credencial administrativa inicial.
+/// Initializes the data directory and returns the initial administrative credential.
 fn init(data: &Path) -> String {
     onepackd(&["init"], data);
     onepackd(&["feed", "create", "internal"], data);
@@ -86,7 +86,7 @@ impl Server {
         server
     }
 
-    /// Simula una caída abrupta (SIGKILL en Unix).
+    /// Simulates an abrupt crash (SIGKILL on Unix).
     fn kill(mut self) {
         self.child.kill().unwrap();
         self.child.wait().unwrap();
@@ -152,7 +152,7 @@ fn nupkg(id: &str, version: &str, padding: usize) -> Vec<u8> {
         .as_bytes(),
     )
     .unwrap();
-    // Contenido incompresible para controlar el tamaño del paquete.
+    // Incompressible content to control the package size.
     let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     zip.start_file("content.bin", stored).unwrap();
     let mut x: u32 = 0x9e37_79b9;
@@ -173,7 +173,7 @@ fn wait_until(mut condition: impl FnMut() -> bool) {
     while !condition() {
         assert!(
             Instant::now() < deadline,
-            "la condición no se cumplió a tiempo"
+            "the condition was not met in time"
         );
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -225,7 +225,7 @@ fn crash_during_upload_leaves_no_partial_version() {
     let body = multipart(&package);
 
     let server = Server::start(data.path(), &token, &[]);
-    // Envía las cabeceras y la mitad del cuerpo, y mata el servidor a mitad de la subida.
+    // Sends the headers and half the body, and kills the server in the middle of the upload.
     let mut stream = TcpStream::connect(server.addr).unwrap();
     let head = format!(
         "PUT /nuget/internal/v2/package HTTP/1.1\r\nHost: x\r\nX-NuGet-ApiKey: {token}\r\nContent-Type: multipart/form-data; boundary={BOUNDARY}\r\nContent-Length: {}\r\n\r\n",
@@ -243,7 +243,7 @@ fn crash_during_upload_leaves_no_partial_version() {
     drop(stream);
     assert!(
         !files_in(&staging).is_empty(),
-        "la subida interrumpida deja un archivo en staging"
+        "the interrupted upload leaves a file in staging"
     );
 
     let server = Server::start(data.path(), &token, &[]);
@@ -254,9 +254,13 @@ fn crash_during_upload_leaves_no_partial_version() {
             .unwrap()
             .0,
         404,
-        "no debe existir una versión parcial"
+        "no partial version must exist"
     );
-    assert_eq!(server.push(&package), Some(201), "la identidad sigue libre");
+    assert_eq!(
+        server.push(&package),
+        Some(201),
+        "the identity is still free"
+    );
 }
 
 #[cfg(feature = "fault-injection")]
@@ -275,14 +279,14 @@ fn crash_between_blob_persist_and_commit_leaves_recoverable_orphan() {
     assert_eq!(
         server.push(&package),
         None,
-        "el proceso aborta antes de responder"
+        "the process aborts before responding"
     );
     let mut child = server;
     assert!(!child.child.wait().unwrap().success());
     assert_eq!(
         files_in(&blobs).len(),
         1,
-        "el blob quedó persistido sin metadatos"
+        "the blob was persisted without metadata"
     );
 
     let server = Server::start(data.path(), &token, &[]);
@@ -317,7 +321,7 @@ fn init_creates_owner_only_credential_once() {
         .arg(data.path())
         .output()
         .unwrap();
-    assert!(!again.status.success(), "un segundo init debe fallar");
+    assert!(!again.status.success(), "a second init must fail");
 }
 
 #[test]
@@ -345,15 +349,15 @@ fn tokens_never_reach_the_logs() {
     let logs = std::fs::read_to_string(&log_path).unwrap();
     assert!(
         logs.contains("authentication rejected"),
-        "el log registra el rechazo"
+        "the log records the rejection"
     );
     let secret = token.rsplit('_').next().unwrap();
     assert!(
         !logs.contains(secret),
-        "el secreto del token apareció en el log"
+        "the token secret appeared in the log"
     );
     assert!(
         !logs.contains(&"e".repeat(64)),
-        "el secreto de un token inválido apareció en el log"
+        "the secret of an invalid token appeared in the log"
     );
 }

@@ -1,5 +1,5 @@
-//! Lectura de `.nupkg`: localiza el `.nuspec` en la raíz del ZIP y extrae la identidad, las
-//! dependencias y los metadatos. No extrae nada a disco ni ejecuta contenido del paquete
+//! `.nupkg` reading: locates the `.nuspec` at the root of the ZIP and extracts the identity, the
+//! dependencies, and the metadata. It extracts nothing to disk and does not execute content from the package
 //! (ADR-014).
 
 use std::collections::{HashMap, HashSet};
@@ -18,24 +18,24 @@ pub struct PackageManifest {
     pub version: NuGetVersion,
     pub dependency_groups: Vec<DependencyGroup>,
     pub metadata: Metadata,
-    /// Bytes originales del `.nuspec`, para servirlos sin regenerarlos.
+    /// Original `.nuspec` bytes, to serve them without regenerating them.
     pub nuspec: Vec<u8>,
 }
 
-/// Metadatos descriptivos del `.nuspec` que exponen los registros y la búsqueda.
+/// Descriptive `.nuspec` metadata exposed by the registrations and search.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Metadata {
     pub title: Option<String>,
     pub description: Option<String>,
     pub summary: Option<String>,
-    /// Lista separada por comas, tal como aparece en el `.nuspec`.
+    /// Comma-separated list, as it appears in the `.nuspec`.
     pub authors: Option<String>,
     pub owners: Option<String>,
-    /// Lista separada por espacios, tal como aparece en el `.nuspec`.
+    /// Space-separated list, as it appears in the `.nuspec`.
     pub tags: Option<String>,
     pub project_url: Option<String>,
     pub icon_url: Option<String>,
-    /// Ruta del icono embebido en el paquete.
+    /// Path of the icon embedded in the package.
     pub icon: Option<String>,
     pub license_url: Option<String>,
     pub license: Option<License>,
@@ -44,7 +44,7 @@ pub struct Metadata {
     pub copyright: Option<String>,
     pub language: Option<String>,
     pub min_client_version: Option<String>,
-    /// Ruta del readme embebido en el paquete.
+    /// Path of the readme embedded in the package.
     pub readme: Option<String>,
     pub repository_url: Option<String>,
     pub package_types: Vec<PackageType>,
@@ -79,7 +79,7 @@ impl Metadata {
         split_list(self.owners.as_deref())
     }
 
-    /// Tipos de paquete; sin declarar, NuGet asume `Dependency`.
+    /// Package types; if not declared, NuGet assumes `Dependency`.
     pub fn package_type_names(&self) -> Vec<&str> {
         if self.package_types.is_empty() {
             vec!["Dependency"]
@@ -112,21 +112,21 @@ pub struct Dependency {
     pub range: Option<String>,
 }
 
-/// Presupuesto de inspección de un paquete no confiable (ADR-014). Los límites son del
-/// registro, no de NuGet: un paquete legítimo muy grande puede requerir ampliarlos.
+/// Inspection budget for an untrusted package (ADR-014). The limits belong to the
+/// registry, not to NuGet: a very large legitimate package may require raising them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InspectionLimits {
-    /// Número máximo de entradas del ZIP.
+    /// Maximum number of ZIP entries.
     pub max_entries: u64,
-    /// Tamaño descomprimido máximo de una entrada, según el directorio central.
+    /// Maximum uncompressed size of one entry, according to the central directory.
     pub max_entry_bytes: u64,
-    /// Suma máxima de los tamaños descomprimidos de todas las entradas.
+    /// Maximum sum of the uncompressed sizes of all entries.
     pub max_total_bytes: u64,
-    /// Tamaño máximo del `.nuspec` descomprimido.
+    /// Maximum uncompressed size of the `.nuspec`.
     pub max_nuspec_bytes: u64,
-    /// Profundidad máxima de anidamiento de elementos del `.nuspec`.
+    /// Maximum nesting depth of `.nuspec` elements.
     pub max_xml_depth: usize,
-    /// Tiempo máximo de inspección.
+    /// Maximum inspection time.
     pub timeout: Duration,
 }
 
@@ -166,7 +166,7 @@ pub enum PackageError {
         limit: usize,
     },
     Timeout,
-    /// Ruta absoluta, con `..`, con caracteres de control o con un nombre reservado.
+    /// Absolute path, with `..`, with control characters, or with a reserved name.
     UnsafePath(String),
     DuplicateEntry(String),
     UnsupportedEntry {
@@ -176,7 +176,7 @@ pub enum PackageError {
 }
 
 impl PackageError {
-    /// Código estable para clientes y auditoría.
+    /// Stable code for clients and auditing.
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotAZip(_)
@@ -230,13 +230,13 @@ impl std::fmt::Display for PackageError {
 
 impl std::error::Error for PackageError {}
 
-/// Lee el manifiesto con los límites por defecto.
+/// Reads the manifest with the default limits.
 pub fn read_package(nupkg: &[u8]) -> Result<PackageManifest, PackageError> {
     read_package_from(Cursor::new(nupkg), &InspectionLimits::default())
 }
 
-/// Inspecciona un paquete sin cargarlo completo en memoria (p. ej. desde un archivo): valida
-/// todas las entradas del ZIP y lee el manifiesto.
+/// Inspects a package without loading it fully into memory (e.g. from a file): validates
+/// every ZIP entry and reads the manifest.
 pub fn read_package_from<R: Read + Seek>(
     nupkg: R,
     limits: &InspectionLimits,
@@ -249,7 +249,7 @@ pub fn read_package_from<R: Read + Seek>(
     )
 }
 
-/// Devuelve solo los bytes del `.nuspec` (para servir `/{id}/{version}/{id}.nuspec`).
+/// Returns only the `.nuspec` bytes (to serve `/{id}/{version}/{id}.nuspec`).
 pub fn read_nuspec_from<R: Read + Seek>(
     nupkg: R,
     limits: &InspectionLimits,
@@ -285,8 +285,8 @@ fn read_nuspec_within<R: Read + Seek>(
     limits: &InspectionLimits,
     deadline: &Deadline,
 ) -> Result<Vec<u8>, PackageError> {
-    // El número de entradas se comprueba antes de que el lector del ZIP reserve memoria
-    // para todo el directorio central.
+    // The number of entries is checked before the ZIP reader reserves memory
+    // for the whole central directory.
     if declared_entries(&mut nupkg)
         .map_err(|e| PackageError::NotAZip(e.into()))?
         .is_some_and(|n| n > limits.max_entries)
@@ -307,7 +307,7 @@ fn read_nuspec_within<R: Read + Seek>(
     let mut found = None;
     for i in 0..archive.len() {
         deadline.check()?;
-        // Solo el directorio central: nada se descomprime ni se escribe a disco.
+        // Central directory only: nothing is decompressed or written to disk.
         let entry = archive.by_index_raw(i).map_err(PackageError::NotAZip)?;
         let name = entry.name().map_err(PackageError::NotAZip)?.into_owned();
         check_entry_name(&name)?;
@@ -347,7 +347,7 @@ fn read_nuspec_within<R: Read + Seek>(
     }
     let index = found.ok_or(PackageError::NuspecMissing)?;
 
-    // El tamaño declarado puede mentir: la lectura se corta en el límite pase lo que pase.
+    // The declared size may lie: reading stops at the limit no matter what.
     let entry = archive.by_index(index).map_err(PackageError::NotAZip)?;
     let mut bytes = Vec::new();
     entry
@@ -363,13 +363,13 @@ fn read_nuspec_within<R: Read + Seek>(
     Ok(bytes)
 }
 
-/// Número de entradas que declara el registro de fin de directorio central (EOCD, o EOCD64
-/// en ZIP64). `None` si no se encuentra: el lector del ZIP dará el error.
+/// Number of entries declared by the end of central directory record (EOCD, or EOCD64
+/// in ZIP64). `None` if it is not found: the ZIP reader will return the error.
 fn declared_entries<R: Read + Seek>(r: &mut R) -> std::io::Result<Option<u64>> {
     const EOCD: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
     const EOCD_LEN: u64 = 22;
     let len = r.seek(SeekFrom::End(0))?;
-    // El EOCD va al final, seguido de un comentario de hasta 65535 bytes.
+    // The EOCD is at the end, followed by a comment of up to 65535 bytes.
     let window = len.min(EOCD_LEN + u64::from(u16::MAX));
     r.seek(SeekFrom::Start(len - window))?;
     let mut tail = vec![0; window as usize];
@@ -387,7 +387,7 @@ fn declared_entries<R: Read + Seek>(r: &mut R) -> std::io::Result<Option<u64>> {
         return Ok(Some(u64::from(entries)));
     }
 
-    // ZIP64: el localizador (20 bytes) precede al EOCD y apunta al EOCD64.
+    // ZIP64: the locator (20 bytes) precedes the EOCD and points to the EOCD64.
     const LOCATOR: [u8; 4] = [0x50, 0x4b, 0x06, 0x07];
     const EOCD64: [u8; 4] = [0x50, 0x4b, 0x06, 0x06];
     if pos < 20 || tail[pos - 20..pos - 16] != LOCATOR {
@@ -409,9 +409,9 @@ fn declared_entries<R: Read + Seek>(r: &mut R) -> std::io::Result<Option<u64>> {
     )))
 }
 
-/// Rechaza rutas que, al extraerse en un cliente, escaparían del directorio del paquete o
-/// fallarían en Windows. Se comprueba el nombre tal cual y con el escape `%XX` de OPC
-/// resuelto, porque los clientes NuGet lo deshacen al extraer.
+/// Rejects paths that, when extracted by a client, would escape the package directory or
+/// fail on Windows. The name is checked as is and with the OPC `%XX` escape
+/// resolved, because NuGet clients undo it on extraction.
 fn check_entry_name(name: &str) -> Result<(), PackageError> {
     let unsafe_path = || PackageError::UnsafePath(name.to_owned());
     let decoded = percent_decode(name).ok_or_else(unsafe_path)?;
@@ -431,7 +431,7 @@ fn is_safe_path(name: &str) -> bool {
     if path.starts_with('/') {
         return false;
     }
-    // El último segmento vacío es el de una entrada de directorio (`lib/`).
+    // The last empty segment is that of a directory entry (`lib/`).
     let segments: Vec<&str> = path.split('/').collect();
     let (last, rest) = segments
         .split_last()
@@ -444,7 +444,7 @@ fn is_safe_segment(segment: &str) -> bool {
     if segment.is_empty() || segment == "." || segment == ".." {
         return false;
     }
-    // Windows ignora los puntos y espacios finales: `a.` y `a ` serían `a`.
+    // Windows ignores trailing dots and spaces: `a.` and `a ` would be `a`.
     if segment.ends_with(['.', ' ']) {
         return false;
     }
@@ -456,7 +456,7 @@ fn is_safe_segment(segment: &str) -> bool {
     !(RESERVED.contains(&upper.as_str()) || numbered_device)
 }
 
-/// Deshace `%XX`. `None` si el resultado no es UTF-8 o hay un escape incompleto.
+/// Undoes `%XX`. `None` if the result is not UTF-8 or there is an incomplete escape.
 fn percent_decode(name: &str) -> Option<String> {
     let bytes = name.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -474,8 +474,8 @@ fn percent_decode(name: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-/// Forma con la que se detectan duplicados: como los vería un sistema de archivos que no
-/// distingue mayúsculas, tras deshacer el escape.
+/// Normalized form used to detect duplicates: as a case-insensitive filesystem would see the
+/// name, after undoing the escape.
 fn canonical_name(name: &str) -> String {
     percent_decode(name)
         .unwrap_or_else(|| name.to_owned())
@@ -490,8 +490,8 @@ fn parse_nuspec_within(
 ) -> Result<PackageManifest, PackageError> {
     let invalid = |msg: String| PackageError::InvalidNuspec(msg);
     let mut reader = Reader::from_reader(nuspec.as_slice());
-    // Sin recortar: el texto llega en trozos separados por las entidades (`A &amp; B`) y
-    // recortarlos se comería los espacios. Se recorta el valor final.
+    // Without trimming: the text arrives in chunks separated by the entities (`A &amp; B`) and
+    // trimming them would eat the spaces. The final value is trimmed.
     reader.config_mut().trim_text(false);
 
     let mut path: Vec<String> = Vec::new();
@@ -506,8 +506,8 @@ fn parse_nuspec_within(
             .read_event_into(&mut buf)
             .map_err(|e| invalid(e.to_string()))?;
         match event {
-            // Sin DTD no hay entidades definidas por el documento ni externas: descarta las
-            // XML bombs (billion laughs) y XXE.
+            // Without a DTD there are no document-defined or external entities: this rules out
+            // XML bombs (billion laughs) and XXE.
             Event::DocType(_) => return Err(invalid("DTD not allowed".into())),
             Event::Start(e) => {
                 if path.len() >= limits.max_xml_depth {
@@ -600,7 +600,7 @@ fn parse_nuspec_within(
     })
 }
 
-/// Campo de texto de `<metadata>` en el que se está dentro, si lo hay.
+/// Text field of `<metadata>` currently inside, if any.
 fn metadata_field(path: &[String]) -> Option<&str> {
     match path {
         [package, metadata, field] if package == "package" && metadata == "metadata" => Some(field),
@@ -636,7 +636,7 @@ fn on_element(
             target_framework: attr(e, "targetFramework")?,
             dependencies: Vec::new(),
         }),
-        // Formato antiguo: dependencias sin grupo equivalen a un grupo sin framework.
+        // Old format: dependencies without a group are equivalent to a group without a framework.
         ("package/metadata/dependencies", "dependency") => {
             if groups.first().is_none_or(|g| g.target_framework.is_some()) {
                 groups.insert(
@@ -813,7 +813,7 @@ mod tests {
     <version>2.0.0-beta.1+build.5</version>
     <title>Hemia Rich</title>
     <authors>Hemia, Cristian</authors>
-    <description>Logs &amp; traces &lt;fast&gt; &#233;xito
+    <description>Logs &amp; traces &lt;fast&gt; na&#239;ve
   second line</description>
     <tags>logging tracing  hemia</tags>
     <license type="expression">MIT</license>
@@ -832,7 +832,7 @@ mod tests {
         assert_eq!(md.title.as_deref(), Some("Hemia Rich"));
         assert_eq!(
             md.description.as_deref(),
-            Some("Logs & traces <fast> éxito\n  second line")
+            Some("Logs & traces <fast> naïve\n  second line")
         );
         assert_eq!(md.author_list(), ["Hemia", "Cristian"]);
         assert_eq!(md.tag_list(), ["logging", "tracing", "hemia"]);

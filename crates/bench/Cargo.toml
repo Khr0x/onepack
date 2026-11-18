@@ -1,6 +1,6 @@
 [package]
 name = "onepack-bench"
-description = "Benchmark de latencia de metadatos de onepackd (Fase 7). No se distribuye."
+description = "onepackd metadata latency benchmark (Phase 7). Not distributed."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

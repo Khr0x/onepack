@@ -1,9 +1,9 @@
-//! Operación (Fase 7, ADR-017): modo mantenimiento, backup, restore y comprobación de
-//! integridad entre la base y los blobs.
+//! Operations (Phase 7, ADR-017): maintenance mode, backup, restore, and integrity
+//! check between the database and the blobs.
 //!
-//! El backup copia la base con `VACUUM INTO` (copia consistente dentro de una transacción
-//! de lectura) y después los blobs que esa copia referencia, verificando su hash. Como las
-//! versiones nunca se borran, un blob referenciado en la copia sigue existiendo en disco.
+//! The backup copies the database with `VACUUM INTO` (consistent copy inside a read
+//! transaction) and then the blobs that copy references, verifying their hash. Since
+//! versions are never deleted, a blob referenced in the copy still exists on disk.
 
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -16,7 +16,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use crate::identity::audit;
 use crate::{DB_FILE, MIGRATOR, Store, StoreError, migrate, read_only_options};
 
-/// Versión del formato del backup. Cambia solo con cambios incompatibles.
+/// Backup format version. It changes only with breaking changes.
 pub const BACKUP_FORMAT: u32 = 1;
 pub const MANIFEST_FILE: &str = "manifest.json";
 
@@ -33,7 +33,7 @@ pub struct BackupManifest {
     pub format: u32,
     pub created_at: String,
     pub onepackd_version: String,
-    /// Última migración aplicada en la base copiada.
+    /// Last migration applied in the copied database.
     pub schema_version: i64,
     pub database: FileEntry,
     pub feeds: u64,
@@ -62,17 +62,17 @@ pub struct RestoreReport {
     pub blobs: usize,
 }
 
-/// Resultado de `onepackd check`.
+/// Result of `onepackd check`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct CheckReport {
     pub versions: u64,
     pub blobs_checked: usize,
     pub hashes_verified: bool,
-    /// Blobs referenciados sin archivo: esas versiones no se pueden descargar.
+    /// Referenced blobs without a file: those versions cannot be downloaded.
     pub missing: Vec<BlobProblem>,
-    /// Archivos con tamaño o hash distinto del esperado.
+    /// Files with a size or hash different from the expected one.
     pub corrupt: Vec<BlobProblem>,
-    /// Archivos que ninguna versión referencia; la limpieza los elimina tras la gracia.
+    /// Files that no version references; cleanup deletes them after the grace period.
     pub orphan_files: Vec<String>,
     pub staging_files: usize,
 }
@@ -81,7 +81,7 @@ pub struct CheckReport {
 pub struct BlobProblem {
     pub sha256: String,
     pub detail: String,
-    /// Versiones afectadas (`feed/Id@versión`).
+    /// Affected versions (`feed/Id@version`).
     pub versions: Vec<String>,
 }
 
@@ -94,13 +94,13 @@ impl CheckReport {
 #[derive(Debug)]
 pub enum OpsError {
     Store(StoreError),
-    /// El destino del backup o del restore no está vacío.
+    /// The backup or restore destination is not empty.
     NotEmpty(PathBuf),
-    /// Ya hay un mantenimiento en curso (p. ej. otro backup).
+    /// A maintenance is already in progress (e.g. another backup).
     MaintenanceActive(Maintenance),
-    /// El backup no supera la verificación.
+    /// The backup does not pass verification.
     InvalidBackup(String),
-    /// Un blob de origen no coincide con su hash: el backup no se completa.
+    /// A source blob does not match its hash: the backup does not complete.
     CorruptSource {
         sha256: String,
         detail: String,
@@ -135,11 +135,11 @@ impl<E: Into<StoreError>> From<E> for OpsError {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Mantenimiento
+// Maintenance
 // ---------------------------------------------------------------------------------------------
 
 impl Store {
-    /// Mantenimiento vigente, si lo hay (uno caducado se ignora).
+    /// Active maintenance, if any (an expired one is ignored).
     pub async fn maintenance(&self) -> Result<Option<Maintenance>, StoreError> {
         let row = sqlx::query(
             "SELECT reason, actor, started_at, expires_at FROM maintenance
@@ -155,7 +155,7 @@ impl Store {
         }))
     }
 
-    /// Activa el mantenimiento durante `ttl_secs` como máximo. Falla si ya hay uno vigente.
+    /// Enables maintenance for at most `ttl_secs`. Fails if one is already active.
     pub async fn begin_maintenance(
         &self,
         reason: &str,
@@ -203,7 +203,7 @@ impl Store {
         Ok(Ok(()))
     }
 
-    /// Termina el mantenimiento. `false` si no había ninguno.
+    /// Ends maintenance. `false` if there was none.
     pub async fn end_maintenance(&self, actor: &str) -> Result<bool, StoreError> {
         let mut tx = self.writer.begin().await?;
         let ended = sqlx::query("DELETE FROM maintenance")
@@ -227,7 +227,7 @@ impl Store {
         Ok(ended)
     }
 
-    /// La base responde (para `/readyz`).
+    /// The database responds (for `/readyz`).
     pub async fn ping(&self) -> Result<(), StoreError> {
         sqlx::query("SELECT 1").execute(&self.reader).await?;
         Ok(())
@@ -235,14 +235,14 @@ impl Store {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Utilidades de archivos (bloqueantes: se ejecutan en `spawn_blocking`)
+// File utilities (blocking: they run in `spawn_blocking`)
 // ---------------------------------------------------------------------------------------------
 
 fn hex(digest: &[u8]) -> String {
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Copia `src` en `dst` calculando el SHA-256 de lo copiado, y deja `dst` en disco.
+/// Copies `src` to `dst` computing the SHA-256 of what was copied, and leaves `dst` on disk.
 fn copy_hashed(src: &Path, dst: &Path) -> io::Result<(String, u64)> {
     if let Some(parent) = dst.parent() {
         std::fs::create_dir_all(parent)?;
@@ -281,7 +281,7 @@ fn hash_file(path: &Path) -> io::Result<(String, u64)> {
     Ok((hex(&hasher.finalize()), size))
 }
 
-/// Ruta relativa de un blob: `blobs/sha256/ab/cd/<hash>` (ADR-005).
+/// Relative path of a blob: `blobs/sha256/ab/cd/<hash>` (ADR-005).
 fn blob_rel(sha256: &str) -> PathBuf {
     PathBuf::from("blobs")
         .join("sha256")
@@ -294,7 +294,7 @@ fn is_sha256_hex(s: &str) -> bool {
     s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
-/// Un destino vale si no existe o es un directorio vacío.
+/// A destination is valid if it does not exist or is an empty directory.
 fn ensure_empty(dir: &Path) -> Result<(), OpsError> {
     match std::fs::read_dir(dir) {
         Ok(mut entries) => {
@@ -324,8 +324,8 @@ async fn blocking<T: Send + 'static>(
 // Backup
 // ---------------------------------------------------------------------------------------------
 
-/// Hace un backup completo de `data_dir` en `out` (que debe estar vacío o no existir).
-/// Activa el mantenimiento durante la copia y lo termina siempre, también si falla.
+/// Makes a full backup of `data_dir` to `out` (which must be empty or nonexistent).
+/// It enables maintenance during the copy and always ends it, even on failure.
 pub async fn backup(
     data_dir: &Path,
     out: &Path,
@@ -360,7 +360,7 @@ async fn copy_backup(
         .execute(&store.writer)
         .await?;
 
-    // Lo que se copia es lo que referencia la copia de la base, no la base viva.
+    // What is copied is what the database copy references, not the live database.
     let copy = SqlitePoolOptions::new()
         .max_connections(1)
         .connect_with(read_only_options(&db_copy))
@@ -445,8 +445,8 @@ async fn now_rfc3339(store: &Store) -> Result<String, StoreError> {
 // Restore
 // ---------------------------------------------------------------------------------------------
 
-/// Lee y valida el manifiesto de un backup, y verifica la base y cada blob contra sus
-/// hashes. No escribe nada.
+/// Reads and validates a backup manifest, and verifies the database and each blob against their
+/// hashes. It writes nothing.
 pub async fn verify_backup(backup: &Path) -> Result<BackupManifest, OpsError> {
     let invalid = |m: String| OpsError::InvalidBackup(m);
     let manifest_path = backup.join(MANIFEST_FILE);
@@ -495,8 +495,8 @@ pub async fn verify_backup(backup: &Path) -> Result<BackupManifest, OpsError> {
     Ok(manifest)
 }
 
-/// Restaura un backup en un directorio de datos vacío (o inexistente). Verifica todo antes de
-/// copiar y migra la base si el backup es de una versión anterior.
+/// Restores a backup into an empty (or nonexistent) data directory. It verifies everything before
+/// copying and migrates the database if the backup is from an earlier version.
 pub async fn restore(backup: &Path, data_dir: &Path) -> Result<RestoreReport, OpsError> {
     ensure_empty(data_dir)?;
     let manifest = verify_backup(backup).await?;
@@ -515,7 +515,7 @@ pub async fn restore(backup: &Path, data_dir: &Path) -> Result<RestoreReport, Op
             }
         }
         let migrated = migrate(data_dir).await?;
-        // Comprueba que el resultado abre y es coherente.
+        // Checks that the result opens and is consistent.
         let report = check(data_dir, false).await?;
         if !report.ok() {
             return Err(OpsError::InvalidBackup(format!(
@@ -532,7 +532,7 @@ pub async fn restore(backup: &Path, data_dir: &Path) -> Result<RestoreReport, Op
     }
     .await;
     if result.is_err() {
-        // No deja un directorio a medias que alguien pudiera arrancar.
+        // Does not leave a half-finished directory that someone could start.
         if let Ok(mut entries) = tokio::fs::read_dir(data_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 let path = entry.path();
@@ -551,7 +551,7 @@ pub async fn restore(backup: &Path, data_dir: &Path) -> Result<RestoreReport, Op
 // Check
 // ---------------------------------------------------------------------------------------------
 
-/// Integridad entre la base y los blobs. Con `verify_hashes`, lee cada blob entero.
+/// Integrity between the database and the blobs. With `verify_hashes`, it reads each blob in full.
 pub async fn check(data_dir: &Path, verify_hashes: bool) -> Result<CheckReport, OpsError> {
     let store = Store::open(data_dir).await?;
     let rows = sqlx::query(
@@ -568,7 +568,7 @@ pub async fn check(data_dir: &Path, verify_hashes: bool) -> Result<CheckReport, 
         hashes_verified: verify_hashes,
         ..CheckReport::default()
     };
-    // Agrupa versiones por blob (varias versiones pueden compartir contenido).
+    // Groups versions by blob (several versions may share content).
     let mut by_blob: Vec<(String, u64, Vec<String>)> = Vec::new();
     for r in &rows {
         let sha: String = r.get("blob_sha256");

@@ -1,5 +1,5 @@
-//! `onepack`: CLI del registro (ADR-015). Datos a stdout, diagnóstico a stderr, `--json`
-//! estable y códigos de salida documentados en `docs/cli.md`.
+//! `onepack`: registry CLI (ADR-015). Data to stdout, diagnostics to stderr, stable
+//! `--json`, and exit codes documented in `docs/cli.md`.
 
 mod app;
 mod commands;
@@ -397,8 +397,8 @@ fn main() {
     std::process::exit(code);
 }
 
-/// Devuelve el código de salida: `exec` propaga el del proceso hijo y `doctor` indica si
-/// hubo fallos.
+/// Returns the exit code: `exec` propagates the child process's exit code and `doctor` indicates
+/// whether there were failures.
 fn run(command: Command, global: Global, out: Out) -> error::CliResult<i32> {
     if let Command::Completion { shell } = command {
         clap_complete::generate(

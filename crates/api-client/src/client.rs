@@ -1,7 +1,7 @@
-//! Cliente bloqueante de `/api/v1` y de las rutas NuGet que usa `onepack` (ADR-015).
+//! Blocking client for `/api/v1` and the NuGet routes used by `onepack` (ADR-015).
 //!
-//! Los reintentos se hacen solo en peticiones idempotentes (`GET`, `PUT`, `DELETE`) y ante
-//! fallos transitorios: conexión, `429`, `502`, `503` y `504`. Los errores nunca incluyen el
+//! Retries happen only on idempotent requests (`GET`, `PUT`, `DELETE`) and on
+//! transient failures: connection, `429`, `502`, `503`, and `504`. Errors never include the
 //! token.
 
 use std::time::Duration;
@@ -22,11 +22,11 @@ const MULTIPART_BOUNDARY: &str = "onepack-cli-boundary-8b1c2f";
 
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
-    /// URL pública del servidor (sin `/api/v1`).
+    /// Public server URL (without `/api/v1`).
     pub base_url: String,
     pub token: Option<String>,
     pub timeout: Duration,
-    /// CA adicional en PEM, para servidores con certificados de una CA propia.
+    /// Extra CA in PEM format, for servers with certificates from a private CA.
     pub ca_cert_pem: Option<Vec<u8>>,
 }
 
@@ -41,17 +41,17 @@ pub enum TransportKind {
 
 #[derive(Debug)]
 pub enum ClientError {
-    /// El servidor respondió con un error.
+    /// The server responded with an error.
     Api {
         status: u16,
         detail: ErrorDetail,
     },
-    /// No se llegó a obtener respuesta.
+    /// No response was obtained.
     Transport {
         kind: TransportKind,
         message: String,
     },
-    /// La respuesta no tiene el formato esperado (p. ej. no es un servidor onepack).
+    /// The response does not have the expected format (e.g. it is not an onepack server).
     InvalidResponse(String),
     Config(String),
 }
@@ -87,7 +87,7 @@ impl ClientError {
     }
 }
 
-/// Respuesta sin interpretar, para las rutas NuGet.
+/// Uninterpreted response, for the NuGet routes.
 #[derive(Debug, Clone)]
 pub struct RawResponse {
     pub status: u16,
@@ -302,7 +302,7 @@ impl Client {
         self.api(Method::DELETE, path, None)
     }
 
-    /// Recorre todas las páginas de un listado. `path` puede llevar ya parámetros.
+    /// Walks every page of a listing. `path` may already carry parameters.
     pub fn list_all<T: DeserializeOwned>(&self, path: &str) -> Result<Vec<T>, ClientError> {
         let separator = if path.contains('?') { '&' } else { '?' };
         let mut items = Vec::new();
@@ -321,8 +321,8 @@ impl Client {
         }
     }
 
-    /// Capacidades del servidor. Un servidor anterior a la Fase 6 no tiene el endpoint: se
-    /// trata como uno sin capacidades administrativas.
+    /// Server capabilities. A server older than Phase 6 does not have the endpoint: it is
+    /// treated as one without administrative capabilities.
     pub fn capabilities(&self) -> Result<Capabilities, ClientError> {
         match self.get::<Capabilities>("/capabilities") {
             Err(ClientError::Api { status: 404, .. }) => Ok(Capabilities {
@@ -334,8 +334,8 @@ impl Client {
         }
     }
 
-    /// Publica un `.nupkg` por `PackagePublish` (la misma ruta que `dotnet nuget push`).
-    /// No se reintenta: un reintento tras un éxito no confirmado daría `409`.
+    /// Publishes a `.nupkg` through `PackagePublish` (the same route as `dotnet nuget push`).
+    /// It is not retried: a retry after an unconfirmed success would return `409`.
     pub fn nuget_push(&self, feed: &str, nupkg: &[u8]) -> Result<RawResponse, ClientError> {
         let mut body = format!(
             "--{MULTIPART_BOUNDARY}\r\nContent-Disposition: form-data; name=\"package\"; filename=\"package.nupkg\"\r\nContent-Type: application/octet-stream\r\n\r\n"
@@ -353,12 +353,12 @@ impl Client {
         )
     }
 
-    /// `GET` autenticado como lo haría un cliente NuGet (Basic con el token).
+    /// Authenticated `GET` as a NuGet client would perform it (Basic with the token).
     pub fn nuget_get(&self, url: &str) -> Result<RawResponse, ClientError> {
         self.send(Method::GET, url, Auth::Basic, None, true)
     }
 
-    /// `GET` sin credenciales: sirve para identificar el servidor (p. ej. en `doctor`).
+    /// `GET` without credentials: useful to identify the server (e.g. in `doctor`).
     pub fn probe(&self, url: &str) -> Result<RawResponse, ClientError> {
         let res = self
             .agent
@@ -388,7 +388,7 @@ fn to_json<B: Serialize>(body: &B) -> Result<Vec<u8>, ClientError> {
     serde_json::to_vec(body).map_err(|e| ClientError::Config(e.to_string()))
 }
 
-/// Interpreta un error: JSON de `/api/v1` o texto `CÓDIGO: mensaje` de las rutas NuGet.
+/// Interprets an error: JSON from `/api/v1` or `CODE: message` text from the NuGet routes.
 pub fn api_error(res: &RawResponse) -> ClientError {
     let detail = serde_json::from_slice::<crate::ErrorBody>(&res.body)
         .map(|b| b.error)
@@ -458,7 +458,7 @@ fn transport(e: ureq::Error) -> ClientError {
     ClientError::Transport { kind, message }
 }
 
-/// Escapa un valor para la query string.
+/// Escapes a value for the query string.
 pub fn encode_query(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for b in value.bytes() {

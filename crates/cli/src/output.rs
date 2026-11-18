@@ -1,5 +1,5 @@
-//! Salida del CLI (ADR-015): los datos van a stdout (texto o `--json`) y el diagnóstico a
-//! stderr. La forma del JSON es parte del contrato y está cubierta por snapshots.
+//! CLI output (ADR-015): data goes to stdout (text or `--json`) and diagnostics to
+//! stderr. The JSON shape is part of the contract and is covered by snapshots.
 
 use std::io::{IsTerminal, Read, Write};
 
@@ -14,7 +14,7 @@ pub struct Out {
 }
 
 impl Out {
-    /// Escribe el resultado: JSON o el texto que devuelve `human`.
+    /// Writes the result: JSON or the text returned by `human`.
     pub fn data<T: Serialize>(&self, value: &T, human: impl FnOnce() -> String) {
         let mut stdout = std::io::stdout().lock();
         if self.json {
@@ -28,7 +28,7 @@ impl Out {
         }
     }
 
-    /// Mensaje informativo para personas: a stderr, también con `--json`.
+    /// Informational message for people: to stderr, also with `--json`.
     pub fn note(&self, message: impl AsRef<str>) {
         eprintln!("{}", message.as_ref());
     }
@@ -51,8 +51,8 @@ impl Out {
         }
     }
 
-    /// Pide confirmación para una operación destructiva. Con `--yes` no pregunta; sin
-    /// terminal o con `--no-input` exige `--yes`.
+    /// Asks for confirmation for a destructive operation. With `--yes` it does not ask; without
+    /// a terminal or with `--no-input` it requires `--yes`.
     pub fn confirm(&self, question: &str, yes: bool) -> CliResult<()> {
         if yes {
             return Ok(());
@@ -82,7 +82,7 @@ impl Out {
         }
     }
 
-    /// Lee un secreto: de stdin con `--token-stdin`, o del terminal sin eco.
+    /// Reads a secret: from stdin with `--token-stdin`, or from the terminal without echo.
     pub fn read_secret(&self, prompt: &str, from_stdin: bool) -> CliResult<String> {
         let secret = if from_stdin {
             let mut s = String::new();
@@ -107,7 +107,7 @@ impl Out {
     }
 }
 
-/// Tabla de texto con columnas alineadas.
+/// Text table with aligned columns.
 pub fn table(headers: &[&str], rows: Vec<Vec<String>>) -> String {
     if rows.is_empty() {
         return "(no results)".to_owned();

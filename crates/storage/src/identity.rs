@@ -1,4 +1,4 @@
-//! Principals, tokens y grants (ADR-010, ADR-012). Toda mutación queda auditada.
+//! Principals, tokens, and grants (ADR-010, ADR-012). Every mutation is audited.
 
 use onepack_core::{
     AuthContext, Feed, Grant, Principal, PrincipalKind, PrincipalName, PublishPattern, Role,
@@ -14,7 +14,7 @@ pub enum AuthOutcome {
     Invalid(AuthFailure),
 }
 
-/// Motivo del rechazo. Nunca contiene el secreto.
+/// Rejection reason. It never contains the secret.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthFailure {
     Malformed,
@@ -52,7 +52,7 @@ impl AuthFailure {
 #[derive(Debug, Clone)]
 pub struct IssuedToken {
     pub id: String,
-    /// Token completo: se muestra una sola vez y no se puede recuperar después.
+    /// Full token: shown only once and cannot be retrieved afterwards.
     pub token: String,
     pub expires_at: String,
 }
@@ -91,8 +91,8 @@ fn to_principal(r: &sqlx::sqlite::SqliteRow) -> Option<Principal> {
 }
 
 impl Store {
-    /// Verifica un token y devuelve la identidad con sus grants. Consulta la base en cada
-    /// llamada, así que una revocación surte efecto inmediato.
+    /// Verifies a token and returns the identity with its grants. It queries the database on every
+    /// call, so a revocation takes effect immediately.
     pub async fn authenticate(&self, raw: &str) -> Result<AuthOutcome, StoreError> {
         let Some((id, secret)) = tokens::parse(raw) else {
             return Ok(AuthOutcome::Invalid(AuthFailure::Malformed));
@@ -112,7 +112,7 @@ impl Store {
         let Some(row) = row else {
             return Ok(AuthOutcome::Invalid(AuthFailure::UnknownToken { id }));
         };
-        // Primero el secreto: sin él no se revela el estado del token.
+        // The secret first: without it, the token state is not revealed.
         if !constant_time_eq(&tokens::verifier(secret), row.get("verifier")) {
             return Ok(AuthOutcome::Invalid(AuthFailure::WrongSecret { id }));
         }
@@ -158,7 +158,7 @@ impl Store {
         }
     }
 
-    /// Registra el último uso del token. Quien llama decide cada cuánto (ADR-010).
+    /// Records the last use of the token. The caller decides how often (ADR-010).
     pub async fn touch_token(&self, id: &str) -> Result<(), StoreError> {
         sqlx::query(
             "UPDATE token SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
@@ -221,7 +221,7 @@ impl Store {
         )
     }
 
-    /// Emite un token con caducidad obligatoria. `ttl_secs` puede ser negativo solo en pruebas.
+    /// Issues a token with a mandatory expiration. `ttl_secs` may be negative only in tests.
     pub async fn create_token(
         &self,
         principal: &Principal,
@@ -265,7 +265,7 @@ impl Store {
         })
     }
 
-    /// Revoca un token. Devuelve `false` si no existía o ya estaba revocado.
+    /// Revokes a token. Returns `false` if it did not exist or was already revoked.
     pub async fn revoke_token(&self, id: &str, actor: &str) -> Result<bool, StoreError> {
         let mut tx = self.writer.begin().await?;
         let revoked = sqlx::query(
@@ -292,7 +292,7 @@ impl Store {
         Ok(revoked)
     }
 
-    /// Crea o reemplaza el grant de un principal sobre un feed.
+    /// Creates or replaces a principal's grant on a feed.
     pub async fn set_grant(
         &self,
         principal: &Principal,
@@ -357,7 +357,7 @@ impl Store {
         actor: &str,
     ) -> Result<bool, StoreError> {
         let mut tx = self.writer.begin().await?;
-        // Los patrones se borran en cascada.
+        // Patterns are deleted in cascade.
         let removed = sqlx::query("DELETE FROM feed_grant WHERE principal_id = ? AND feed_id = ?")
             .bind(principal.id)
             .bind(feed.id)

@@ -1,5 +1,5 @@
-//! Pruebas bloqueantes de la Fase 6 para el CLI (ADR-015, ADR-016): el binario `onepack`
-//! contra un `onepackd` real en proceso.
+//! Phase 6 blocking tests for the CLI (ADR-015, ADR-016): the `onepack` binary
+//! against a real in-process `onepackd`.
 
 use std::io::{Cursor, Write};
 use std::net::SocketAddr;
@@ -21,7 +21,7 @@ struct Server {
     reader: String,
 }
 
-/// `onepackd` con un feed `internal`, un administrador y un lector de ese feed.
+/// `onepackd` with an `internal` feed, an administrator, and a reader for that feed.
 fn server() -> Server {
     let dir = TempDir::new().unwrap();
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -83,7 +83,7 @@ fn server() -> Server {
     }
 }
 
-/// Entorno aislado del CLI: configuración propia, sin keychain y sin variables heredadas.
+/// Isolated CLI environment: its own configuration, no keychain, and no inherited variables.
 struct Cli {
     config: TempDir,
     cwd: TempDir,
@@ -98,12 +98,12 @@ struct Run {
 impl Run {
     fn json(&self) -> Value {
         serde_json::from_str(&self.stdout)
-            .unwrap_or_else(|e| panic!("stdout no es JSON ({e}): {}", self.stdout))
+            .unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", self.stdout))
     }
 
     fn error_json(&self) -> Value {
         serde_json::from_str(&self.stderr)
-            .unwrap_or_else(|e| panic!("stderr no es JSON ({e}): {}", self.stderr))
+            .unwrap_or_else(|e| panic!("stderr is not JSON ({e}): {}", self.stderr))
     }
 }
 
@@ -240,7 +240,7 @@ fn full_flow_without_ui() {
         )
         .json();
     let ci = issued["token"].as_str().unwrap().to_owned();
-    // En texto, solo el token va a stdout.
+    // In text mode, only the token goes to stdout.
     let plain = cli.ok(&["token", "create", "--principal", "ci-payments"], a);
     assert!(plain.stdout.trim().starts_with("opk_"));
     assert_eq!(plain.stdout.trim().lines().count(), 1);
@@ -278,7 +278,7 @@ fn full_flow_without_ui() {
         .json();
     assert_eq!(pushed[0]["status"], "pushed");
 
-    // El mismo archivo otra vez: error sin la opción, éxito con ella.
+    // The same file again: error without the option, success with it.
     let dup = cli.run(
         &[
             "package",
@@ -306,7 +306,7 @@ fn full_flow_without_ui() {
         )
         .json();
     assert_eq!(skipped[0]["status"], "skipped");
-    // Misma versión, contenido distinto: conflicto también con la opción.
+    // Same version, different content: conflict also with the option.
     let other = nupkg(pkgs.path(), "Hemia.Payments.Core", "1.0.0", "different");
     let conflict = cli.run(
         &[
@@ -321,7 +321,7 @@ fn full_flow_without_ui() {
     );
     assert_eq!(conflict.code, 6);
     assert!(conflict.stderr.contains("different content"));
-    // Fuera de sus patrones: sin permiso.
+    // Outside its patterns: no permission.
     let foreign = nupkg(pkgs.path(), "Acme.Other", "1.0.0", "a");
     let denied = cli.run(
         &[
@@ -364,13 +364,13 @@ fn full_flow_without_ui() {
             "Hemia.Payments.Core",
             "1.0.0",
             "--reason",
-            "incidente",
+            "incident",
         ],
         a,
     );
     assert_eq!(
         blocked.code, 2,
-        "sin --yes y sin terminal: {}",
+        "without --yes and without a terminal: {}",
         blocked.stderr
     );
     assert!(blocked.stderr.contains("CONFIRMATION_REQUIRED"));
@@ -383,7 +383,7 @@ fn full_flow_without_ui() {
             "Hemia.Payments.Core",
             "1.0.0",
             "--reason",
-            "incidente",
+            "incident",
             "--yes",
         ],
         a,
@@ -403,7 +403,7 @@ fn full_flow_without_ui() {
         )
         .json();
     assert_eq!(inspect["availability"], "blocked");
-    assert_eq!(inspect["blocked_reason"], "incidente");
+    assert_eq!(inspect["blocked_reason"], "incident");
 
     let audit = cli
         .ok(&["audit", "list", "--action", "package.", "--json"], a)
@@ -422,9 +422,9 @@ fn full_flow_without_ui() {
     );
     assert!(revoke.stdout.contains("revoked"));
     let after = cli.run(&["whoami"], &ci);
-    assert_eq!(after.code, 3, "token revocado: {}", after.stderr);
+    assert_eq!(after.code, 3, "revoked token: {}", after.stderr);
 
-    // Ningún secreto en archivos del CLI.
+    // No secrets in CLI files.
     assert!(!cli.files_contain(&ci));
     assert!(!cli.files_contain(a));
 }
@@ -448,7 +448,7 @@ fn exit_codes_and_error_format() {
     let err = forbidden.error_json();
     assert_eq!(err["error"]["code"], "AUTH_ADMIN_REQUIRED");
     assert_eq!(err["error"]["request_id"].as_str().map(str::len), Some(16));
-    assert!(forbidden.stdout.is_empty(), "los errores van a stderr");
+    assert!(forbidden.stdout.is_empty(), "errors go to stderr");
 
     let missing = cli.run(&["feed", "show", "nope"], &s.admin);
     assert_eq!(missing.code, 5);
@@ -528,7 +528,7 @@ fn exec_injects_credentials_only_into_the_child() {
     let s = server();
     let cli = Cli::new();
     context(&cli, &s);
-    // Un administrador accede a cualquier feed: una variable por feed.
+    // An administrator can access any feed: one variable per feed.
     let r = cli.ok(
         &[
             "exec", "--feed", "internal", "--feed", "customer-a", "--", "sh", "-c",
@@ -539,7 +539,7 @@ fn exec_injects_credentials_only_into_the_child() {
     let lines: Vec<&str> = r.stdout.lines().collect();
     let as_admin = format!("Username=onepack;Password={}", s.admin);
     assert_eq!(lines, [as_admin.as_str(), as_admin.as_str()]);
-    // El proceso padre no recibe nada y no se escribe nada a disco.
+    // The parent process receives nothing and nothing is written to disk.
     assert!(std::env::var("NuGetPackageSourceCredentials_onepack_internal").is_err());
     assert!(!cli.files_contain(&s.admin));
 
@@ -558,7 +558,7 @@ fn exec_injects_credentials_only_into_the_child() {
     let expected = format!("Username=onepack;Password={}", s.reader);
     assert_eq!(r.stdout, expected);
 
-    // El código de salida del hijo se propaga.
+    // The child's exit code is propagated.
     let failing = cli.run(
         &["exec", "--feed", "internal", "--", "sh", "-c", "exit 42"],
         &s.reader,
@@ -581,8 +581,8 @@ fn exec_injects_credentials_only_into_the_child() {
     assert_eq!(custom.stdout, expected);
 }
 
-/// Con un token inválido o sin acceso al feed, NuGet solo diría NU1301: `exec` lo detecta antes
-/// de lanzar el comando. Si el servidor no responde, avisa y ejecuta (puede bastar la caché).
+/// With an invalid token or without access to the feed, NuGet would only say NU1301: `exec` detects it before
+/// launching the command. If the server does not respond, it warns and runs (the cache may suffice).
 #[cfg(unix)]
 #[test]
 fn exec_checks_the_credential_before_running_the_command() {
@@ -605,7 +605,7 @@ fn exec_checks_the_credential_before_running_the_command() {
             .unwrap()
             .contains("new token")
     );
-    assert!(!marker.exists(), "no debe ejecutar el comando");
+    assert!(!marker.exists(), "it must not run the command");
 
     let scope = cli.run(
         &[
@@ -631,7 +631,7 @@ fn exec_checks_the_credential_before_running_the_command() {
     );
     assert!(!marker.exists());
 
-    // Servidor caído: aviso y el comando se ejecuta.
+    // Server down: warning and the command runs.
     let down = cli
         .command(&[
             "--url",
@@ -661,7 +661,7 @@ fn nuget_init_preserves_existing_config_and_shows_a_diff() {
     context(&cli, &s);
     let existing = r#"<?xml version="1.0" encoding="utf-8"?>
 <configuration>
-  <!-- no tocar -->
+  <!-- do not touch -->
   <packageSources>
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
   </packageSources>
@@ -696,7 +696,7 @@ fn nuget_init_preserves_existing_config_and_shows_a_diff() {
     assert_eq!(
         std::fs::read_to_string(&config).unwrap(),
         existing,
-        "--dry-run no escribe"
+        "--dry-run does not write"
     );
 
     let no_yes = cli.run_with(
@@ -711,7 +711,7 @@ fn nuget_init_preserves_existing_config_and_shows_a_diff() {
         None,
         None,
     );
-    assert_eq!(no_yes.code, 2, "sin terminal hace falta --yes");
+    assert_eq!(no_yes.code, 2, "without a terminal --yes is required");
 
     let applied = cli
         .run_with(
@@ -731,11 +731,11 @@ fn nuget_init_preserves_existing_config_and_shows_a_diff() {
         .json();
     assert_eq!(applied["written"], true);
     let written = std::fs::read_to_string(&config).unwrap();
-    assert!(written.contains("<!-- no tocar -->"));
+    assert!(written.contains("<!-- do not touch -->"));
     assert!(written.contains("https://api.nuget.org/v3/index.json"));
     assert!(written.contains(&format!("{}/nuget/internal/v3/index.json", s.url)));
     assert!(written.contains("<packageSource key=\"nuget.org\">"));
-    assert!(!written.contains("Password"), "sin secretos");
+    assert!(!written.contains("Password"), "no secrets");
 
     let again = cli
         .run_with(
@@ -752,7 +752,7 @@ fn nuget_init_preserves_existing_config_and_shows_a_diff() {
             None,
         )
         .json();
-    assert_eq!(again["changed"], false, "idempotente");
+    assert_eq!(again["changed"], false, "idempotent");
 }
 
 #[test]
@@ -793,7 +793,7 @@ fn doctor_reports_missing_publish_scope_without_leaking_the_token() {
             .unwrap()
             .iter()
             .find(|c| c["name"] == name)
-            .unwrap_or_else(|| panic!("falta {name}: {report}"))
+            .unwrap_or_else(|| panic!("missing {name}: {report}"))
             .clone()
     };
     let permissions = check("permissions");
@@ -821,12 +821,12 @@ fn doctor_reports_missing_publish_scope_without_leaking_the_token() {
     let secret = s.reader.rsplit('_').next().unwrap();
     assert!(!r.stdout.contains(secret) && !r.stderr.contains(secret));
 
-    // Con lectura basta: sin fallos.
+    // Read access is enough: no failures.
     let fine = cli.run(&["doctor", "--feed", "internal"], &s.reader);
     assert_eq!(fine.code, 0, "{}", fine.stdout);
     assert!(fine.stdout.contains("No failures."));
 
-    // Un servidor inaccesible se diagnostica en la red, antes de la credencial.
+    // An unreachable server is diagnosed at the network check, before the credential.
     let down = cli.run(
         &["doctor", "--url", "http://127.0.0.1:9", "--json"],
         &s.reader,
@@ -835,7 +835,7 @@ fn doctor_reports_missing_publish_scope_without_leaking_the_token() {
     assert!(down.stdout.contains("CONNECT_FAILED"));
 }
 
-/// Servidor mínimo que imita una versión anterior de onepackd.
+/// Minimal server that mimics an older version of onepackd.
 fn old_server(capabilities: Option<Value>) -> String {
     use axum::Json;
     use axum::routing::get;
@@ -863,7 +863,7 @@ fn old_server(capabilities: Option<Value>) -> String {
 #[test]
 fn newer_cli_against_older_server_fails_with_missing_capability() {
     let cli = Cli::new();
-    // N-1 que anuncia capacidades, pero no la de auditoría.
+    // N-1 that announces capabilities, but not the audit one.
     let url = old_server(Some(json!({
         "server_version": "0.0.0-n1",
         "api_version": 1,
@@ -877,14 +877,14 @@ fn newer_cli_against_older_server_fails_with_missing_capability() {
     assert!(audit.stderr.contains("CAPABILITY_MISSING"));
     assert!(audit.stderr.contains("0.0.0-n1"));
 
-    // Servidor de antes de la Fase 6: sin endpoint de capacidades.
+    // Server from before Phase 6: no capabilities endpoint.
     let url = old_server(None);
     let r = cli.run(&["feed", "list", "--url", &url], "opk_x_y");
     assert_eq!(r.code, 8, "{}", r.stderr);
     assert!(r.stderr.contains("CAPABILITY_MISSING"));
 }
 
-/// Forma de un valor JSON: claves y tipos, sin datos.
+/// Shape of a JSON value: keys and types, without data.
 fn shape(v: &Value) -> Value {
     match v {
         Value::Object(map) => {
@@ -1020,12 +1020,12 @@ fn json_output_matches_schema_snapshot() {
     }
     let expected: Value = serde_json::from_str(
         &std::fs::read_to_string(&path)
-            .expect("falta el snapshot; genera con ONEPACK_UPDATE_SNAPSHOTS=1"),
+            .expect("missing the snapshot; generate it with ONEPACK_UPDATE_SNAPSHOTS=1"),
     )
     .unwrap();
     assert_eq!(
         actual, expected,
-        "la salida --json cambió de forma: es un cambio de contrato (ADR-015). \
-         Si es intencionado, regenera con ONEPACK_UPDATE_SNAPSHOTS=1 y documenta el cambio."
+        "the --json output changed shape: this is a contract change (ADR-015). \
+         If intentional, regenerate with ONEPACK_UPDATE_SNAPSHOTS=1 and document the change."
     );
 }

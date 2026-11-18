@@ -1,4 +1,4 @@
-//! Pruebas de la Fase 3: registros, búsqueda, autocompletado y unlist/relist (ADR-009, ADR-013).
+//! Phase 3 tests: registrations, search, autocomplete, and unlist/relist (ADR-009, ADR-013).
 
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -62,12 +62,12 @@ async fn server() -> (Router, TempDir) {
     (router, dir)
 }
 
-/// Paquete con metadatos y dependencias arbitrarios (XML dentro de `<metadata>`).
+/// Package with arbitrary metadata and dependencies (XML inside `<metadata>`).
 fn nupkg(id: &str, version: &str, extra: &str) -> Vec<u8> {
     let nuspec = format!(
         r#"<?xml version="1.0"?><package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
 <metadata><id>{id}</id><version>{version}</version><authors>Tester</authors>
-<description>Paquete {id}</description>{extra}</metadata></package>"#
+<description>Package {id}</description>{extra}</metadata></package>"#
     );
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     zip.start_file(format!("{id}.nuspec"), SimpleFileOptions::default())
@@ -211,7 +211,7 @@ async fn registration_exposes_metadata_and_dependency_groups() {
     assert_eq!(
         status,
         StatusCode::OK,
-        "packageContent apunta a un recurso descargable"
+        "packageContent points to a downloadable resource"
     );
 
     let leaf_doc = get_json(
@@ -234,7 +234,7 @@ async fn large_registrations_are_paged() {
     let pages = index["items"].as_array().unwrap();
     assert!(
         pages.iter().all(|p| p.get("items").is_none()),
-        "con >128 versiones las páginas no van inline"
+        "with >128 versions, pages are not inlined"
     );
     assert_eq!(pages[0]["lower"], "1.0.0");
     assert_eq!(pages[0]["upper"], "1.63.0");
@@ -315,10 +315,10 @@ async fn search_pages_and_matches_text() {
     assert_eq!(
         ids(&all),
         ["Hemia.Logging", "Hemia.Tracing", "Other.Hemia"],
-        "prefijo de id primero"
+        "id prefix first"
     );
     let logging = &all["data"][0];
-    assert_eq!(logging["version"], "1.1.0", "la versión es la más reciente");
+    assert_eq!(logging["version"], "1.1.0", "the version is the latest");
     assert_eq!(logging["versions"].as_array().unwrap().len(), 2);
     assert_eq!(
         logging["registration"],
@@ -433,7 +433,7 @@ async fn unlisted_versions_are_hidden_from_discovery_but_still_restorable() {
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT, "unlist es idempotente");
+    assert_eq!(status, StatusCode::NO_CONTENT, "unlist is idempotent");
 
     let search = get_json(&router, "/nuget/internal/v3/query?q=hemia.core").await;
     assert_eq!(search["data"][0]["version"], "1.0.0");
@@ -471,7 +471,7 @@ async fn unlisted_versions_are_hidden_from_discovery_but_still_restorable() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body, original,
-        "una versión no listada sigue siendo descargable"
+        "an unlisted version can still be downloaded"
     );
 
     let (status, _) = send(
@@ -485,7 +485,7 @@ async fn unlisted_versions_are_hidden_from_discovery_but_still_restorable() {
     let search = get_json(&router, "/nuget/internal/v3/query?q=hemia.core").await;
     assert_eq!(
         search["data"][0]["version"], "2.0.0",
-        "relist la devuelve a la búsqueda"
+        "relist returns it to search"
     );
 
     let (status, _) = send(

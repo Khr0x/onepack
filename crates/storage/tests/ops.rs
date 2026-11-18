@@ -1,5 +1,5 @@
-//! Recuperación (Fase 7, ADR-017, ADR-020): mantenimiento, backup, restore, comprobación de
-//! integridad y actualización del esquema desde la versión anterior.
+//! Recovery (Phase 7, ADR-017, ADR-020): maintenance, backup, restore, integrity
+//! check, and schema upgrade from the previous version.
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -16,11 +16,11 @@ async fn seeded() -> (TempDir, Feed) {
         .create_feed(&FeedName::parse("internal").unwrap(), "test")
         .await
         .unwrap();
-    // Dos versiones con el mismo contenido y una distinta.
+    // Two versions with the same content and one different.
     for (id, v, content) in [
-        ("Hemia.Core", "1.0.0", b"contenido A".as_slice()),
-        ("Hemia.Core", "1.1.0", b"contenido B"),
-        ("Hemia.Copy", "1.0.0", b"contenido A"),
+        ("Hemia.Core", "1.0.0", b"content A".as_slice()),
+        ("Hemia.Core", "1.1.0", b"content B"),
+        ("Hemia.Copy", "1.0.0", b"content A"),
     ] {
         let mut w = store.blobs().begin_staging(1 << 20).await.unwrap();
         w.write(content).await.unwrap();
@@ -71,14 +71,10 @@ async fn backup_and_restore_roundtrip() {
     let manifest = backup(src.path(), out.path(), "test", 3600).await.unwrap();
     assert_eq!(manifest.versions, 3);
     assert_eq!(manifest.feeds, 1);
-    assert_eq!(
-        manifest.blobs.len(),
-        2,
-        "el contenido compartido se copia una vez"
-    );
+    assert_eq!(manifest.blobs.len(), 2, "shared content is copied once");
     assert_eq!(manifest.schema_version, 5);
 
-    // El mantenimiento termina al acabar el backup.
+    // Maintenance ends when the backup finishes.
     let store = Store::open(src.path()).await.unwrap();
     assert_eq!(store.maintenance().await.unwrap(), None);
     store.close().await;
@@ -96,7 +92,7 @@ async fn backup_and_restore_roundtrip() {
         .unwrap()
         .unwrap();
     let bytes = std::fs::read(restored.blobs().path(&v.blob_sha256)).unwrap();
-    assert_eq!(bytes, b"contenido B");
+    assert_eq!(bytes, b"content B");
     restored.close().await;
     assert!(check(&target, true).await.unwrap().ok());
 }
@@ -107,26 +103,26 @@ async fn restore_requires_an_empty_target_and_a_valid_backup() {
     let out = TempDir::new().unwrap();
     backup(src.path(), out.path(), "test", 3600).await.unwrap();
 
-    // Destino ocupado.
+    // Destination occupied.
     assert!(matches!(
         restore(out.path(), src.path()).await,
         Err(OpsError::NotEmpty(_))
     ));
-    // Backup en un destino ocupado.
+    // Backup to an occupied destination.
     assert!(matches!(
         backup(src.path(), out.path(), "test", 3600).await,
         Err(OpsError::NotEmpty(_))
     ));
 
-    // Un blob alterado en el backup: no se restaura nada.
+    // An altered blob in the backup: nothing is restored.
     let tampered = blob_files(out.path()).pop().unwrap();
-    std::fs::write(&tampered, b"alterado").unwrap();
+    std::fs::write(&tampered, b"tampered").unwrap();
     let dst = TempDir::new().unwrap();
     let err = restore(out.path(), dst.path()).await.unwrap_err();
     assert!(matches!(err, OpsError::InvalidBackup(_)), "{err}");
     assert_eq!(std::fs::read_dir(dst.path()).unwrap().count(), 0);
 
-    // Sin manifiesto tampoco.
+    // Without a manifest either.
     std::fs::remove_file(out.path().join("manifest.json")).unwrap();
     assert!(matches!(
         restore(out.path(), dst.path()).await,
@@ -145,7 +141,7 @@ async fn maintenance_is_exclusive_and_expires() {
         .unwrap();
     assert_eq!(store.maintenance().await.unwrap().unwrap().reason, "manual");
 
-    // Un backup no puede empezar mientras hay otro mantenimiento.
+    // A backup cannot start while there is another maintenance.
     let out = TempDir::new().unwrap();
     assert!(matches!(
         backup(src.path(), out.path(), "test", 3600).await,
@@ -154,16 +150,16 @@ async fn maintenance_is_exclusive_and_expires() {
     assert!(store.end_maintenance("test").await.unwrap());
     assert!(!store.end_maintenance("test").await.unwrap());
 
-    // Uno caducado (p. ej. de un backup interrumpido) no bloquea.
+    // An expired one (e.g. from an interrupted backup) does not block.
     store
-        .begin_maintenance("viejo", 0, "test")
+        .begin_maintenance("old", 0, "test")
         .await
         .unwrap()
         .unwrap();
     assert_eq!(store.maintenance().await.unwrap(), None);
     assert!(
         store
-            .begin_maintenance("nuevo", 60, "test")
+            .begin_maintenance("new", 60, "test")
             .await
             .unwrap()
             .is_ok()
@@ -177,26 +173,26 @@ async fn check_detects_missing_corrupt_and_orphan_blobs() {
     assert!(check(src.path(), true).await.unwrap().ok());
 
     let files = blob_files(src.path());
-    // Blob compartido por dos versiones, eliminado a mano.
+    // Blob shared by two versions, deleted by hand.
     let shared = files
         .iter()
-        .find(|p| std::fs::read(p).unwrap() == b"contenido A")
+        .find(|p| std::fs::read(p).unwrap() == b"content A")
         .unwrap()
         .clone();
     std::fs::remove_file(&shared).unwrap();
-    // El otro, alterado con el mismo tamaño: solo lo detecta la verificación de hashes.
+    // The other one, altered with the same size: only hash verification detects it.
     let other = files.iter().find(|p| **p != shared).unwrap().clone();
-    std::fs::write(&other, b"contenido X").unwrap();
-    // Y un archivo que nadie referencia.
+    std::fs::write(&other, b"content X").unwrap();
+    // And a file that nobody references.
     let orphan = "f".repeat(64);
     let orphan_path = src.path().join("blobs/sha256/ff/ff").join(&orphan);
     std::fs::create_dir_all(orphan_path.parent().unwrap()).unwrap();
-    std::fs::write(&orphan_path, b"huerfano").unwrap();
+    std::fs::write(&orphan_path, b"orphan").unwrap();
 
     let quick = check(src.path(), false).await.unwrap();
     assert_eq!(quick.missing.len(), 1);
     assert_eq!(quick.missing[0].versions.len(), 2);
-    assert!(quick.corrupt.is_empty(), "sin hashes no se nota");
+    assert!(quick.corrupt.is_empty(), "without hashes it goes unnoticed");
 
     let full = check(src.path(), true).await.unwrap();
     assert!(!full.ok());
@@ -205,7 +201,7 @@ async fn check_detects_missing_corrupt_and_orphan_blobs() {
     assert_eq!(full.corrupt[0].versions, ["internal/Hemia.Core@1.1.0"]);
     assert_eq!(full.orphan_files, [orphan]);
 
-    // Con un blob dañado, el backup se niega en lugar de copiar basura.
+    // With a damaged blob, the backup refuses instead of copying garbage.
     let out = TempDir::new().unwrap();
     assert!(matches!(
         backup(src.path(), out.path(), "test", 3600).await,
@@ -215,13 +211,13 @@ async fn check_detects_missing_corrupt_and_orphan_blobs() {
     assert_eq!(
         store.maintenance().await.unwrap(),
         None,
-        "termina aunque falle"
+        "it ends even on failure"
     );
     store.close().await;
 }
 
-/// Actualización N-1 → N: un directorio creado con todas las migraciones menos la última
-/// se actualiza conservando los datos y dejando un backup previo.
+/// N-1 → N upgrade: a directory created with all migrations except the last one
+/// is upgraded while preserving the data and leaving a previous backup.
 #[tokio::test]
 async fn upgrade_from_previous_schema_keeps_data_and_backs_up_first() {
     let dir = TempDir::new().unwrap();
@@ -259,14 +255,11 @@ async fn upgrade_from_previous_schema_keeps_data_and_backs_up_first() {
 
     let report = migrate(dir.path()).await.unwrap();
     assert_eq!(report.applied, 1);
-    let backup_file = report.backup.expect("backup previo a migrar");
+    let backup_file = report.backup.expect("backup before migrating");
     assert!(backup_file.exists());
 
     let store = Store::open(dir.path()).await.unwrap();
-    assert!(
-        store.feed("legacy").await.unwrap().is_some(),
-        "datos intactos"
-    );
+    assert!(store.feed("legacy").await.unwrap().is_some(), "data intact");
     store.close().await;
     assert!(schema_status(dir.path()).await.unwrap().pending.is_empty());
 }

@@ -1,6 +1,6 @@
 [package]
 name = "onepack-core"
-description = "Dominio de onepack: feeds, versiones, permisos y casos de uso."
+description = "onepack domain: feeds, versions, permissions, and use cases."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,6 +1,6 @@
-//! `onepack doctor` (ADR-015): diagnóstico de punta a punta, como producto. Cada
-//! comprobación da un estado, un código estable cuando falla y la acción a tomar. Nunca
-//! muestra el token.
+//! `onepack doctor` (ADR-015): end-to-end diagnosis, as a product. Each
+//! check reports a status, a stable code when it fails, and the action to take. It never
+//! shows the token.
 
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
@@ -116,7 +116,7 @@ fn is_loopback(host: &str) -> bool {
     host == "localhost" || host.starts_with("127.") || host == "::1"
 }
 
-/// Busca `NuGet.Config` en el directorio actual y sus padres, como hace `dotnet`.
+/// Searches for `NuGet.Config` in the current directory and its parents, as `dotnet` does.
 fn locate_config(explicit: Option<PathBuf>) -> Option<PathBuf> {
     if explicit.is_some() {
         return explicit;
@@ -198,7 +198,7 @@ pub fn run(app: &App, args: DoctorArgs) -> CliResult<i32> {
 }
 
 fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) {
-    // --- Red ---
+    // --- Network ---
     let Some((host, port)) = host_port(&target.url) else {
         checks.fail(
             "url",
@@ -241,7 +241,7 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
         }
     }
 
-    // --- TLS (sin credencial) ---
+    // --- TLS (without credential) ---
     let anonymous = match app.client_for(target, None, timeout) {
         Ok(c) => c,
         Err(e) => {
@@ -281,7 +281,7 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
         );
     }
 
-    // --- Credencial ---
+    // --- Credential ---
     let credential = match app.credential(target) {
         Ok(Some(c)) => {
             checks.ok(
@@ -337,7 +337,7 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
         ),
     );
 
-    // --- Servidor ---
+    // --- Server ---
     match client.capabilities() {
         Ok(Capabilities {
             server_version,
@@ -370,7 +370,7 @@ fn diagnose(app: &App, args: &DoctorArgs, target: &Target, checks: &mut Checks) 
         return;
     };
 
-    // --- Permisos ---
+    // --- Permissions ---
     let role = if me.administrator {
         Some(ScopeArg::Maintain)
     } else {

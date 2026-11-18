@@ -1,14 +1,14 @@
-//! Autenticación HTTP (ADR-011).
+//! HTTP authentication (ADR-011).
 //!
-//! Un único middleware protege **todas** las rutas, incluidas las que no existen: una ruta
-//! nueva queda protegida por defecto. Cada superficie acepta solo sus mecanismos:
+//! A single middleware protects **all** routes, including ones that do not exist: a
+//! new route is protected by default. Each surface accepts only its mechanisms:
 //!
-//! | Superficie | Mecanismo |
+//! | Surface | Mechanism |
 //! |---|---|
-//! | `/api/...` (administración) | `Authorization: Bearer <token>` |
-//! | NuGet (lectura y publicación) | `X-NuGet-ApiKey: <token>` o `Authorization: Basic` con el token como contraseña |
+//! | `/api/...` (administration) | `Authorization: Bearer <token>` |
+//! | NuGet (read and publish) | `X-NuGet-ApiKey: <token>` or `Authorization: Basic` with the token as password |
 //!
-//! La autorización por feed la decide `AuthContext` en cada handler.
+//! Per-feed authorization is decided by `AuthContext` in each handler.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -25,7 +25,7 @@ use onepack_storage::AuthOutcome;
 use crate::AppState;
 use crate::nuget_api::ApiError;
 
-/// Frecuencia máxima con la que se escribe `last_used_at` de un token (ADR-010).
+/// Maximum frequency at which a token's `last_used_at` is written (ADR-010).
 const TOUCH_INTERVAL: Duration = Duration::from_secs(300);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,7 +44,7 @@ impl Surface {
     }
 }
 
-/// Recuerda cuándo se registró por última vez el uso de cada token.
+/// Remembers when each token's use was last recorded.
 #[derive(Default)]
 pub struct TouchTracker(Mutex<HashMap<String, Instant>>);
 
@@ -76,7 +76,7 @@ fn credential(surface: Surface, headers: &HeaderMap) -> Option<String> {
             }
             let encoded = authorization?.strip_prefix("Basic ")?;
             let decoded = String::from_utf8(STANDARD.decode(encoded.trim()).ok()?).ok()?;
-            // El usuario es informativo; el token va en la contraseña.
+            // The user is informational; the token goes in the password.
             decoded
                 .split_once(':')
                 .map(|(_, password)| password.to_owned())
@@ -93,7 +93,7 @@ pub async fn require_auth(
     mut req: Request,
     next: Next,
 ) -> Response {
-    // Sondas de salud: sin credencial y sin datos (Fase 7).
+    // Health probes: no credential and no data (Phase 7).
     if crate::ops::is_probe(req.uri().path()) {
         return next.run(req).await;
     }

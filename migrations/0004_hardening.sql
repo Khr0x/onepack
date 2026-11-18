@@ -1,10 +1,10 @@
--- Cuotas por feed y motivo de bloqueo (Fase 5: ADR-013, ADR-014).
+-- Per-feed quotas and block reason (Phase 5: ADR-013, ADR-014).
 --
--- Una cuota NULL significa sin límite. El uso se calcula como suma lógica: cada versión cuenta
--- el tamaño de su blob aunque otra versión comparta el mismo contenido.
+-- A NULL quota means unlimited. Usage is computed as a logical sum: each version counts
+-- the size of its blob even if another version shares the same content.
 
 ALTER TABLE feed ADD COLUMN max_storage_bytes INTEGER CHECK (max_storage_bytes >= 0);
 ALTER TABLE feed ADD COLUMN max_versions INTEGER CHECK (max_versions >= 0);
 
--- Motivo del último bloqueo; el historial completo queda en `audit_event`.
+-- Reason for the last block; the full history remains in `audit_event`.
 ALTER TABLE package_version ADD COLUMN blocked_reason TEXT;

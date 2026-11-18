@@ -1,5 +1,5 @@
-//! API administrativa `/api/v1` (Fase 6, ADR-015): gestión completa, permisos de
-//! administrador, errores con acción y `request_id`, y paginación por cursor.
+//! Administrative API `/api/v1` (Phase 6, ADR-015): full management, administrator
+//! permissions, errors with action and `request_id`, and cursor pagination.
 
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -145,7 +145,7 @@ impl Env {
         self.router.clone().oneshot(req).await.unwrap().status()
     }
 
-    /// Recorre todas las páginas y devuelve los elementos y el número de páginas.
+    /// Walks every page and returns the items and the number of pages.
     async fn all_pages(&self, path: &str, token: &str) -> (Vec<Value>, usize) {
         let separator = if path.contains('?') { '&' } else { '?' };
         let mut items = Vec::new();
@@ -192,7 +192,7 @@ async fn errors_carry_code_action_and_request_id() {
     assert_eq!(error.error.request_id, reply.request_id);
     assert_eq!(reply.request_id.as_deref().map(str::len), Some(16));
 
-    // Sin credencial también, y cada petición tiene su propio id.
+    // Without a credential too, and each request has its own id.
     let unauthenticated = env.get("/api/v1/whoami", "opk_bad").await;
     assert_eq!(unauthenticated.status, StatusCode::UNAUTHORIZED);
     assert_eq!(unauthenticated.json["error"]["code"], "AUTH_REQUIRED");
@@ -236,7 +236,7 @@ async fn admin_operations_require_administrator() {
         assert_eq!(reply.status, StatusCode::FORBIDDEN, "{method} {path}");
         assert_eq!(reply.json["error"]["code"], "AUTH_ADMIN_REQUIRED");
     }
-    // Los intentos quedan auditados.
+    // The attempts are audited.
     let audit = env.get("/api/v1/audit?action=principal.", &env.admin).await;
     assert!(
         audit.json["items"]
@@ -311,7 +311,7 @@ async fn full_identity_lifecycle_through_the_api() {
     assert_eq!(grant.status, StatusCode::OK, "{}", grant.json);
     assert_eq!(grant.json["publish_patterns"], json!(["hemia.payments.*"]));
 
-    // El token nuevo funciona y ve solo su feed.
+    // The new token works and sees only its feed.
     let me = env.get("/api/v1/whoami", &issued.token).await;
     assert_eq!(me.json["grants"][0]["feed"], "payments");
     let (feeds, _) = env.all_pages("/api/v1/feeds", &issued.token).await;
@@ -324,10 +324,10 @@ async fn full_identity_lifecycle_through_the_api() {
     assert_eq!(listed["id"], issued.id);
     assert!(
         !tokens.json.to_string().contains(&issued.token),
-        "sin secretos"
+        "no secrets"
     );
 
-    // Revocar corta el acceso de inmediato.
+    // Revoking cuts access immediately.
     let revoked = env
         .post(
             &format!("/api/v1/tokens/{}/revoke", issued.id),
@@ -410,7 +410,7 @@ async fn cursor_pagination() {
     assert_eq!(names.len(), 8);
     let mut sorted = names.clone();
     sorted.sort();
-    assert_eq!(names, sorted, "orden estable");
+    assert_eq!(names, sorted, "stable order");
 
     for bad in [
         "/api/v1/feeds?cursor=%%%",
@@ -421,7 +421,7 @@ async fn cursor_pagination() {
         assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{bad}");
     }
 
-    // Auditoría: del más reciente al más antiguo, paginada y filtrable.
+    // Audit: newest to oldest, paginated and filterable.
     let (events, pages) = env
         .all_pages("/api/v1/audit?action=feed.create&limit=2", &env.admin)
         .await;
@@ -480,7 +480,7 @@ async fn packages_listing_and_state_changes() {
         .collect();
     assert_eq!(order, ["1.0.0", "1.2.0", "1.10.0"]);
 
-    // Unlist exige Publisher; el lector recibe el código y la acción sugerida.
+    // Unlist requires Publisher; the reader receives the code and the suggested action.
     let path = "/api/v1/feeds/internal/packages/hemia.core/1.0.0";
     let denied = env
         .post(&format!("{path}/unlist"), &env.reader, json!({}))

@@ -1,31 +1,31 @@
-//! Errores del CLI y códigos de salida documentados (ADR-015). Cambiar un código de salida
-//! es un cambio incompatible.
+//! CLI errors and documented exit codes (ADR-015). Changing an exit code
+//! is a breaking change.
 
 use onepack_api_client::ErrorDetail;
 use onepack_api_client::client::{ClientError, TransportKind};
 use serde::Serialize;
 
-/// Códigos de salida. Ver `docs/cli.md`.
+/// Exit codes. See `docs/cli.md`.
 pub mod exit {
     pub const OK: i32 = 0;
-    /// Error no clasificado.
+    /// Unclassified error.
     pub const ERROR: i32 = 1;
-    /// Uso incorrecto: argumentos, entrada inválida o confirmación requerida con --no-input.
+    /// Incorrect usage: arguments, invalid input, or confirmation required with --no-input.
     pub const USAGE: i32 = 2;
-    /// Sin credencial válida (ausente, caducada o revocada).
+    /// No valid credential (missing, expired, or revoked).
     pub const AUTH: i32 = 3;
-    /// Credencial válida sin permiso suficiente.
+    /// Valid credential without sufficient permission.
     pub const FORBIDDEN: i32 = 4;
     pub const NOT_FOUND: i32 = 5;
-    /// Ya existe (p. ej. una versión publicada con otro contenido).
+    /// Already exists (e.g. a published version with different content).
     pub const CONFLICT: i32 = 6;
-    /// Red, DNS, TLS, timeouts, límites de peticiones o errores del servidor: reintentable.
+    /// Network, DNS, TLS, timeouts, request limits, or server errors: retryable.
     pub const UNAVAILABLE: i32 = 7;
-    /// El servidor no ofrece una capacidad que el comando necesita.
+    /// The server does not offer a capability the command needs.
     pub const INCOMPATIBLE: i32 = 8;
-    /// No hay keychain del sistema disponible.
+    /// No system keychain available.
     pub const KEYCHAIN: i32 = 9;
-    /// `doctor` encontró al menos un fallo.
+    /// `doctor` found at least one failure.
     pub const CHECKS_FAILED: i32 = 10;
 }
 

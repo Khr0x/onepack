@@ -1,7 +1,7 @@
-//! Almacén de blobs en el filesystem local, direccionado por SHA-256 (ADR-005).
+//! Blob store on the local filesystem, addressed by SHA-256 (ADR-005).
 //!
-//! Disposición: `blobs/sha256/ab/cd/<hash>` y `staging/` para subidas en curso.
-//! Los bytes se guardan exactamente como se recibieron.
+//! Layout: `blobs/sha256/ab/cd/<hash>` and `staging/` for uploads in progress.
+//! Bytes are stored exactly as received.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ pub struct BlobStore {
     seq: AtomicU64,
 }
 
-/// Subida en curso: escribe en staging y calcula el hash a la vez.
+/// Upload in progress: writes to staging and computes the hash at the same time.
 pub struct StagingWriter {
     file: fs::File,
     blob: StagedBlob,
@@ -26,7 +26,7 @@ pub struct StagingWriter {
     max_size: u64,
 }
 
-/// Archivo completo y sincronizado en staging. Si no se persiste, se borra al soltarlo.
+/// Complete, synced file in staging. If it is not persisted, it is deleted when dropped.
 pub struct StagedBlob {
     path: PathBuf,
     sha256: String,
@@ -81,7 +81,7 @@ impl StagingWriter {
         Ok(())
     }
 
-    /// Sincroniza el archivo a disco y devuelve el blob listo para inspeccionar y persistir.
+    /// Syncs the file to disk and returns the blob ready to inspect and persist.
     pub async fn finish(mut self) -> Result<StagedBlob, StagingError> {
         self.file.flush().await?;
         self.file.sync_all().await?;
@@ -108,7 +108,7 @@ impl BlobStore {
         &self.staging
     }
 
-    /// Ruta de un blob. `sha256` debe venir de la base o de un hash calculado, nunca de una URL.
+    /// Path of a blob. `sha256` must come from the database or a computed hash, never from a URL.
     pub fn path(&self, sha256: &str) -> PathBuf {
         debug_assert!(is_sha256_hex(sha256));
         self.root
@@ -136,16 +136,16 @@ impl BlobStore {
         })
     }
 
-    /// Mueve el blob de staging a su ubicación definitiva de forma durable (ADR-006).
-    /// Si ya existe un blob con el mismo hash se reutiliza (deduplicación).
+    /// Moves the blob from staging to its final location durably (ADR-006).
+    /// If a blob with the same hash already exists it is reused (deduplication).
     pub async fn persist(&self, mut staged: StagedBlob) -> io::Result<()> {
         let target = self.path(&staged.sha256);
         let shard2 = target.parent().expect("blob with a directory");
         let shard1 = shard2.parent().expect("blob with a directory");
 
         if fs::try_exists(&target).await? {
-            // Renueva la fecha para que la limpieza de huérfanos no lo borre mientras
-            // se confirman los metadatos que lo van a referenciar.
+            // Refreshes the date so that orphan cleanup does not delete it while
+            // the metadata that will reference it is being committed.
             let file = fs::File::open(&target).await?.into_std().await;
             tokio::task::spawn_blocking(move || file.set_modified(SystemTime::now()))
                 .await
@@ -166,7 +166,7 @@ impl BlobStore {
         fs::File::open(self.path(sha256)).await
     }
 
-    /// Hashes de todos los blobs en disco con antigüedad mayor que `min_age`.
+    /// Hashes of all blobs on disk older than `min_age`.
     pub async fn list_older_than(&self, min_age: Duration) -> io::Result<Vec<String>> {
         let mut found = Vec::new();
         for shard1 in read_dirs(&self.root).await? {
@@ -188,7 +188,7 @@ impl BlobStore {
         fs::remove_file(self.path(sha256)).await
     }
 
-    /// Elimina subidas abandonadas en staging (p. ej. tras una caída del proceso).
+    /// Deletes abandoned uploads in staging (e.g. after a process crash).
     pub async fn clean_staging(&self, min_age: Duration) -> io::Result<usize> {
         let mut removed = 0;
         let mut entries = fs::read_dir(&self.staging).await?;
@@ -224,8 +224,8 @@ async fn read_dirs(dir: &Path) -> io::Result<Vec<PathBuf>> {
     Ok(dirs)
 }
 
-/// Hace durable la entrada de directorio de un rename. En Windows no se puede abrir un
-/// directorio como archivo; NTFS registra los cambios de metadatos en su journal.
+/// Makes a rename's directory entry durable. On Windows a directory cannot be opened
+/// as a file; NTFS records metadata changes in its journal.
 #[cfg(unix)]
 async fn sync_dir(dir: &Path) -> io::Result<()> {
     fs::File::open(dir).await?.sync_all().await

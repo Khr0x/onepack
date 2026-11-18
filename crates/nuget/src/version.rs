@@ -1,13 +1,13 @@
-//! Versiones NuGet (ADR-008).
+//! NuGet versions (ADR-008).
 //!
-//! Reproduce `NuGetVersion.TryParse`, `ToNormalizedString` y `VersionComparer.Default` de
-//! `NuGet.Versioning`. El comportamiento se valida contra el corpus generado en
+//! Reproduces `NuGetVersion.TryParse`, `ToNormalizedString`, and `VersionComparer.Default` from
+//! `NuGet.Versioning`. The behavior is validated against the corpus generated in
 //! `tests/conformance-dotnet/version-corpus`.
 
 use std::cmp::Ordering;
 use std::fmt;
 
-/// Versión NuGet: `Major.Minor[.Patch[.Revision]][-Release][+Metadata]`.
+/// NuGet version: `Major.Minor[.Patch[.Revision]][-Release][+Metadata]`.
 #[derive(Debug, Clone)]
 pub struct NuGetVersion {
     numbers: [u32; 4],
@@ -80,13 +80,13 @@ impl NuGetVersion {
         !self.release.is_empty()
     }
 
-    /// SemVer 2.0.0: varias etiquetas de prerelease o metadatos de build.
+    /// SemVer 2.0.0: multiple prerelease labels or build metadata.
     pub fn is_semver2(&self) -> bool {
         self.release.len() > 1 || self.metadata.is_some()
     }
 
-    /// Forma normalizada de NuGet: sin metadatos, revisión solo si no es cero,
-    /// etiquetas con su capitalización original.
+    /// NuGet normalized form: no metadata, revision only if it is not zero,
+    /// labels with their original capitalization.
     pub fn normalized(&self) -> String {
         let [major, minor, patch, revision] = self.numbers;
         let mut out = format!("{major}.{minor}.{patch}");
@@ -100,7 +100,7 @@ impl NuGetVersion {
         out
     }
 
-    /// Forma normalizada con metadatos de build.
+    /// Normalized form with build metadata.
     pub fn full(&self) -> String {
         match &self.metadata {
             Some(meta) => format!("{}+{meta}", self.normalized()),
@@ -108,13 +108,13 @@ impl NuGetVersion {
         }
     }
 
-    /// Clave de identidad dentro de un feed (ADR-007): normalizada y en minúsculas.
-    /// Dos versiones son la misma identidad si y solo si sus claves coinciden.
+    /// Identity key within a feed (ADR-007): normalized and lowercase.
+    /// Two versions are the same identity if and only if their keys match.
     pub fn identity(&self) -> String {
         self.normalized().to_ascii_lowercase()
     }
 
-    /// Orden de precedencia de `VersionComparer.Default` (ignora metadatos).
+    /// Precedence order of `VersionComparer.Default` (ignores metadata).
     pub fn precedence_cmp(&self, other: &Self) -> Ordering {
         self.numbers.cmp(&other.numbers).then_with(|| {
             match (self.release.is_empty(), other.release.is_empty()) {
@@ -133,7 +133,7 @@ impl fmt::Display for NuGetVersion {
     }
 }
 
-/// Componente numérico: admite espacios alrededor y ceros a la izquierda, máximo `i32::MAX`.
+/// Numeric component: allows surrounding spaces and leading zeros, maximum `i32::MAX`.
 fn parse_component(part: &str) -> Option<u32> {
     let digits = part.trim();
     if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
@@ -142,8 +142,8 @@ fn parse_component(part: &str) -> Option<u32> {
     digits.parse::<u32>().ok().filter(|&n| n <= i32::MAX as u32)
 }
 
-/// Etiqueta de prerelease o metadatos: `[0-9A-Za-z-]+`. En prerelease, una etiqueta
-/// solo de dígitos no puede tener ceros a la izquierda.
+/// Prerelease label or metadata: `[0-9A-Za-z-]+`. In prerelease, a label
+/// of digits only cannot have leading zeros.
 fn is_valid_label(label: &str, allow_leading_zeros: bool) -> bool {
     if label.is_empty()
         || !label
@@ -166,8 +166,8 @@ fn cmp_release(a: &[String], b: &[String]) -> Ordering {
     a.len().cmp(&b.len())
 }
 
-/// Las etiquetas que `Int32.TryParse` acepta se comparan como números y van antes que las
-/// alfanuméricas, que se comparan ordinalmente sin distinguir mayúsculas.
+/// Labels that `Int32.TryParse` accepts are compared as numbers and come before
+/// alphanumeric ones, which are compared ordinally without case distinction.
 fn cmp_label(a: &str, b: &str) -> Ordering {
     match (as_int32(a), as_int32(b)) {
         (Some(x), Some(y)) => x.cmp(&y),
@@ -177,8 +177,8 @@ fn cmp_label(a: &str, b: &str) -> Ordering {
     }
 }
 
-/// Equivalente a `Int32.TryParse` para etiquetas ya validadas (sin espacios ni `+`).
-/// Acepta un `-` inicial: `"-1"` es numérico para NuGet.
+/// Equivalent to `Int32.TryParse` for already validated labels (no spaces or `+`).
+/// It accepts a leading `-`: `"-1"` is numeric for NuGet.
 fn as_int32(label: &str) -> Option<i32> {
     let digits = label.strip_prefix('-').unwrap_or(label);
     if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {

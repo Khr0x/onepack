@@ -1,5 +1,5 @@
-//! `onepack nuget init` y `onepack exec` (ADR-016): configuración de NuGet sin secretos y
-//! credenciales solo en el entorno del proceso hijo.
+//! `onepack nuget init` and `onepack exec` (ADR-016): NuGet configuration without secrets and
+//! credentials only in the child process environment.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -12,10 +12,10 @@ use crate::error::{CliError, CliResult, exit};
 use crate::nuget_config::{Document, diff, source_key};
 use crate::{ExecArgs, NugetCommand};
 
-/// Nombres con los que `dotnet` y `nuget.exe` encuentran el archivo, en orden de preferencia.
+/// Names under which `dotnet` and `nuget.exe` find the file, in preference order.
 const CONFIG_NAMES: [&str; 3] = ["NuGet.Config", "nuget.config", "NuGet.config"];
 
-/// `NuGet.Config` del directorio, si existe con alguno de sus nombres habituales.
+/// `NuGet.Config` in the directory, if it exists under any of its usual names.
 pub fn find_config_in(dir: &Path) -> Option<PathBuf> {
     CONFIG_NAMES
         .iter()
@@ -148,14 +148,14 @@ pub fn init(app: &App, cmd: NugetCommand) -> CliResult<i32> {
     Ok(exit::OK)
 }
 
-/// Variable con la que NuGet lee las credenciales de una fuente.
+/// Variable through which NuGet reads the credentials for a source.
 pub fn credential_var(source: &str) -> String {
     format!("NuGetPackageSourceCredentials_{source}")
 }
 
-/// Comprueba la credencial antes de lanzar el comando. Con un token revocado o caducado, o sin
-/// acceso al feed, NuGet solo dice que no puede cargar el índice de servicio (NU1301).
-/// Si el servidor no responde, se avisa y se sigue: el comando puede tirar de la caché.
+/// Checks the credential before launching the command. With a revoked or expired token, or without
+/// access to the feed, NuGet only says it cannot load the service index (NU1301).
+/// If the server does not respond, it warns and continues: the command may rely on the cache.
 fn check_access(app: &App, target: &Target, token: &str, feeds: &[String]) -> CliResult<()> {
     let me: WhoAmI = match app
         .client_for(target, Some(token.to_owned()), DEFAULT_TIMEOUT)?
@@ -219,7 +219,7 @@ pub fn exec(app: &App, args: ExecArgs) -> CliResult<i32> {
     child.args(rest);
     for feed in &args.feeds {
         let source = args.source_name.clone().unwrap_or_else(|| source_key(feed));
-        // Solo en el entorno del hijo: ni el shell padre ni ningún archivo lo ven.
+        // Only in the child's environment: neither the parent shell nor any file sees it.
         child.env(
             credential_var(&source),
             format!("Username=onepack;Password={}", credential.token),
@@ -233,7 +233,7 @@ pub fn exec(app: &App, args: ExecArgs) -> CliResult<i32> {
         )
     })?;
     Ok(status.code().unwrap_or_else(|| {
-        // Terminado por una señal: convención de las shells (128 + señal).
+        // Terminated by a signal: shell convention (128 + signal).
         #[cfg(unix)]
         {
             use std::os::unix::process::ExitStatusExt;

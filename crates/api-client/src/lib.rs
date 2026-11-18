@@ -1,19 +1,19 @@
-//! Contratos de la API administrativa `/api/v1`, compartidos por `onepackd` y `onepack`
+//! Contracts of the administrative API `/api/v1`, shared by `onepackd` and `onepack`
 //! (ADR-015).
 //!
-//! Compatibilidad: los campos nuevos se añaden como opcionales (`#[serde(default)]`) y nadie
-//! rechaza campos desconocidos, así que un CLI N habla con un servidor N-1 y al revés. Lo
-//! que un servidor sabe hacer lo anuncia en [`Capabilities`].
+//! Compatibility: new fields are added as optional (`#[serde(default)]`) and nobody
+//! rejects unknown fields, so a CLI N talks to an N-1 server and vice versa. What
+//! a server can do is announced in [`Capabilities`].
 
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "client")]
 pub mod client;
 
-/// Versión del contrato. Cambia solo con cambios incompatibles.
+/// Contract version. It changes only with breaking changes.
 pub const API_VERSION: u32 = 1;
 
-/// Capacidades que anuncia un servidor en `GET /api/v1/capabilities`.
+/// Capabilities a server announces in `GET /api/v1/capabilities`.
 pub mod capability {
     pub const FEEDS: &str = "feeds";
     pub const FEED_QUOTAS: &str = "feeds.quotas";
@@ -25,7 +25,7 @@ pub mod capability {
     pub const PACKAGE_AVAILABILITY: &str = "packages.availability";
     pub const AUDIT: &str = "audit";
 
-    /// Todas las que implementa esta versión.
+    /// All the ones implemented by this version.
     pub const ALL: &[&str] = &[
         FEEDS,
         FEED_QUOTAS,
@@ -39,7 +39,7 @@ pub mod capability {
     ];
 }
 
-/// Tamaño de página por defecto y máximo de los listados con cursor.
+/// Default and maximum page size for cursor-based listings.
 pub const DEFAULT_PAGE_SIZE: u32 = 50;
 pub const MAX_PAGE_SIZE: u32 = 500;
 
@@ -56,7 +56,7 @@ impl Capabilities {
     }
 }
 
-/// Página de un listado. `next_cursor` es opaco; `None` indica la última página.
+/// A listing page. `next_cursor` is opaque; `None` indicates the last page.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Page<T> {
     pub items: Vec<T>,
@@ -99,7 +99,7 @@ pub struct CreateFeed {
     pub name: String,
 }
 
-/// Reemplaza las cuotas del feed; `None` es sin límite.
+/// Replaces the feed quotas; `None` means no limit.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigureFeed {
     #[serde(default)]
@@ -148,7 +148,7 @@ pub struct CreateToken {
     pub expires_in_days: u32,
 }
 
-/// Token recién emitido: el único momento en que el secreto viaja por la API.
+/// Newly issued token: the only time the secret travels over the API.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IssuedToken {
     pub id: String,
@@ -177,7 +177,7 @@ pub struct SetGrant {
 pub struct PackageSummary {
     pub id: String,
     pub versions: u64,
-    /// Versión más alta, listada o no.
+    /// Highest version, listed or not.
     pub latest_version: String,
 }
 
@@ -189,7 +189,7 @@ pub struct PackageVersion {
     pub listed: bool,
     /// `available` o `blocked`.
     pub availability: String,
-    /// Solo para quien puede mantener el feed.
+    /// Only for those who can maintain the feed.
     #[serde(default)]
     pub blocked_reason: Option<String>,
     pub sha256: String,
@@ -202,7 +202,7 @@ pub struct Reason {
     pub reason: String,
 }
 
-/// Resultado de un cambio de estado (unlist, relist, block, unblock).
+/// Result of a state change (unlist, relist, block, unblock).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VersionState {
     pub feed: String,
@@ -230,7 +230,7 @@ pub struct AuditEvent {
     pub detail: Option<serde_json::Value>,
 }
 
-/// Cuerpo de todas las respuestas de error de `/api/v1`.
+/// Body of every error response from `/api/v1`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ErrorBody {
     pub error: ErrorDetail,
@@ -238,13 +238,13 @@ pub struct ErrorBody {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ErrorDetail {
-    /// Código estable (p. ej. `AUTH_SCOPE_MISSING`).
+    /// Stable code (e.g. `AUTH_SCOPE_MISSING`).
     pub code: String,
     pub message: String,
-    /// Qué puede hacer quien recibe el error.
+    /// What the recipient of the error can do.
     #[serde(default)]
     pub action: Option<String>,
-    /// Identificador para buscar la petición en los logs del servidor.
+    /// Identifier to find the request in the server logs.
     #[serde(default)]
     pub request_id: Option<String>,
 }
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn unknown_fields_and_missing_optionals_are_tolerated() {
-        // Un servidor más nuevo puede añadir campos; uno más viejo puede omitir opcionales.
+        // A newer server may add fields; an older one may omit optional ones.
         let feed: Feed = serde_json::from_str(
             r#"{"name":"a","created_at":"t","versions":1,"storage_bytes":2,"future":true}"#,
         )

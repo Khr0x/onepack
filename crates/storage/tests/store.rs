@@ -54,11 +54,11 @@ async fn open_requires_migrated_data_dir() {
 
     let report = migrate(dir.path()).await.unwrap();
     assert_eq!(report.applied, 5);
-    assert_eq!(report.backup, None, "una base nueva no necesita backup");
+    assert_eq!(report.backup, None, "a new database needs no backup");
     assert_eq!(
         migrate(dir.path()).await.unwrap().applied,
         0,
-        "migrar es idempotente"
+        "migrating is idempotent"
     );
     assert!(Store::open(dir.path()).await.is_ok());
 }
@@ -75,7 +75,7 @@ async fn refuses_schema_from_newer_version() {
     .unwrap();
     sqlx::query(
         "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time)
-         VALUES (9999, 'futura', 1, x'00', 0)",
+         VALUES (9999, 'future', 1, x'00', 0)",
     )
     .execute(&pool)
     .await
@@ -168,7 +168,7 @@ async fn duplicate_identity_conflicts_and_reports_if_identical() {
     assert_eq!(
         staging_files(&dir),
         0,
-        "los conflictos no dejan archivos en staging"
+        "conflicts leave no files in staging"
     );
 }
 
@@ -230,7 +230,7 @@ async fn concurrent_publishes_of_same_identity_confirm_exactly_one() {
             let store = store.clone();
             let feed = feed.clone();
             tokio::spawn(async move {
-                let content = format!("contenido-{i}");
+                let content = format!("content-{i}");
                 let staged = stage(&store, content.as_bytes()).await;
                 (
                     content,
@@ -247,10 +247,10 @@ async fn concurrent_publishes_of_same_identity_confirm_exactly_one() {
         match task.await.unwrap() {
             (content, Ok(())) => winners.push(content),
             (_, Err(PublishError::Conflict { identical: false })) => {}
-            (_, other) => panic!("resultado inesperado: {other:?}"),
+            (_, other) => panic!("unexpected result: {other:?}"),
         }
     }
-    assert_eq!(winners.len(), 1, "exactamente una publicación confirmada");
+    assert_eq!(winners.len(), 1, "exactly one publication confirmed");
 
     let v = store
         .version(&feed, "race", "1.0.0")
@@ -277,17 +277,17 @@ async fn gc_removes_orphans_after_grace_and_keeps_referenced_blobs() {
         .await
         .unwrap();
 
-    // Huérfano: blob persistido sin metadatos (caída entre ADR-006 pasos 5 y 6).
+    // Orphan: blob persisted without metadata (crash between ADR-006 steps 5 and 6).
     let orphan = stage(&store, b"orphan").await;
     let orphan_sha = orphan.sha256().to_owned();
     store.blobs().persist(orphan).await.unwrap();
-    // Subida abandonada en staging.
+    // Abandoned upload in staging.
     std::fs::write(dir.path().join("staging").join("dead.upload"), b"partial").unwrap();
 
     let report = store.gc(Duration::from_secs(3600)).await.unwrap();
     assert_eq!(
         report.orphan_blobs_removed, 0,
-        "dentro del periodo de gracia no se borra nada"
+        "nothing is deleted within the grace period"
     );
     assert_eq!(report.staging_removed, 0);
 
@@ -299,7 +299,7 @@ async fn gc_removes_orphans_after_grace_and_keeps_referenced_blobs() {
     let v = store.version(&feed, "a", "1.0.0").await.unwrap().unwrap();
     assert!(
         store.blobs().path(&v.blob_sha256).exists(),
-        "el blob referenciado se conserva"
+        "the referenced blob is kept"
     );
 }
 
@@ -380,7 +380,7 @@ async fn unlist_hides_from_listing_but_keeps_the_version() {
             .is_empty()
     );
     let v = store.version(&feed, "a", "1.0.0").await.unwrap().unwrap();
-    assert!(!v.listed, "sigue existiendo, solo no listada");
+    assert!(!v.listed, "it still exists, just unlisted");
 
     assert_eq!(
         store
@@ -412,7 +412,7 @@ async fn missing_metadata_can_be_backfilled_once() {
         )
         .await
         .unwrap();
-    // Simula una versión publicada antes de la migración 0003.
+    // Simulates a version published before migration 0003.
     let pool = sqlx::SqlitePool::connect(&format!(
         "sqlite://{}",
         dir.path().join("metadata.sqlite").display()

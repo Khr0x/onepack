@@ -1,8 +1,8 @@
-//! API administrativa `/api/v1` (Bearer, ADR-011, ADR-015). Los tipos de petición y
-//! respuesta son los de `onepack_api_client`, compartidos con el CLI.
+//! Administrative API `/api/v1` (Bearer, ADR-011, ADR-015). The request and
+//! response types are those of `onepack_api_client`, shared with the CLI.
 //!
-//! Autorización: feeds y paquetes se rigen por el rol en el feed (como la superficie NuGet);
-//! identidades, permisos, cuotas y auditoría requieren el rol Administrator.
+//! Authorization: feeds and packages follow the role on the feed (like the NuGet surface);
+//! identities, permissions, quotas, and auditing require the Administrator role.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -28,7 +28,7 @@ use crate::AppState;
 use crate::auth::Surface;
 use crate::nuget_api::{ApiError, authorized_feed, id_key, set_listed, version_key};
 
-/// Error de la API administrativa: el mismo `ApiError`, en JSON.
+/// Administrative API error: the same `ApiError`, as JSON.
 pub struct AdminError(ApiError);
 
 impl From<ApiError> for AdminError {
@@ -52,7 +52,7 @@ impl IntoResponse for AdminError {
 type AdminResult<T> = Result<T, AdminError>;
 type Params = Query<HashMap<String, String>>;
 
-/// Longitud máxima del motivo de un bloqueo.
+/// Maximum length of a block reason.
 const MAX_REASON_CHARS: usize = 500;
 
 fn invalid(code: &'static str, message: impl Into<String>) -> AdminError {
@@ -80,7 +80,7 @@ fn parse_body<T: DeserializeOwned>(body: &[u8]) -> AdminResult<T> {
         .map_err(|e| invalid("INVALID_REQUEST", format!("invalid JSON body: {e}")))
 }
 
-/// Identidades, permisos, cuotas y auditoría: solo administradores. El intento se audita.
+/// Identities, permissions, quotas, and auditing: administrators only. The attempt is audited.
 async fn require_admin(state: &AppState, auth: &AuthContext, action: &str) -> AdminResult<()> {
     if auth.principal.is_admin {
         return Ok(());
@@ -93,7 +93,7 @@ async fn require_admin(state: &AppState, auth: &AuthContext, action: &str) -> Ad
 }
 
 // ---------------------------------------------------------------------------------------------
-// Paginación
+// Pagination
 // ---------------------------------------------------------------------------------------------
 
 fn encode_cursor(key: &str) -> String {
@@ -129,8 +129,8 @@ fn page_size(params: &HashMap<String, String>) -> AdminResult<u32> {
     }
 }
 
-/// Página de una lista ya ordenada y pequeña (feeds, principals, tokens, grants). El cursor
-/// es la clave del último elemento devuelto.
+/// Page of a small, already sorted list (feeds, principals, tokens, grants). The cursor
+/// is the key of the last returned item.
 fn paginate<T>(
     items: Vec<T>,
     params: &HashMap<String, String>,
@@ -158,7 +158,7 @@ fn paginate<T>(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Identidad y capacidades
+// Identity and capabilities
 // ---------------------------------------------------------------------------------------------
 
 pub async fn capabilities() -> Json<api::Capabilities> {
@@ -172,7 +172,7 @@ pub async fn capabilities() -> Json<api::Capabilities> {
     })
 }
 
-/// Identidad y permisos de la credencial usada. Útil para diagnosticar (`onepack doctor`).
+/// Identity and permissions of the credential used. Useful for diagnosing (`onepack doctor`).
 pub async fn whoami(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,
@@ -219,8 +219,8 @@ fn feed_dto(feed: &Feed, d: FeedDetails) -> api::Feed {
     }
 }
 
-/// Feeds visibles para la credencial: todos para un administrador, los de sus grants para
-/// el resto.
+/// Feeds visible to the credential: all of them for an administrator, those of its grants for
+/// the rest.
 pub async fn list_feeds(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,
@@ -273,7 +273,7 @@ pub async fn get_feed(
     ok(&feed_dto(&feed, details))
 }
 
-/// Cuotas del feed (reemplazo completo: un campo ausente es sin límite).
+/// Feed quotas (full replacement: a missing field means no limit).
 pub async fn configure_feed(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,
@@ -405,7 +405,7 @@ pub async fn disable_principal(
 // Tokens
 // ---------------------------------------------------------------------------------------------
 
-/// Tokens del más reciente al más antiguo; `?principal=` filtra. Nunca incluye secretos.
+/// Tokens from newest to oldest; `?principal=` filters. It never includes secrets.
 pub async fn list_tokens(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,
@@ -502,7 +502,7 @@ pub async fn revoke_token(
 // Grants
 // ---------------------------------------------------------------------------------------------
 
-/// `?principal=` y `?feed=` filtran.
+/// `?principal=` and `?feed=` filter.
 pub async fn list_grants(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,
@@ -615,7 +615,7 @@ fn version_dto(
     }
 }
 
-/// Motivo de bloqueo, solo para quien puede mantener el feed.
+/// Block reason, only for those who can maintain the feed.
 async fn visible_reason(
     state: &AppState,
     auth: &AuthContext,
@@ -641,7 +641,7 @@ pub async fn list_packages(
     let feed = authorized_feed(&state, &auth, &feed_name, Access::Read).await?;
     let limit = page_size(&params)?;
     let after = decode_cursor(&params)?;
-    // Un elemento de más indica si hay otra página.
+    // One extra item indicates whether there is another page.
     let mut rows = state
         .store
         .list_packages(&feed, after.as_deref(), limit + 1)
@@ -669,7 +669,7 @@ pub async fn list_packages(
     ok(&api::Page { items, next_cursor })
 }
 
-/// Versiones de un paquete, de menor a mayor precedencia.
+/// Versions of a package, from lowest to highest precedence.
 pub async fn package_versions(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,
@@ -726,7 +726,7 @@ async fn version_state(
     })
 }
 
-/// Unlist y relist: mismas reglas que en el protocolo NuGet (Publisher y patrones).
+/// Unlist and relist: same rules as in the NuGet protocol (Publisher and patterns).
 async fn change_listing(
     state: &AppState,
     auth: &AuthContext,
@@ -779,7 +779,7 @@ pub async fn unblock(
     set_blocked(&state, &auth, &feed_name, &id, &version, false, &body).await
 }
 
-/// Bloqueo y desbloqueo (ADR-013): rol Maintainer y motivo obligatorio, que se audita.
+/// Blocking and unblocking (ADR-013): Maintainer role and mandatory reason, which is audited.
 async fn set_blocked(
     state: &AppState,
     auth: &AuthContext,
@@ -823,10 +823,10 @@ async fn set_blocked(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Auditoría
+// Audit
 // ---------------------------------------------------------------------------------------------
 
-/// Eventos del más reciente al más antiguo. `?feed=` y `?action=` (prefijo) filtran.
+/// Events from newest to oldest. `?feed=` and `?action=` (prefix) filter.
 pub async fn list_audit(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<Arc<AuthContext>>,

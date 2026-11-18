@@ -1,5 +1,5 @@
-//! Consultas de administración (Fase 6): listados, detalle de feeds y desactivación de
-//! principals. Los listados grandes (paquetes, auditoría) paginan por clave en SQL.
+//! Administration queries (Phase 6): listings, feed details, and principal
+//! deactivation. Large listings (packages, audit) paginate by key in SQL.
 
 use onepack_core::{Feed, FeedQuota, FeedUsage, Principal};
 use sqlx::Row;
@@ -27,7 +27,7 @@ pub struct PrincipalRow {
 pub enum DisableOutcome {
     Disabled,
     AlreadyDisabled,
-    /// Es el último administrador activo: desactivarlo dejaría el registro sin gestión.
+    /// It is the last active administrator: deactivating it would leave the registry without management.
     LastAdmin,
 }
 
@@ -68,14 +68,14 @@ pub struct AuditRow {
     pub detail: Option<String>,
 }
 
-/// Filtros del listado de auditoría.
+/// Audit listing filters.
 #[derive(Debug, Clone, Default)]
 pub struct AuditQuery {
-    /// Eventos con id menor (cursor; el listado va del más reciente al más antiguo).
+    /// Events with a lower id (cursor; the listing goes from newest to oldest).
     pub before_id: Option<i64>,
     pub limit: u32,
     pub feed_id: Option<i64>,
-    /// Prefijo de la acción (p. ej. `package.` o `token.create`).
+    /// Action prefix (e.g. `package.` or `token.create`).
     pub action_prefix: Option<String>,
 }
 
@@ -111,8 +111,8 @@ impl Store {
             .collect())
     }
 
-    /// Desactiva un principal: sus tokens dejan de autenticar de inmediato. No se puede
-    /// desactivar al último administrador activo.
+    /// Deactivates a principal: its tokens stop authenticating immediately. The last active
+    /// administrator cannot be deactivated.
     pub async fn disable_principal(
         &self,
         principal: &Principal,
@@ -157,7 +157,7 @@ impl Store {
         Ok(DisableOutcome::Disabled)
     }
 
-    /// Tokens (activos o no), de un principal o de todos, del más reciente al más antiguo.
+    /// Tokens (active or not), for one principal or all, from newest to oldest.
     pub async fn list_tokens(
         &self,
         principal: Option<&Principal>,
@@ -243,7 +243,7 @@ impl Store {
         Ok(grants)
     }
 
-    /// Paquetes de un feed en orden de clave, a partir de `after` (exclusivo).
+    /// Packages in a feed in key order, starting from `after` (exclusive).
     pub async fn list_packages(
         &self,
         feed: &Feed,

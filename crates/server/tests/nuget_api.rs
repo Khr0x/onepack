@@ -41,8 +41,8 @@ async fn server() -> (Router, TempDir) {
         .await
         .unwrap()
         .token;
-    // Estos tests cubren el comportamiento NuGet: todas las peticiones van como administrador.
-    // La autenticación y los permisos se prueban en `auth.rs`.
+    // These tests cover NuGet behavior: all requests go as administrator.
+    // Authentication and permissions are tested in `auth.rs`.
     let api_key = HeaderValue::from_str(&token).unwrap();
     let router = app(
         Arc::new(store),
@@ -176,7 +176,7 @@ async fn service_index_uses_public_url_and_announces_only_implemented_resources(
     expected.sort();
     assert_eq!(
         resources, expected,
-        "URLs desde public_url, nunca desde Host/X-Forwarded-*"
+        "URLs come from public_url, never from Host/X-Forwarded-*"
     );
 }
 
@@ -271,7 +271,7 @@ async fn equivalent_identity_is_rejected_with_conflict() {
     .await;
     assert_eq!(
         body, original,
-        "un duplicado no debe sobrescribir el original"
+        "a duplicate must not overwrite the original"
     );
 }
 
@@ -371,7 +371,7 @@ async fn concurrent_http_publishes_confirm_exactly_one() {
     let (router, _dir) = server().await;
     let packages: Vec<Vec<u8>> = (0..6)
         .map(|i| {
-            // Mismo id y versión, contenido distinto.
+            // Same id and version, different content.
             let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
             zip.start_file("Race.nuspec", SimpleFileOptions::default())
                 .unwrap();
@@ -399,7 +399,7 @@ async fn concurrent_http_publishes_confirm_exactly_one() {
         match status {
             StatusCode::CREATED => created.push(package),
             StatusCode::CONFLICT => {}
-            other => panic!("estado inesperado: {other}"),
+            other => panic!("unexpected status: {other}"),
         }
     }
     assert_eq!(created.len(), 1);

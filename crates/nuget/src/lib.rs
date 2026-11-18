@@ -1,4 +1,4 @@
-//! Adaptador NuGet: lectura de `.nupkg`, normalización de ids y versiones, recursos V3.
+//! NuGet adapter: `.nupkg` reading, id and version normalization, V3 resources.
 
 pub mod id;
 pub mod package;
