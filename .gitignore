@@ -2,3 +2,29 @@
 bin/
 obj/
 *.nupkg
+
+# Local data directories and databases
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+initial-admin-token
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Logs and editor/OS files
+*.log
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc

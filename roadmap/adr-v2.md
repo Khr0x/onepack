@@ -1,213 +1,212 @@
-# Architecture Decision Records — v2 multiecosistema
+# Architecture Decision Records — v2 multi-ecosystem
 
-> Diseño de contratos para servir NuGet/.NET, npm/JavaScript y PyPI/Python desde el mismo
-> registro privado. El alcance acordado en Obsidian (`Onepack-Alcance-v2`) se materializa
-> aquí en decisiones técnicas; este documento es la fuente del repositorio.
+> Contract design for serving NuGet/.NET, npm/JavaScript and PyPI/Python from the same
+> private registry. The scope agreed in Obsidian (`Onepack-Alcance-v2`) is materialized
+> here in technical decisions; this document is the repository source.
 >
-> Tarea: OP-021. Depende de OP-020 (alcance verificado). Habilita OP-022 y las specs OP-023
-> (npm) y OP-027 (PyPI). No implementa adaptadores.
+> Task: OP-021. Depends on OP-020 (verified scope). Enables OP-022 and the OP-023
+> (npm) and OP-027 (PyPI) specs. Does not implement adapters.
 >
-> Baseline consultado: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
-> Fecha: 2026-10-19. Estado: **aceptado**. Revisión del 2026-10-19 por el mantenedor
-> (instrucción en la sesión de trabajo); ADR-021…026 aceptados sin cambios de alcance.
-> La implementación sigue correspondiendo a OP-022, OP-024 y OP-033.
+> Baseline consulted: `88467a94eaee4fc7345bac54fdf6fa4449a913b8`.
+> Date: 2026-10-19. Status: **accepted**. Review on 2026-10-19 by the maintainer
+> (instruction in the work session); ADR-021…026 accepted without scope changes.
+> Implementation still corresponds to OP-022, OP-024 and OP-033.
 
-## Índice
+## Index
 
-| ADR | Decisión | Estatus |
+| ADR | Decision | Status |
 |---|---|---|
-| [021](#adr-021) | Feeds tipados por ecosistema; `format` inmutable | Aceptado |
-| [022](#adr-022) | Identidad, versión y orden delegados al adaptador | Aceptado |
-| [023](#adr-023) | Múltiples archivos por versión con `version_file` | Aceptado |
-| [024](#adr-024) | Rutas, capacidades y contratos aditivos por protocolo | Aceptado |
-| [025](#adr-025) | `feed_format` como tabla autoritativa; el CHECK v1 queda como legado | Aceptado |
-| [026](#adr-026) | Frontera de crates: adaptadores fuera de `core`/`storage` | Aceptado |
+| [021](#adr-021) | Feeds typed by ecosystem; immutable `format` | Accepted |
+| [022](#adr-022) | Identity, version and ordering delegated to the adapter | Accepted |
+| [023](#adr-023) | Multiple files per version with `version_file` | Accepted |
+| [024](#adr-024) | Routes, capabilities and additive contracts per protocol | Accepted |
+| [025](#adr-025) | `feed_format` as the authoritative table; the v1 CHECK remains as legacy | Accepted |
+| [026](#adr-026) | Crate boundary: adapters outside `core`/`storage` | Accepted |
 
 ---
 
-## 1. Alcance de esta especificación
+## 1. Scope of this specification
 
-Esta spec resuelve el diseño de los tres ecosistemas y deja listo el corte de OP-022. No
-incluye:
+This spec resolves the design of the three ecosystems and leaves the OP-022 cut ready. It does
+not include:
 
-- La matriz de clientes ni los flujos exactos de npm (OP-023) y PyPI (OP-027).
-- La implementación de adaptadores, rutas o migraciones (OP-022, OP-024, OP-033).
-- SSO, UI, PostgreSQL y alta disponibilidad (propuestas transversales).
+- The client matrix or the exact npm (OP-023) and PyPI (OP-027) flows.
+- The implementation of adapters, routes or migrations (OP-022, OP-024, OP-033).
+- SSO, UI, PostgreSQL and high availability (cross-cutting proposals).
 
-La separación modular existente (OP-037/OP-039) se conserva. Este documento solo describe
-los cambios reales que el soporte multiecosistema exige.
+The existing modular separation (OP-037/OP-039) is preserved. This document only describes
+the real changes that multi-ecosystem support requires.
 
-## 2. Inventario de consumidores y supuestos NuGet
+## 2. Inventory of consumers and NuGet assumptions
 
-Recorrido del baseline para separar base reutilizable de cambios necesarios. Los símbolos se
-citan por archivo; no se fijan números de línea.
+Walkthrough of the baseline to separate the reusable base from the necessary changes. Symbols
+are cited by file; line numbers are not fixed.
 
-| Capa / archivo | Supuesto NuGet actual | Reutilizable | Cambio necesario |
+| Layer / file | Current NuGet assumption | Reusable | Necessary change |
 |---|---|---|---|
-| `migrations/0001_initial.sql` | `feed.format TEXT NOT NULL CHECK (format IN ('nuget'))`; `package_version.is_semver2`; un solo `blob_sha256` por versión | Identidad inmutable, `blob` por SHA-256, auditoría | Nuevo `feed_format` y `version_file`; documentar `is_semver2` como señal NuGet |
-| `crates/core/src/lib.rs` | `Feed` sin formato; `NewVersion`/`PublishedVersion` con `is_prerelease` e `is_semver2`; `package_key`/`version_key` genéricos | Identidad `package_key + version_key` (ADR-007), cuotas, `PublishError` | Añadir `format` a `Feed`; documentar semántica de flags; sin tipos NuGet |
-| `crates/core/src/auth.rs` | `PublishPattern` acepta `[A-Za-z0-9._-]` y `*` final; rechaza `@` y `/` | Roles acumulativos y patrón exacto/prefijo | Validación por adaptador; permitir `@` y `/` en patrones npm |
-| `crates/storage/src/lib.rs` | `create_feed` inserta literal `'nuget'`; la cuota suma el blob de cada versión | SQL de publicación, staging, cuotas, auditoría | Insertar `feed_format`; cuota suma archivos de la versión |
-| `crates/storage/src/catalog.rs` | Filtros `is_prerelease` e `is_semver2` en búsqueda | Paginación y búsqueda por `search_text` | Filtro `is_semver2` solo para NuGet; adaptador decide |
-| `crates/server/src/lib.rs` | Rutas `/nuget/{feed}`; `backfill_metadata` lee `.nupkg` con `onepack_nuget` | Capas, auth, límites, métricas, mantenimiento | Rutas por protocolo; backfill despachado por adaptador |
-| `crates/server/src/nuget_api.rs` | Construye `NewVersion` desde `.nuspec`; JSON de metadatos con `v3::catalog_metadata` | Flujo staging → inspección → `store.publish` | Extraer el flujo común; el adaptador produce `NewVersion` y archivos |
-| `crates/server/src/admin_api.rs` | `Feed` DTO sin `format`; `capabilities` sin ecosistemas | Endpoints administrativos genéricos | Añadir `format`; capacidades `formats.*` |
-| `crates/server/src/ops.rs` | `Surface::NuGet` como única superficie de paquete | Métricas y sondas | Superficies `npm` y `pypi` |
-| `crates/api-client/src/lib.rs` | DTOs y capacidades sin formato | Contrato aditivo y tolerante (`serde(default)`) | `format` opcional; capacidades nuevas |
-| `crates/cli/src/nuget_config.rs`, `nuget.rs` | `nuget init`, `onepack exec`, generación de `NuGet.Config` | `onepack exec`, credenciales, doctor | Comandos por ecosistema en OP-025/OP-034 |
-| `docs/api.md`, `docs/compatibility.md`, `docs/security.md` | Documentan solo NuGet | Estructura y criterios | Secciones por protocolo al implementar |
-| `crates/nuget/*`, `tests/conformance-dotnet/*` | Adaptador y corpus NuGet | Modelo de adaptador y corpus | Réplica para npm y PyPI |
+| `migrations/0001_initial.sql` | `feed.format TEXT NOT NULL CHECK (format IN ('nuget'))`; `package_version.is_semver2`; a single `blob_sha256` per version | Immutable identity, `blob` by SHA-256, auditing | New `feed_format` and `version_file`; document `is_semver2` as a NuGet signal |
+| `crates/core/src/lib.rs` | `Feed` without format; `NewVersion`/`PublishedVersion` with `is_prerelease` and `is_semver2`; generic `package_key`/`version_key` | Identity `package_key + version_key` (ADR-007), quotas, `PublishError` | Add `format` to `Feed`; document flag semantics; no NuGet types |
+| `crates/core/src/auth.rs` | `PublishPattern` accepts `[A-Za-z0-9._-]` and a trailing `*`; rejects `@` and `/` | Cumulative roles and exact/prefix pattern | Validation by adapter; allow `@` and `/` in npm patterns |
+| `crates/storage/src/lib.rs` | `create_feed` inserts the literal `'nuget'`; the quota sums the blob of each version | Publication SQL, staging, quotas, auditing | Insert `feed_format`; quota sums the version files |
+| `crates/storage/src/catalog.rs` | `is_prerelease` and `is_semver2` filters in search | Pagination and search by `search_text` | `is_semver2` filter only for NuGet; adapter decides |
+| `crates/server/src/lib.rs` | `/nuget/{feed}` routes; `backfill_metadata` reads `.nupkg` with `onepack_nuget` | Layers, auth, limits, metrics, maintenance | Routes per protocol; backfill dispatched by adapter |
+| `crates/server/src/nuget_api.rs` | Builds `NewVersion` from `.nuspec`; metadata JSON with `v3::catalog_metadata` | Staging → inspection → `store.publish` flow | Extract the common flow; the adapter produces `NewVersion` and files |
+| `crates/server/src/admin_api.rs` | `Feed` DTO without `format`; `capabilities` without ecosystems | Generic administrative endpoints | Add `format`; `formats.*` capabilities |
+| `crates/server/src/ops.rs` | `Surface::NuGet` as the only package surface | Metrics and probes | `npm` and `pypi` surfaces |
+| `crates/api-client/src/lib.rs` | DTOs and capabilities without format | Additive and tolerant contract (`serde(default)`) | Optional `format`; new capabilities |
+| `crates/cli/src/nuget_config.rs`, `nuget.rs` | `nuget init`, `onepack exec`, `NuGet.Config` generation | `onepack exec`, credentials, doctor | Commands per ecosystem in OP-025/OP-034 |
+| `docs/api.md`, `docs/compatibility.md`, `docs/security.md` | Document only NuGet | Structure and criteria | Sections per protocol when implementing |
+| `crates/nuget/*`, `tests/conformance-dotnet/*` | NuGet adapter and corpus | Adapter model and corpus | Replica for npm and PyPI |
 
-**Conclusión del inventario:** `core` y `storage` no contienen tipos NuGet hoy. Las fugas
-reales son: el `CHECK` de `feed.format`, los flags `is_semver2` (semántica NuGet), el literal
-`'nuget'` en `create_feed`, las rutas del servidor, el backfill de metadatos, la superficie
-de métricas y los patrones de publicación. Ninguna obliga a introducir `onepack-nuget` en
-`core` o `storage`.
+**Inventory conclusion:** `core` and `storage` do not contain NuGet types today. The real leaks
+are: the `feed.format` `CHECK`, the `is_semver2` flags (NuGet semantics), the `'nuget'` literal
+in `create_feed`, the server routes, metadata backfill, the metrics surface and publication
+patterns. None of them forces `onepack-nuget` into `core` or `storage`.
 
-## 3. Decisiones
+## 3. Decisions
 
 <a id="adr-021"></a>
 
-### ADR-021 — Feeds tipados por ecosistema; `format` inmutable
+### ADR-021 — Feeds typed by ecosystem; immutable `format`
 
-**Contexto.** Un feed hoy es una fila con nombre único y `format` limitado a `nuget`. Los
-tres protocolos tienen reglas de nombre, versión, orden y distribución incompatibles; mezclar
-paquetes de distinto ecosistema en la misma identidad produce colisiones y permisos ambiguos.
+**Context.** A feed today is a row with a unique name and `format` limited to `nuget`. The
+three protocols have incompatible name, version, ordering and distribution rules; mixing
+packages from different ecosystems in the same identity produces collisions and ambiguous
+permissions.
 
-**Decisión.** Cada feed declara exactamente un formato (`nuget`, `npm`, `pypi`) al crearse y
-no puede cambiarlo. El nombre del feed sigue siendo único en todo el registro. Para usar el
-mismo namespace lógico en dos ecosistemas se crean feeds distintos (`internal`,
-`internal-npm`). El formato ausente en la API se interpreta como `nuget`, lo que mantiene el
-comportamiento v1.
+**Decision.** Each feed declares exactly one format (`nuget`, `npm`, `pypi`) when created and
+cannot change it. The feed name remains unique across the entire registry. To use the same
+logical namespace in two ecosystems, different feeds are created (`internal`,
+`internal-npm`). A missing format in the API is interpreted as `nuget`, which preserves v1
+behavior.
 
-**Alternativas consideradas.**
+**Alternatives considered.**
 
-- *Feed mixto:* una fila alberga varios formatos. Se descarta: exige identidad compuesta,
-  búsqueda y permisos por protocolo dentro del mismo feed, y abre colisiones/confusiones sin
-  un caso de uso confirmado.
-- *Nombre único por formato* (`(name, format)`): permitiría `internal` en dos ecosistemas,
-  pero cambia la clave de todas las rutas y grants. Se pospone hasta que exista necesidad
-  demostrada.
+- *Mixed feed:* one row hosts several formats. Discarded: it requires composite identity,
+  search and permissions per protocol within the same feed, and opens collisions/confusion
+  without a confirmed use case.
+- *Unique name per format* (`(name, format)`): would allow `internal` in two ecosystems,
+  but changes the key of all routes and grants. Postponed until a demonstrated need exists.
 
-**Consecuencias.** Rutas y permisos siguen resolviéndose por feed; no hay ambigüedad de
-identidad entre protocolos. El costo es que el mismo nombre lógico requiere dos feeds y dos
-grants si se usan dos ecosistemas. Se revisará si aparece esa necesidad real.
+**Consequences.** Routes and permissions continue to be resolved per feed; there is no identity
+ambiguity between protocols. The cost is that the same logical name requires two feeds and two
+grants if two ecosystems are used. It will be reviewed if that real need appears.
 
 <a id="adr-022"></a>
 
-### ADR-022 — Identidad, versión y orden delegados al adaptador
+### ADR-022 — Identity, version and ordering delegated to the adapter
 
-**Contexto.** `NewVersion`/`PublishedVersion` ya son genéricos salvo `is_semver2`, cuyo
-significado es de NuGet. Cada ecosistema normaliza y ordena distinto: NuGet (ADR-008), SemVer
-de npm, PEP 440 de Python.
+**Context.** `NewVersion`/`PublishedVersion` are already generic except for `is_semver2`, whose
+meaning belongs to NuGet. Each ecosystem normalizes and orders differently: NuGet (ADR-008),
+npm SemVer, Python PEP 440.
 
-**Decisión.**
+**Decision.**
 
-- El dominio conserva `package_id`, `package_key`, `version`, `version_key`, `full_version`,
-  `is_prerelease`, `metadata` y `search_text` como datos opacos.
-- Cada adaptador valida, normaliza y ordena; el registro nunca interpreta reglas del
-  ecosistema.
-- `is_prerelease` es común: existe en los tres protocolos.
-- `is_semver2` se documenta como **señal exclusiva de NuGet** para `semVerLevel`. Los
-  adaptadores npm y PyPI escriben `false` y sus rutas no lo leen. No se renombra en v2 para
-  no romper el esquema ni los filtros existentes; queda como deuda explícita a revisar si
-  aparece otro ecosistema SemVer.
-- El orden de versiones (registro, `latest`, páginas) lo calcula el adaptador; `storage`
-  devuelve filas sin ordenar por versión.
+- The domain keeps `package_id`, `package_key`, `version`, `version_key`, `full_version`,
+  `is_prerelease`, `metadata` and `search_text` as opaque data.
+- Each adapter validates, normalizes and orders; the registry never interprets ecosystem
+  rules.
+- `is_prerelease` is common: it exists in all three protocols.
+- `is_semver2` is documented as a **NuGet-only signal** for `semVerLevel`. The npm and PyPI
+  adapters write `false` and their routes do not read it. It is not renamed in v2 to avoid
+  breaking the schema or existing filters; it remains explicit debt to review if another
+  SemVer ecosystem appears.
+- Version ordering (registration, `latest`, pages) is computed by the adapter; `storage`
+  returns rows unordered by version.
 
-**Ejemplos y contraejemplos.**
+**Examples and counterexamples.**
 
-| Ecosistema | Id publicado | `package_key` | Versión publicada | `version_key` | `full_version` | Nota |
+| Ecosystem | Published id | `package_key` | Published version | `version_key` | `full_version` | Note |
 |---|---|---|---|---|---|---|
-| NuGet | `Hemia.Logging` | `hemia.logging` | `1.0.0-Beta.1+sha.abc` | `1.0.0-beta.1` | `1.0.0-Beta.1+sha.abc` | Metadatos de build fuera de la identidad |
-| NuGet | `hemia.logging` | `hemia.logging` | `1.0.0` | `1.0.0` | `1.0.0` | Segunda publicación: `409` con contenido distinto |
-| npm | `@acme/widgets` | `@acme/widgets` | `1.2.3-beta.1+build.5` | `1.2.3-beta.1` | `1.2.3-beta.1+build.5` | Build fuera de la identidad SemVer |
-| npm | `Widgets` | — | — | — | — | Inválido: npm exige minúsculas |
-| PyPI | `Hemia_Logging` | `hemia-logging` | `1.0rc1` | `1.0rc1` | `1.0rc1` | Normalización PEP 503 y PEP 440 |
-| PyPI | `hemia.logging` | `hemia-logging` | `1.0` | `1.0` | `1.0` | Colisiona con `hemia-logging`; `409`, no dos paquetes |
+| NuGet | `Hemia.Logging` | `hemia.logging` | `1.0.0-Beta.1+sha.abc` | `1.0.0-beta.1` | `1.0.0-Beta.1+sha.abc` | Build metadata outside identity |
+| NuGet | `hemia.logging` | `hemia.logging` | `1.0.0` | `1.0.0` | `1.0.0` | Second publication: `409` with different content |
+| npm | `@acme/widgets` | `@acme/widgets` | `1.2.3-beta.1+build.5` | `1.2.3-beta.1` | `1.2.3-beta.1+build.5` | Build outside SemVer identity |
+| npm | `Widgets` | — | — | — | — | Invalid: npm requires lowercase |
+| PyPI | `Hemia_Logging` | `hemia-logging` | `1.0rc1` | `1.0rc1` | `1.0rc1` | PEP 503 and PEP 440 normalization |
+| PyPI | `hemia.logging` | `hemia-logging` | `1.0` | `1.0` | `1.0` | Collides with `hemia-logging`; `409`, not two packages |
 
-Reglas de identidad por ecosistema (el adaptador las implementa y las prueba con corpus):
+Identity rules per ecosystem (the adapter implements and tests them with a corpus):
 
-- **NuGet:** caso-insensible; versión `1`, `1.0`, `1.0.0` y `1.0.0+meta` son la misma
-  identidad; prerelease y SemVer 2.0.0 según ADR-008.
-- **npm:** nombre en minúsculas, scoped `@scope/name` o no scoped; versión SemVer válida;
-  el build metadata no entra en la identidad; los dist-tags (`latest`, `next`) no son
-  versiones y no crean identidad.
-- **PyPI:** nombre normalizado con PEP 503 (`_`, `.`, mayúsculas → `-` minúscula); versión
-  PEP 440 canónica; las versiones locales (`+local`) se conservan tal cual en la identidad
-  (no se colapsan); prerelease/release/post según PEP 440.
+- **NuGet:** case-insensitive; versions `1`, `1.0`, `1.0.0` and `1.0.0+meta` are the same
+  identity; prerelease and SemVer 2.0.0 according to ADR-008.
+- **npm:** lowercase name, scoped `@scope/name` or unscoped; valid SemVer version;
+  build metadata does not enter identity; dist-tags (`latest`, `next`) are not
+  versions and do not create identity.
+- **PyPI:** name normalized with PEP 503 (`_`, `.`, uppercase → lowercase `-`); canonical
+  PEP 440 version; local versions (`+local`) are preserved as-is in the identity
+  (not collapsed); prerelease/release/post according to PEP 440.
 
-**Consecuencias.** Los corpus de conformidad son obligatorios por adaptador, como el de
-`crates/nuget/tests/version_corpus.rs`. El coste de un ecosistema nuevo queda acotado a un
-crate de adaptador más su corpus.
+**Consequences.** Conformance corpora are mandatory per adapter, like the one in
+`crates/nuget/tests/version_corpus.rs`. The cost of a new ecosystem is bounded to an adapter
+crate plus its corpus.
 
 <a id="adr-023"></a>
 
-### ADR-023 — Múltiples archivos por versión con `version_file`
+### ADR-023 — Multiple files per version with `version_file`
 
-**Contexto.** `package_version` guarda un único `blob_sha256`. NuGet publica un `.nupkg` por
-versión, pero PyPI admite varios archivos por versión (varias wheels y sdist) y npm publica
-un tarball más metadatos. Python es obligatorio en v2.
+**Context.** `package_version` stores a single `blob_sha256`. NuGet publishes one `.nupkg` per
+version, but PyPI supports several files per version (multiple wheels and an sdist) and npm
+publishes a tarball plus metadata. Python is mandatory in v2.
 
-**Decisión.**
+**Decision.**
 
-- Se añade `version_file(version_id, filename, kind, sha256, size)` con primaria
-  `(version_id, filename)` y FK a `blob`.
-- `package_version.blob_sha256` se conserva como **artefacto primario** para no romper las
-  consultas v1. La migración rellena `version_file` con ese blob y un nombre sintetizado por
-  el adaptador NuGet (`{id}.{version}.nupkg` en minúsculas, como el flat container).
-- `kind` distingue el rol del archivo (`package`, `tarball`, `wheel`, `sdist`, `metadata`).
-  La lista exacta se fija en OP-023/OP-027; el valor es opaco para `storage`.
-- Un `filename` es inmutable: subir el mismo nombre con bytes distintos responde `409`
-  (`VERSION_FILE_CONFLICT`). La comparación es exacta sobre el nombre; el adaptador
-  normaliza cuando su protocolo lo exige. Subir otro nombre a una versión existente es
-  válido solo para ecosistemas que lo permiten; el adaptador decide (PyPI sí; NuGet no).
-- La cuota del feed suma el tamaño de los archivos de cada versión. Un blob compartido entre
-  versiones se cuenta una vez por versión, como hoy.
-- En el primer corte no se borran archivos desde el registro; retirar (yank/unlist) es un
-  cambio de estado, no una eliminación.
+- `version_file(version_id, filename, kind, sha256, size)` is added with primary key
+  `(version_id, filename)` and an FK to `blob`.
+- `package_version.blob_sha256` is kept as the **primary artifact** to avoid breaking v1
+  queries. The migration fills `version_file` with that blob and a name synthesized by
+  the NuGet adapter (`{id}.{version}.nupkg` in lowercase, like the flat container).
+- `kind` distinguishes the role of the file (`package`, `tarball`, `wheel`, `sdist`, `metadata`).
+  The exact list is fixed in OP-023/OP-027; the value is opaque to `storage`.
+- A `filename` is immutable: uploading the same name with different bytes responds `409`
+  (`VERSION_FILE_CONFLICT`). The comparison is exact on the name; the adapter
+  normalizes when its protocol requires it. Uploading another name to an existing version is
+  valid only for ecosystems that allow it; the adapter decides (PyPI does; NuGet does not).
+- The feed quota sums the size of the files of each version. A blob shared between
+  versions is counted once per version, as today.
+- In the first cut, files are not deleted from the registry; withdrawing (yank/unlist) is a
+  state change, not a deletion.
 
-**Consecuencias.** PyPI puede publicar varias distribuciones sin duplicar la fila de versión
-ni inventar identidades. NuGet sigue sirviendo el artefacto primario sin cambios.
+**Consequences.** PyPI can publish several distributions without duplicating the version row
+or inventing identities. NuGet continues to serve the primary artifact without changes.
 
 <a id="adr-024"></a>
 
-### ADR-024 — Rutas, capacidades y contratos aditivos por protocolo
+### ADR-024 — Routes, capabilities and additive contracts per protocol
 
-**Contexto.** El contrato `/api/v1` es aditivo y tolerante a campos desconocidos; el CLI
-negocia capacidades. Las rutas actuales son solo `/nuget/{feed}`.
+**Context.** The `/api/v1` contract is additive and tolerant of unknown fields; the CLI
+negotiates capabilities. Current routes are only `/nuget/{feed}`.
 
-**Decisión.**
+**Decision.**
 
-- Rutas namespaced por protocolo y feed: `/nuget/{feed}/...` (sin cambios), `/npm/{feed}/...`
-  y `/pypi/{feed}/...`. La superficie exacta la fijan OP-023 y OP-027.
-- Un cliente de protocolo que golpea un feed de otro formato recibe `404` con
-  `FEED_NOT_FOUND`, igual que un feed inexistente: no se filtra existencia entre protocolos.
-- Capacidades nuevas: `formats` y `formats.nuget`, `formats.npm`, `formats.pypi`. El servidor
-  anuncia solo los adaptadores compilados; un CLI viejo ignora los valores nuevos.
-- `/api/v1/feeds` añade `format` (`#[serde(default)]` → `nuget`); `POST /api/v1/feeds` acepta
-  `format` opcional; `PATCH` no puede cambiarlo (`FEED_FORMAT_IMMUTABLE`).
-- Métricas: la etiqueta `surface` pasa a `nuget`, `npm`, `pypi`, `admin` o `probe`.
-- El CLI gana `feed create --format <nuget|npm|pypi>` y muestra el formato; los comandos de
-  configuración por ecosistema llegan en OP-025 y OP-034.
-- Errores nuevos: `FEED_FORMAT_IMMUTABLE`, `VERSION_FILE_CONFLICT`,
-  `FEED_FORMAT_MISMATCH` (uso interno si una ruta y un feed no coinciden). Se conservan los
-  códigos estables actuales.
+- Routes namespaced by protocol and feed: `/nuget/{feed}/...` (unchanged), `/npm/{feed}/...`
+  and `/pypi/{feed}/...`. The exact surface is fixed by OP-023 and OP-027.
+- A protocol client that hits a feed of another format receives `404` with
+  `FEED_NOT_FOUND`, just like a nonexistent feed: existence is not leaked between protocols.
+- New capabilities: `formats` and `formats.nuget`, `formats.npm`, `formats.pypi`. The server
+  announces only the compiled adapters; an old CLI ignores the new values.
+- `/api/v1/feeds` adds `format` (`#[serde(default)]` → `nuget`); `POST /api/v1/feeds` accepts
+  an optional `format`; `PATCH` cannot change it (`FEED_FORMAT_IMMUTABLE`).
+- Metrics: the `surface` label becomes `nuget`, `npm`, `pypi`, `admin` or `probe`.
+- The CLI gains `feed create --format <nuget|npm|pypi>` and shows the format; ecosystem
+  configuration commands arrive in OP-025 and OP-034.
+- New errors: `FEED_FORMAT_IMMUTABLE`, `VERSION_FILE_CONFLICT`,
+  `FEED_FORMAT_MISMATCH` (internal use if a route and a feed do not match). The current
+  stable codes are preserved.
 
-**Compatibilidad.** Un CLI v1 contra un servidor v2: `format` desconocido se ignora;
-`create feed` sin `format` crea `nuget`. Un CLI v2 contra un servidor v1: las capacidades
-`formats.*` faltan y los comandos de otros ecosistemas fallan antes de llamar. Los clientes
-NuGet no ven ninguna diferencia.
+**Compatibility.** A v1 CLI against a v2 server: unknown `format` is ignored;
+`create feed` without `format` creates `nuget`. A v2 CLI against a v1 server: the `formats.*`
+capabilities are missing and commands for other ecosystems fail before calling. NuGet clients
+see no difference.
 
 <a id="adr-025"></a>
 
-### ADR-025 — `feed_format` como tabla autoritativa; el CHECK v1 queda como legado
+### ADR-025 — `feed_format` as the authoritative table; the v1 CHECK remains as legacy
 
-**Contexto.** SQLite no permite ampliar un `CHECK` sin reconstruir la tabla, y `feed` tiene
-FKs desde `package`, `package_version`, `feed_grant` y `audit_event`. Reconstruir la tabla en
-una migración forward-only es más arriesgado que añadir una tabla.
+**Context.** SQLite does not allow expanding a `CHECK` without rebuilding the table, and `feed`
+has FKs from `package`, `package_version`, `feed_grant` and `audit_event`. Rebuilding the table
+in a forward-only migration is riskier than adding a table.
 
-**Decisión.** La migración `0006` crea:
+**Decision.** Migration `0006` creates:
 
 ```sql
 CREATE TABLE feed_format (
@@ -216,165 +215,165 @@ CREATE TABLE feed_format (
 ) STRICT;
 ```
 
-- Rellena todas las filas existentes con `nuget`.
-- `create_feed` sigue insertando `'nuget'` en la columna legada para satisfacer su `CHECK` y
-  escribe el formato real en `feed_format`. La columna `feed.format` no se lee para decidir
-  comportamiento; se documenta como legado de v1 y se eliminará cuando una reconstrucción de
-  tabla esté justificada.
-- El formato de un feed se lee con `LEFT JOIN feed_format`, con `nuget` como valor por
-  defecto si la fila faltara.
+- Fills all existing rows with `nuget`.
+- `create_feed` still inserts `'nuget'` in the legacy column to satisfy its `CHECK` and
+  writes the real format to `feed_format`. The `feed.format` column is not read to decide
+  behavior; it is documented as v1 legacy and will be removed when a table rebuild
+  is justified.
+- A feed's format is read with `LEFT JOIN feed_format`, with `nuget` as the default value
+  if the row were missing.
 
-**Consecuencias.** Migración segura, sin reconstrucción ni riesgo de FKs, y compatible con
-bases v1. El costo es una columna legada que miente para feeds nuevos; queda registrada como
-deuda con condición de salida (reconstrucción de `feed` en una migración futura).
+**Consequences.** Safe migration, without rebuilding or FK risk, and compatible with
+v1 databases. The cost is a legacy column that lies for new feeds; it is recorded as
+debt with an exit condition (rebuilding `feed` in a future migration).
 
 <a id="adr-026"></a>
 
-### ADR-026 — Frontera de crates: adaptadores fuera de `core`/`storage`
+### ADR-026 — Crate boundary: adapters outside `core`/`storage`
 
-**Contexto.** `onepack-nuget` ya concentra validación, normalización, inspección y JSON de
-NuGet. La regla ADR-003 prohíbe que `core`, `storage` y el dominio dependan de un ecosistema.
+**Context.** `onepack-nuget` already concentrates NuGet validation, normalization, inspection and
+JSON. The ADR-003 rule forbids `core`, `storage` and the domain from depending on an ecosystem.
 
-**Decisión.**
+**Decision.**
 
-- Nuevos crates `onepack-npm` y `onepack-pypi`, espejo de `onepack-nuget`: inspección de
-  archivos, normalización, orden y serialización de protocolo.
-- El servidor gana módulos de rutas por protocolo (`npm_api`, `pypi_api`) y comparte el flujo
-  común de subida: staging → límite → `tokio::task::spawn_blocking` → inspección del
-  adaptador → `NewVersion` + archivos → `store.publish`.
-- `backfill_metadata` deja de llamar a `onepack_nuget` directo: el adaptador del feed
-  aporta el lector (registro por formato en el servidor).
-- `core` y `storage` no reciben dependencias de ecosistema. Si aparece una interfaz común,
-  será un rasgo mínimo definido en `core` con implementaciones en los crates de adaptador;
-  no se crea una fábrica de adaptadores antes de que existan dos consumidores reales.
+- New crates `onepack-npm` and `onepack-pypi`, mirroring `onepack-nuget`: file
+  inspection, normalization, ordering and protocol serialization.
+- The server gains route modules per protocol (`npm_api`, `pypi_api`) and shares the common
+  upload flow: staging → limit → `tokio::task::spawn_blocking` → adapter inspection →
+  `NewVersion` + files → `store.publish`.
+- `backfill_metadata` stops calling `onepack_nuget` directly: the feed's adapter
+  provides the reader (registry per format in the server).
+- `core` and `storage` receive no ecosystem dependencies. If a common interface appears,
+  it will be a minimal trait defined in `core` with implementations in the adapter crates;
+  an adapter factory is not created before two real consumers exist.
 
-**Consecuencias.** Un ecosistema nuevo es un crate y un módulo de rutas. El binario crece con
-los adaptadores compilados, como ya anuncia `capabilities`.
+**Consequences.** A new ecosystem is a crate and a route module. The binary grows with
+the compiled adapters, as `capabilities` already announces.
 
-## 4. Permisos y patrones de publicación
+## 4. Permissions and publication patterns
 
-Los roles siguen siendo `reader`, `publisher` y `maintainer`, acumulativos, con `is_admin`
-global. La política de patrón es del registro y se aplica sobre `package_key`; su sintaxis
-debe admitir la forma de cada ecosistema.
+Roles remain `reader`, `publisher` and `maintainer`, cumulative, with a global `is_admin`.
+The pattern policy belongs to the registry and is applied to `package_key`; its syntax
+must support the shape of each ecosystem.
 
-| Ecosistema | Patrón válido | `package_key` | ¿Coincide? |
+| Ecosystem | Valid pattern | `package_key` | Does it match? |
 |---|---|---|---|
-| NuGet | `Hemia.Payments.*` | `hemia.payments.core` | Sí |
-| NuGet | `Hemia.Payments.*` | `hemia.payments.core.extra` | Sí |
-| NuGet | `Hemia.Payments.*` | `hemia.paymentsx` | No (el prefijo incluye el punto) |
-| npm | `@acme/*` | `@acme/widgets` | Sí |
-| npm | `@acme/widgets` | `@acme/widgets` | Sí |
-| npm | `widgets` | `widgets` | Sí (`@acme/widgets` no coincide) |
-| PyPI | `hemia-*` | `hemia-logging` | Sí |
-| PyPI | `hemia-logging` | `hemia.logging` | Sí (normalizado a `hemia-logging`) |
+| NuGet | `Hemia.Payments.*` | `hemia.payments.core` | Yes |
+| NuGet | `Hemia.Payments.*` | `hemia.payments.core.extra` | Yes |
+| NuGet | `Hemia.Payments.*` | `hemia.paymentsx` | No (the prefix includes the dot) |
+| npm | `@acme/*` | `@acme/widgets` | Yes |
+| npm | `@acme/widgets` | `@acme/widgets` | Yes |
+| npm | `widgets` | `widgets` | Yes (`@acme/widgets` does not match) |
+| PyPI | `hemia-*` | `hemia-logging` | Yes |
+| PyPI | `hemia-logging` | `hemia.logging` | Yes (normalized to `hemia-logging`) |
 
-Decisión: `PublishPattern` conserva el comodín final `*` y la comparación exacta o por
-prefijo, en minúsculas. La validación de caracteres se delega al adaptador en el borde de la
-API; el core deja de rechazar `@` y `/`. Un patrón vacío sigue significando «cualquier id del
-feed». Sin patrones, no hay restricción adicional.
+Decision: `PublishPattern` keeps the trailing `*` wildcard and exact or prefix matching,
+in lowercase. Character validation is delegated to the adapter at the API edge; the core
+stops rejecting `@` and `/`. An empty pattern still means "any id in the feed". Without
+patterns, there is no additional restriction.
 
-## 5. Contratos de API, CLI y errores
+## 5. API, CLI and error contracts
 
-### API administrativa (`/api/v1`)
+### Administrative API (`/api/v1`)
 
-| Cambio | Forma | Compatibilidad |
+| Change | Shape | Compatibility |
 |---|---|---|
-| `Feed.format` | `"nuget" \| "npm" \| "pypi"` | Aditivo; ausente se interpreta `nuget` |
-| `CreateFeed.format` | opcional; por defecto `nuget` | Un cliente v1 sigue creando NuGet |
-| Capacidades | `formats`, `formats.nuget`, `formats.npm`, `formats.pypi` | Aditivas |
-| `PATCH /feeds/{feed}` | no acepta `format` | `409 FEED_FORMAT_IMMUTABLE` |
-| `PackageVersion` | sin cambio en v2; los archivos se exponen en la ruta del protocolo | Aditivo si se añade `files` después |
+| `Feed.format` | `"nuget" \| "npm" \| "pypi"` | Additive; missing is interpreted as `nuget` |
+| `CreateFeed.format` | optional; defaults to `nuget` | A v1 client still creates NuGet |
+| Capabilities | `formats`, `formats.nuget`, `formats.npm`, `formats.pypi` | Additive |
+| `PATCH /feeds/{feed}` | does not accept `format` | `409 FEED_FORMAT_IMMUTABLE` |
+| `PackageVersion` | unchanged in v2; files are exposed on the protocol route | Additive if `files` is added later |
 
 ### CLI
 
-| Comando | v1 | v2 |
+| Command | v1 | v2 |
 |---|---|---|
-| `onepack feed create` | crea NuGet | `--format` opcional; sin flag crea NuGet |
-| `onepack feed show/list` | sin formato | muestran `format` |
-| `onepack doctor` | comprueba feeds NuGet | comprueba el formato del feed y las capacidades del servidor |
+| `onepack feed create` | creates NuGet | optional `--format`; without the flag creates NuGet |
+| `onepack feed show/list` | without format | show `format` |
+| `onepack doctor` | checks NuGet feeds | checks the feed format and server capabilities |
 | `onepack npm init` / `onepack python init` | — | OP-025 / OP-034 |
 
-### Errores estables nuevos
+### New stable errors
 
-| Código | Cuándo | Respuesta |
+| Code | When | Response |
 |---|---|---|
-| `FEED_FORMAT_IMMUTABLE` | `PATCH` intenta cambiar `format` | `409` |
-| `VERSION_FILE_CONFLICT` | mismo `filename`, bytes distintos | `409` |
-| `FEED_FORMAT_MISMATCH` | ruta de protocolo sobre feed de otro formato | `404` visible como `FEED_NOT_FOUND` |
+| `FEED_FORMAT_IMMUTABLE` | `PATCH` tries to change `format` | `409` |
+| `VERSION_FILE_CONFLICT` | same `filename`, different bytes | `409` |
+| `FEED_FORMAT_MISMATCH` | protocol route over a feed of another format | `404` visible as `FEED_NOT_FOUND` |
 
-## 6. Migración y compatibilidad
+## 6. Migration and compatibility
 
-La migración `0006_multiecosistema.sql` es forward-only (ADR-020) y hace todo en una
-transacción:
+Migration `0006_multiecosistema.sql` is forward-only (ADR-020) and does everything in one
+transaction:
 
-1. Crea `feed_format` y `version_file`.
-2. Rellena `feed_format` con `nuget` para cada feed existente.
-3. Rellena `version_file` desde `package_version.blob_sha256` con `kind = 'package'` y un
-   nombre sintetizado por el adaptador NuGet.
-4. No toca `feed`, `package`, `package_version`, grants ni auditoría.
+1. Creates `feed_format` and `version_file`.
+2. Fills `feed_format` with `nuget` for each existing feed.
+3. Fills `version_file` from `package_version.blob_sha256` with `kind = 'package'` and a
+   name synthesized by the NuGet adapter.
+4. Does not touch `feed`, `package`, `package_version`, grants or auditing.
 
-Antes de migrar se sigue el procedimiento de backup vigente
-([docs/runbooks/backup-restore.md](../docs/runbooks/backup-restore.md)); el ensayo de
-`onepackd backup` + migración + restauración es parte de la evidencia de OP-022. El backup
-existente ya cubre las tablas nuevas y los blobs; no se introduce un formato de datos
-distinto ni una recuperación nueva.
+Before migrating, the current backup procedure is followed
+([docs/runbooks/backup-restore.md](../docs/runbooks/backup-restore.md)); the rehearsal of
+`onepackd backup` + migration + restore is part of the OP-022 evidence. The existing backup
+already covers the new tables and blobs; no different data format or new recovery is
+introduced.
 
-Compatibilidad verificable:
+Verifiable compatibility:
 
-- Feeds y datos v1 siguen siendo NuGet y responden en las mismas rutas.
-- Un `package_version` existente conserva su blob primario y gana una fila en
-  `version_file`; las descargas NuGet no cambian.
-- El CLI v1 habla con el servidor v2 y viceversa (campos nuevos tolerados; comandos nuevos
-  bloqueados por capacidades).
-- Los permisos, tokens, auditoría y cuotas se reutilizan sin cambios de significado.
+- v1 feeds and data remain NuGet and respond on the same routes.
+- An existing `package_version` keeps its primary blob and gains a row in
+  `version_file`; NuGet downloads do not change.
+- The v1 CLI talks to the v2 server and vice versa (new fields tolerated; new commands
+  blocked by capabilities).
+- Permissions, tokens, auditing and quotas are reused without changes in meaning.
 
-## 7. Plan de implementación para OP-022 (handoff)
+## 7. Implementation plan for OP-022 (handoff)
 
-Orden mínimo sugerido, cada paso con su prueba:
+Minimum suggested order, each step with its test:
 
-1. Migración `0006` y pruebas de migración desde una base v1 con feeds y versiones.
-2. `feed_format` en `storage` y `Feed.format` en `core`/`api-client`; `create_feed` con
-   formato.
-3. `version_file` en `storage` y lectura de archivos; cuota por archivos.
-4. Flujo común de publicación extraído de `nuget_api`; registro de adaptadores en el
-   servidor.
-5. Rutas npm y PyPI vacías que respondan `FEED_FORMAT_MISMATCH` cuando corresponda; superficie
-   de métricas por protocolo.
-6. Adaptadores reales en OP-024 y OP-033; specs en OP-023 y OP-027.
+1. Migration `0006` and migration tests from a v1 database with feeds and versions.
+2. `feed_format` in `storage` and `Feed.format` in `core`/`api-client`; `create_feed` with
+   format.
+3. `version_file` in `storage` and file reading; quota by files.
+4. Common publication flow extracted from `nuget_api`; adapter registry in the
+   server.
+5. Empty npm and PyPI routes that respond `FEED_FORMAT_MISMATCH` when appropriate; metrics
+   surface per protocol.
+6. Real adapters in OP-024 and OP-033; specs in OP-023 and OP-027.
 
-Pruebas mínimas que OP-022 debe entregar:
+Minimum tests that OP-022 must deliver:
 
-- Migración: base v1 con feeds, versiones y blobs → `feed_format` y `version_file`
-  completos; mismo contenido descargable y mismas cuotas.
-- Fronteras: `./scripts/check-crate-deps.sh` y la matriz de dependencias confirman que
-  `core`/`storage` no dependen de `onepack-nuget`, `onepack-npm` ni `onepack-pypi`.
-- Compatibilidad: CLI v1 contra servidor v2 y CLI v2 contra servidor v1 (crear/leer feeds,
-  `format` ausente); clientes NuGet sin regresión.
-- Aislamiento: un token con grant en un feed no puede leer ni publicar en un feed de otro
-  formato, y un feed de formato A no responde en la ruta del formato B.
-- Conformidad: corpus de identidad/versión por adaptador antes de exponer sus rutas.
+- Migration: v1 database with feeds, versions and blobs → complete `feed_format` and
+  `version_file`; same downloadable content and same quotas.
+- Boundaries: `./scripts/check-crate-deps.sh` and the dependency matrix confirm that
+  `core`/`storage` do not depend on `onepack-nuget`, `onepack-npm` or `onepack-pypi`.
+- Compatibility: v1 CLI against v2 server and v2 CLI against v1 server (create/read feeds,
+  missing `format`); NuGet clients without regression.
+- Isolation: a token with a grant on one feed cannot read or publish to a feed of another
+  format, and a feed of format A does not respond on the route of format B.
+- Conformance: identity/version corpus per adapter before exposing its routes.
 
-## 8. Decisiones pendientes para OP-023 y OP-027
+## 8. Pending decisions for OP-023 and OP-027
 
-- **npm:** matriz de clientes (npm 10/11; pnpm/yarn fuera del primer corte), mecanismo de
-  autenticación de publicación, política de dist-tags (mover `latest`, no borrar), límites de
-  tarball y corpus SemVer.
-- **PyPI:** versiones de pip y twine, índice simple (PEP 503) y JSON (PEP 691), mapeo de
-  yanked (PEP 592) sin borrar bytes, corpus PEP 440, y si se permite un archivo nuevo en una
-  versión ya publicada (ADR-023 dice que el adaptador decide; la spec debe fijarlo).
-- **Orden de versiones:** corpus ejecutables en CI, como el de NuGet, para npm y PyPI.
-- **Búsqueda:** `search_text` y metadatos por adaptador; sin búsqueda cruzada entre formatos.
+- **npm:** client matrix (npm 10/11; pnpm/yarn outside the first cut), publication
+  authentication mechanism, dist-tag policy (move `latest`, do not delete), tarball limits
+  and SemVer corpus.
+- **PyPI:** pip and twine versions, simple index (PEP 503) and JSON (PEP 691), yanked mapping
+  (PEP 592) without deleting bytes, PEP 440 corpus, and whether a new file is allowed in an
+  already published version (ADR-023 says the adapter decides; the spec must fix it).
+- **Version ordering:** executable corpora in CI, like the NuGet one, for npm and PyPI.
+- **Search:** `search_text` and metadata per adapter; no cross-format search.
 
-## 9. Verificación de esta especificación
+## 9. Verification of this specification
 
-- AC-01: inventario de la sección 2, con el `CHECK format IN ('nuget')` y `is_semver2`
-  señalados.
-- AC-02: ADR-021 (feeds) y la tabla de identidad con ejemplos y contraejemplos de los tres
-  protocolos; decisión aceptada el 2026-10-19.
-- AC-03: secciones 4–6 con contratos de API/CLI, errores, migración y compatibilidad; `core`
-  y `storage` conservan su frontera sin dependencias NuGet.
-- AC-CIERRE: cerrado con la aceptación registrada del 2026-10-19, la nota OP-021 y el
-  backlog sincronizados.
+- AC-01: inventory in section 2, with `CHECK format IN ('nuget')` and `is_semver2`
+  pointed out.
+- AC-02: ADR-021 (feeds) and the identity table with examples and counterexamples for the three
+  protocols; decision accepted on 2026-10-19.
+- AC-03: sections 4–6 with API/CLI contracts, errors, migration and compatibility; `core`
+  and `storage` preserve their boundary without NuGet dependencies.
+- AC-CIERRE: closed with the recorded acceptance of 2026-10-19, the OP-021 note and the
+  backlog synchronized.
 
-Evidencia: ruta de este documento, SHA-256 del contenido aceptado, commit local `514e439`
-(entrega) y la aceptación registrada en Obsidian el 2026-10-19.
+Evidence: path of this document, SHA-256 of the accepted content, local commit `514e439`
+(delivery) and the acceptance recorded in Obsidian on 2026-10-19.

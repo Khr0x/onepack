@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/Khr0x/onepack/security/advisories/new
+    about: Report a vulnerability privately. Do not open a public issue.
+  - name: Usage and support
+    url: https://github.com/Khr0x/onepack/blob/main/SUPPORT.md
+    about: Where to ask questions and report non-security problems.

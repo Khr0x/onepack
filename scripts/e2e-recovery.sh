@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Prueba de recuperación de la Fase 7 (ADR-017): backup en un servidor, restore en otro y
-# `dotnet restore` contra el restaurado.
+# Phase 7 recovery test (ADR-017): backup on one server, restore on another and
+# `dotnet restore` against the restored one.
 #
-#   e2e-recovery.sh backup  ARCHIVO.tar.gz   origen: publica paquetes y hace el backup en caliente
-#   e2e-recovery.sh restore ARCHIVO.tar.gz   destino: restaura, comprueba y restaura un proyecto
-#   e2e-recovery.sh                          ambas fases en esta máquina
+#   e2e-recovery.sh backup  FILE.tar.gz   origin: publishes packages and takes a hot backup
+#   e2e-recovery.sh restore FILE.tar.gz   target: restores, checks and restores a project
+#   e2e-recovery.sh                       both phases on this machine
 #
-# En CI cada fase corre en una máquina distinta (Linux -> macOS).
+# In CI each phase runs on a different machine (Linux -> macOS).
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -27,32 +27,32 @@ cleanup() {
 trap cleanup EXIT
 
 fail() {
-  echo "E2E RECUPERACIÓN FALLÓ: $*" >&2
+  echo "E2E RECOVERY FAILED: $*" >&2
   cat "$work"/server-*.log >&2 2>/dev/null || true
   exit 1
 }
 step() { echo "==> $*"; }
 sha() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
-step "Compilando onepackd y onepack"
+step "Building onepackd and onepack"
 cargo build --quiet --manifest-path "$root/Cargo.toml" -p onepack-server -p onepack-cli
 onepackd() { "$root/target/debug/onepackd" "$@"; }
 onepack() { "$root/target/debug/onepack" "$@"; }
 export ONEPACK_CONFIG_DIR="$work/onepack-config" ONEPACK_KEYRING=off ONEPACK_NO_INPUT=1
 unset ONEPACK_TOKEN
 
-# Arranca onepackd y espera a /readyz. Uso: serve DIR PUERTO
+# Starts onepackd and waits for /readyz. Usage: serve DIR PORT
 serve() {
-  # El binario directamente (no la función): `$!` debe ser el PID del servidor.
+  # The binary directly (not the function): `$!` must be the server PID.
   "$root/target/debug/onepackd" serve --data-dir "$1" --listen "127.0.0.1:$2" --public-url "http://127.0.0.1:$2" \
     --ops-listen "127.0.0.1:$(($2 + 1000))" --min-free-space-mib 0 >"$work/server-$2.log" 2>&1 &
   server_pid=$!
   for _ in $(seq 1 50); do
     curl -fs "http://127.0.0.1:$2/readyz" >/dev/null 2>&1 && return 0
-    kill -0 "$server_pid" 2>/dev/null || fail "onepackd terminó al arrancar"
+    kill -0 "$server_pid" 2>/dev/null || fail "onepackd exited at startup"
     sleep 0.2
   done
-  fail "onepackd no llegó a ready"
+  fail "onepackd did not become ready"
 }
 stop() { kill "$server_pid"; wait "$server_pid" 2>/dev/null || true; server_pid=""; }
 
@@ -64,7 +64,7 @@ origin() {
   cp -R "$conformance/fixtures" "$work/fixtures"
   rm -rf "$work"/fixtures/*/bin "$work"/fixtures/*/obj
 
-  step "Origen: inicializando y publicando paquetes"
+  step "Origin: initializing and publishing packages"
   onepackd init --data-dir "$data" >/dev/null
   ADMIN_TOKEN=$(tr -d '\n' <"$data/initial-admin-token")
   export ADMIN_TOKEN
@@ -76,29 +76,29 @@ origin() {
   admin grant add --principal ci --feed $feed --role publisher >/dev/null
   CI_TOKEN=$(admin token create --principal ci --expires-in-days 1 2>/dev/null)
   export CI_TOKEN
-  pack() { (cd "$work" && dotnet pack "fixtures/$1" -c Release -o "$work/nupkgs" --nologo -v quiet "${@:2}") >/dev/null || fail "pack de $1"; }
+  pack() { (cd "$work" && dotnet pack "fixtures/$1" -c Release -o "$work/nupkgs" --nologo -v quiet "${@:2}") >/dev/null || fail "pack $1"; }
   pack Onepack.Fixture.Basic
   pack Onepack.Fixture.Basic -p:Version=1.1.0
   pack Onepack.Fixture.Dependent
   pack Onepack.Fixture.Rich
   pack Onepack.Fixture.Ranged "-p:RestoreAdditionalProjectSources=$work/nupkgs"
   onepack --context origin --token-env CI_TOKEN package push --feed $feed "$work"/nupkgs/*.nupkg >/dev/null 2>&1 \
-    || fail "push en el origen"
+    || fail "push on the origin"
 
-  step "Origen: backup con el servidor en marcha"
+  step "Origin: backup with the server running"
   onepackd backup --data-dir "$data" --output "$work/backup" || fail "backup"
   curl -fs "http://127.0.0.1:$((port + 1000))/metrics" | grep -q '^onepack_maintenance 0' \
-    || fail "el mantenimiento no terminó tras el backup"
-  admin feed create after-backup >/dev/null || fail "el servidor no acepta mutaciones tras el backup"
-  onepackd check --data-dir "$data" >/dev/null || fail "check en el origen"
+    || fail "maintenance did not finish after the backup"
+  admin feed create after-backup >/dev/null || fail "the server does not accept mutations after the backup"
+  onepackd check --data-dir "$data" >/dev/null || fail "check on the origin"
   stop
 
-  # Lo que el destino necesita para comprobar: el backup, los hashes publicados y el token de
-  # CI (de prueba, caduca en un día) para demostrar que las credenciales sobreviven.
+  # What the target needs to check: the backup, the published hashes and the CI token
+  # (test-only, expires in one day) to prove that credentials survive.
   (cd "$work/nupkgs" && for f in *.nupkg; do echo "$(sha "$f") $f"; done) >"$work/backup/expected.sha256"
   printf %s "$CI_TOKEN" >"$work/backup/ci-token.txt"
   tar -czf "$out" -C "$work" backup
-  echo "    backup: $(du -h "$out" | cut -f1) en $out"
+  echo "    backup: $(du -h "$out" | cut -f1) at $out"
 }
 
 target() {
@@ -108,21 +108,21 @@ target() {
   tar -xzf "$in" -C "$work/in"
   local backup="$work/in/backup"
 
-  step "Destino: restaurando en un directorio vacío"
+  step "Target: restoring into an empty directory"
   onepackd restore --from "$backup" --data-dir "$data" || fail "restore"
-  onepackd check --data-dir "$data" || fail "check tras restaurar"
+  onepackd check --data-dir "$data" || fail "check after restoring"
   if onepackd restore --from "$backup" --data-dir "$data" >/dev/null 2>&1; then
-    fail "restore debió negarse a escribir sobre un directorio con datos"
+    fail "restore should have refused to write over a directory with data"
   fi
 
-  step "Destino: arrancando con otra URL pública"
+  step "Target: starting with a different public URL"
   serve "$data" $port
   CI_TOKEN=$(cat "$backup/ci-token.txt")
   export CI_TOKEN
   onepack --url "http://127.0.0.1:$port" --token-env CI_TOKEN whoami >/dev/null \
-    || fail "la credencial de CI no sobrevivió al restore"
+    || fail "the CI credential did not survive the restore"
 
-  step "Destino: dotnet restore de un proyecto contra el servidor restaurado"
+  step "Target: dotnet restore of a project against the restored server"
   mkdir -p "$work/client"
   cp "$conformance/global.json" "$work/global.json"
   [ -n "${ONEPACK_E2E_SDK:-}" ] && printf '{ "sdk": { "version": "%s", "rollForward": "latestFeature" } }\n' "$ONEPACK_E2E_SDK" >"$work/global.json"
@@ -137,32 +137,32 @@ target() {
   export NUGET_PACKAGES="$work/packages" NUGET_HTTP_CACHE_PATH="$work/http-cache"
   (cd "$work/client/consumer" && onepack --url "http://127.0.0.1:$port" --token-env CI_TOKEN exec --feed $feed -- \
     dotnet restore --nologo "-p:ConsumerTargetFramework=$tfm") >"$work/restore.log" 2>&1 \
-    || { cat "$work/restore.log"; fail "dotnet restore contra el servidor restaurado"; }
+    || { cat "$work/restore.log"; fail "dotnet restore against the restored server"; }
   output=$(cd "$work/client/consumer" && dotnet run --no-restore --nologo "-p:ConsumerTargetFramework=$tfm")
   expected=$'dependent -> hello from onepack fixture\nranged -> hello from onepack fixture\nrich'
-  [ "$output" = "$expected" ] || fail "salida inesperada: '$output'"
+  [ "$output" = "$expected" ] || fail "unexpected output: '$output'"
 
-  step "Destino: los paquetes descargados son idénticos a los publicados en el origen"
+  step "Target: the downloaded packages are identical to those published on the origin"
   while read -r hash file; do
     lower=$(echo "$file" | tr '[:upper:]' '[:lower:]')
     found=$(find "$NUGET_PACKAGES" -name "$lower" | head -1)
     [ -n "$found" ] || continue
-    [ "$(sha "$found")" = "$hash" ] || fail "$file restaurado no coincide con el original"
+    [ "$(sha "$found")" = "$hash" ] || fail "$file restored does not match the original"
     checked=$((${checked:-0} + 1))
   done <"$backup/expected.sha256"
-  [ "${checked:-0}" -ge 4 ] || fail "solo se compararon ${checked:-0} paquetes"
+  [ "${checked:-0}" -ge 4 ] || fail "only ${checked:-0} packages were compared"
   stop
-  echo "    $checked paquetes idénticos byte a byte"
+  echo "    $checked packages identical byte for byte"
 }
 
 case "$mode" in
-  backup) [ -n "$archive" ] || fail "uso: $0 backup ARCHIVO.tar.gz"; origin "$archive" ;;
-  restore) [ -n "$archive" ] || fail "uso: $0 restore ARCHIVO.tar.gz"; target "$archive" ;;
+  backup) [ -n "$archive" ] || fail "usage: $0 backup FILE.tar.gz"; origin "$archive" ;;
+  restore) [ -n "$archive" ] || fail "usage: $0 restore FILE.tar.gz"; target "$archive" ;;
   all)
     origin "$work/backup.tar.gz"
     rm -rf "$work/origin" "$work/backup" "$work/nupkgs"
     target "$work/backup.tar.gz"
     ;;
-  *) fail "modo desconocido: $mode" ;;
+  *) fail "unknown mode: $mode" ;;
 esac
-echo "E2E RECUPERACIÓN OK ($mode)"
+echo "E2E RECOVERY OK ($mode)"

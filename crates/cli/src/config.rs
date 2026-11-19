@@ -1,8 +1,8 @@
-//! Contextos: a qué servidor habla el CLI. El archivo nunca contiene secretos; los tokens
-//! van al keychain del sistema (ADR-015).
+//! Contexts: which server the CLI talks to. The file never contains secrets; tokens
+//! go to the system keychain (ADR-015).
 //!
-//! Ubicación: `$ONEPACK_CONFIG_DIR`, o `$XDG_CONFIG_HOME/onepack`, o `~/.config/onepack`
-//! (`%APPDATA%\onepack` en Windows), archivo `config.json`.
+//! Location: `$ONEPACK_CONFIG_DIR`, or `$XDG_CONFIG_HOME/onepack`, or `~/.config/onepack`
+//! (`%APPDATA%\onepack` on Windows), file `config.json`.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -54,7 +54,7 @@ fn path() -> CliResult<PathBuf> {
     Ok(dir()?.join("config.json"))
 }
 
-/// Nombre de contexto: letras, dígitos, `-`, `_` y `.`.
+/// Context name: letters, digits, `-`, `_`, and `.`.
 pub fn validate_name(name: &str) -> CliResult<()> {
     let ok = !name.is_empty()
         && name.len() <= 64
@@ -91,13 +91,13 @@ impl Config {
         let dir = path.parent().expect("the file is inside a directory");
         std::fs::create_dir_all(dir).map_err(|e| CliError::io(&dir.display().to_string(), &e))?;
         let json = serde_json::to_vec_pretty(self).expect("the configuration is serializable");
-        // Escritura atómica: un corte a mitad no deja el archivo truncado.
+        // Atomic write: an interruption halfway does not leave the file truncated.
         let tmp = dir.join("config.json.tmp");
         std::fs::write(&tmp, json).map_err(|e| CliError::io(&tmp.display().to_string(), &e))?;
         std::fs::rename(&tmp, &path).map_err(|e| CliError::io(&path.display().to_string(), &e))
     }
 
-    /// Contexto que se usa: el indicado o el actual.
+    /// Context to use: the given one or the current one.
     pub fn resolve(&self, name: Option<&str>) -> CliResult<(String, Context)> {
         let name = name.or(self.current.as_deref()).ok_or_else(|| {
             CliError::new(exit::USAGE, "CONTEXT_MISSING", "no context is configured")

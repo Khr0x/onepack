@@ -1,8 +1,8 @@
-//! Edición de `NuGet.Config` (ADR-016): añade fuentes y `packageSourceMapping` conservando
-//! todo lo existente (comentarios, espacios, otras fuentes) y nunca escribe secretos.
+//! Editing `NuGet.Config` (ADR-016): adds sources and `packageSourceMapping` while preserving
+//! everything that exists (comments, whitespace, other sources) and never writes secrets.
 //!
-//! Se usa un árbol mínimo que guarda el texto original de cada nodo, así que lo que no se
-//! toca se reescribe byte a byte.
+//! A minimal tree is used that stores the original text of each node, so anything not
+//! touched is rewritten byte for byte.
 
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -10,20 +10,20 @@ use quick_xml::events::{BytesStart, Event};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node {
     Element(Element),
-    /// Texto tal como estaba (con sus escapes).
+    /// Text as it was (with its escapes).
     Text(String),
-    /// Declaración, comentario, CDATA, instrucción o DOCTYPE, con sus delimitadores.
+    /// Declaration, comment, CDATA, instruction, or DOCTYPE, with its delimiters.
     Raw(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     pub name: String,
-    /// Valores tal como estaban (con sus escapes).
+    /// Values as they were (with their escapes).
     pub attrs: Vec<(String, String)>,
     pub children: Vec<Node>,
     pub self_closing: bool,
-    /// Etiqueta de apertura original; se descarta al modificar el elemento.
+    /// Original opening tag; discarded when the element is modified.
     raw_open: Option<String>,
 }
 
@@ -46,7 +46,7 @@ impl Element {
         }
     }
 
-    /// Valor de un atributo, sin escapes.
+    /// Value of an attribute, without escapes.
     pub fn attr(&self, name: &str) -> Option<String> {
         self.attrs
             .iter()
@@ -92,7 +92,7 @@ impl Element {
             .find(|e| e.name.eq_ignore_ascii_case(name))
     }
 
-    /// Añade un hijo con la sangría del documento, antes del espacio que precede al cierre.
+    /// Adds a child with the document indentation, before the whitespace preceding the closing tag.
     fn append(&mut self, child: Element, depth: usize, indent: &str) {
         let inner = format!("\n{}", indent.repeat(depth + 1));
         let outer = format!("\n{}", indent.repeat(depth));
@@ -241,7 +241,7 @@ impl Document {
         out
     }
 
-    /// Unidad de sangría del documento (la del primer hijo de `configuration`).
+    /// Document indentation unit (that of the first child of `configuration`).
     fn indent(&self) -> String {
         self.root()
             .and_then(|r| {
@@ -256,7 +256,7 @@ impl Document {
             .unwrap_or_else(|| "  ".to_owned())
     }
 
-    /// Fuentes declaradas en este archivo: (clave, URL).
+    /// Sources declared in this file: (key, URL).
     pub fn sources(&self) -> Vec<(String, String)> {
         self.root()
             .and_then(|r| r.child("packageSources"))
@@ -269,14 +269,14 @@ impl Document {
             .unwrap_or_default()
     }
 
-    /// `true` si `packageSources` empieza con `<clear />` (no hereda fuentes).
+    /// `true` if `packageSources` starts with `<clear />` (it does not inherit sources).
     pub fn clears_sources(&self) -> bool {
         self.root()
             .and_then(|r| r.child("packageSources"))
             .is_some_and(|s| s.elements().any(|e| e.name == "clear"))
     }
 
-    /// Patrones de `packageSourceMapping` por fuente; `None` si no hay sección.
+    /// `packageSourceMapping` patterns per source; `None` if there is no section.
     pub fn mapping(&self) -> Option<Vec<(String, Vec<String>)>> {
         let section = self.root()?.child("packageSourceMapping")?;
         Some(
@@ -295,7 +295,7 @@ impl Document {
         )
     }
 
-    /// Claves con credenciales en texto plano (`ClearTextPassword`).
+    /// Keys with plaintext credentials (`ClearTextPassword`).
     pub fn cleartext_credentials(&self) -> Vec<String> {
         let Some(creds) = self
             .root()
@@ -315,7 +315,7 @@ impl Document {
             .collect()
     }
 
-    /// Añade o actualiza una fuente y su mapeo. Devuelve avisos para la persona.
+    /// Adds or updates a source and its mapping. Returns warnings for the user.
     pub fn upsert_source(
         &mut self,
         key: &str,
@@ -367,9 +367,9 @@ impl Document {
             .child_mut("packageSourceMapping")
             .expect("created above");
         if !had_mapping {
-            // Con mapeo, NuGet solo usa para cada paquete las fuentes que lo mapean. Para no
-            // romper lo que ya restauraba, el resto de fuentes conserva `*`; los patrones de
-            // onepack son más específicos y ganan.
+            // With mapping, NuGet uses only the sources that map each package. To avoid
+            // breaking what already restored, the rest of the sources keep `*`; onepack
+            // patterns are more specific and win.
             let mut inherited = others.clone();
             if !clears && !inherited.iter().any(|k| k == "nuget.org") {
                 inherited.push("nuget.org".to_owned());
@@ -439,17 +439,17 @@ fn render_node(node: &Node, out: &mut String) {
     }
 }
 
-/// Clave de fuente para un feed: `onepack_<feed>` (los `-` pasan a `_` para que la variable
-/// `NuGetPackageSourceCredentials_<clave>` sea válida en cualquier shell).
+/// Source key for a feed: `onepack_<feed>` (dashes become underscores so that the
+/// `NuGetPackageSourceCredentials_<key>` variable is valid in any shell).
 pub fn source_key(feed: &str) -> String {
     format!("onepack_{}", feed.replace('-', "_"))
 }
 
-/// Diff de líneas con dos líneas de contexto. Vacío si no hay cambios.
+/// Line diff with two context lines. Empty if there are no changes.
 pub fn diff(old: &str, new: &str) -> String {
     let a: Vec<&str> = old.lines().collect();
     let b: Vec<&str> = new.lines().collect();
-    // Tabla LCS: los archivos de configuración son pequeños.
+    // LCS table: configuration files are small.
     let mut lcs = vec![vec![0usize; b.len() + 1]; a.len() + 1];
     for i in (0..a.len()).rev() {
         for j in (0..b.len()).rev() {
@@ -558,7 +558,7 @@ mod tests {
         );
         assert_eq!(notes.len(), 0, "nuget.org was already declared");
         assert!(!out.contains("Password"));
-        // Sigue siendo XML válido y con la sangría del archivo.
+        // It remains valid XML and keeps the file's indentation.
         assert!(Document::parse(&out).is_ok());
         assert!(out.contains("\n    <packageSourceMapping>\n        <packageSource key=\"nuget.org\">\n            <package pattern=\"*\" />"));
     }

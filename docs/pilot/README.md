@@ -5,7 +5,7 @@
 
 The pilot answers one question: **can a team that did not write onepack install it, use it in their daily work and recover from an incident using only the documentation?** Anything that prevents this is an MVP blocker.
 
-The [decisive test](../../roadmap/roadmap-mvp.md#prueba-decisiva-del-mvp) already runs automatically on every change ([`scripts/e2e-acceptance.sh`](../../scripts/e2e-acceptance.sh)). The pilot checks what a script cannot: that people complete it without help, on their own infrastructure and with their own projects.
+The [decisive test](../../roadmap/roadmap-mvp.md#decisive-mvp-test) already runs automatically on every change ([`scripts/e2e-acceptance.sh`](../../scripts/e2e-acceptance.sh)). The pilot checks what a script cannot: that people complete it without help, on their own infrastructure and with their own projects.
 
 ## Pilot team
 
@@ -52,7 +52,7 @@ There is no need to propose a fix: what they were trying to do, what happened an
 
 ## Exit criteria
 
-The pilot succeeds when, in addition to the [MVP exit criteria](../../roadmap/roadmap-mvp.md#criterios-de-cierre-del-mvp):
+The pilot succeeds when, in addition to the [MVP exit criteria](../../roadmap/roadmap-mvp.md#mvp-close-criteria):
 
 - the team installed and published without direct help (or every bit of help is logged and fixed in the documentation);
 - the incident drill was completed and all three incidents were resolved with the runbooks;
@@ -66,6 +66,6 @@ A 45-minute session at the end with these questions, with the answers summarised
 1. What would you do differently if you installed it again tomorrow?
 2. Which step in the documentation was unnecessary or missing?
 3. What would make you stop using it?
-4. From the [out-of-MVP list](../../roadmap/roadmap-mvp.md#fuera-del-mvp-referencia) (credential provider, S3, nuget.org proxy, npm…), what did you miss first?
+4. From the [out-of-MVP list](../../roadmap/roadmap-mvp.md#outside-the-mvp-reference) (credential provider, S3, nuget.org proxy, npm…), what did you miss first?
 
 The answer to question 4 updates the evolution order in the roadmap.

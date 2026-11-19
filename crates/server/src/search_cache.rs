@@ -1,11 +1,11 @@
-//! Caché del índice de búsqueda por feed (Fase 7). Construir el índice exige leer todas las
-//! versiones listadas del feed; con varias búsquedas concurrentes eso domina la latencia de
-//! los metadatos (ver docs/performance.md).
+//! Per-feed search index cache (Phase 7). Building the index requires reading all
+//! listed versions of the feed; with several concurrent searches that dominates the metadata
+//! latency (see docs/performance.md).
 //!
-//! Frescura: las mutaciones de este proceso (publicar, unlist/relist, bloquear) invalidan la
-//! caché al momento. Las de otros procesos sobre el mismo directorio de datos (p. ej.
-//! `onepackd package block`) se ven como mucho tras `TTL`. La descarga de una versión
-//! bloqueada se comprueba siempre en la base, sin caché.
+//! Freshness: mutations in this process (publish, unlist/relist, block) invalidate the
+//! cache immediately. Those from other processes on the same data directory (e.g.
+//! `onepackd package block`) are visible at most after `TTL`. Downloading a
+//! blocked version is always checked in the database, without cache.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -18,7 +18,7 @@ use onepack_storage::{Store, StoreError};
 
 const TTL: Duration = Duration::from_secs(5);
 
-/// Clave: feed, incluir prerelease, incluir SemVer 2.0.0.
+/// Key: feed, include prerelease, include SemVer 2.0.0.
 type Key = (i64, bool, bool);
 
 struct Entry {
@@ -34,7 +34,7 @@ pub struct SearchCache {
 }
 
 impl SearchCache {
-    /// Invalida todo: lo llama cualquier cambio del catálogo en este proceso.
+    /// Invalidates everything: called by any catalog change in this process.
     pub fn invalidate(&self) {
         self.generation.fetch_add(1, Ordering::SeqCst);
     }
@@ -47,8 +47,8 @@ impl SearchCache {
         semver2: bool,
     ) -> Result<Arc<SearchIndex>, StoreError> {
         let key = (feed.id, prerelease, semver2);
-        // Se toma antes de leer: si algo cambia mientras se construye, la entrada nace ya
-        // obsoleta y la siguiente búsqueda la reconstruye.
+        // It is taken before reading: if something changes while it is being built, the entry is born already
+        // stale and the next search rebuilds it.
         let generation = self.generation.load(Ordering::SeqCst);
         if let Some(e) = self.entries.lock().expect("mutex not poisoned").get(&key)
             && e.generation == generation

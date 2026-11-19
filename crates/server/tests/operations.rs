@@ -1,6 +1,6 @@
-//! Operación (Fase 7): sondas sin credencial, modo mantenimiento y métricas. Las métricas
-//! son del proceso y las comparten las pruebas de este archivo: se comprueba qué series
-//! existen, no sus valores exactos.
+//! Operations (Phase 7): probes without a credential, maintenance mode, and metrics. Metrics
+//! belong to the process and are shared by the tests in this file: which series
+//! exist is checked, not their exact values.
 
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -115,9 +115,9 @@ async fn probes_need_no_credentials_and_reveal_nothing() {
         assert_eq!(ready["status"], "ready");
         assert_eq!(ready["checks"]["database"], "ok");
         assert_eq!(ready["checks"]["storage"], "ok");
-        assert!(!body.contains("internal"), "sin datos del registro");
+        assert!(!body.contains("internal"), "no registry data");
     }
-    // El resto sigue exigiendo credencial, y /metrics no existe en el listener principal.
+    // The rest still require a credential, and /metrics does not exist on the main listener.
     let (status, _, _) = send(&env.router, get("/metrics", None)).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     let (status, _, _) = send(
@@ -155,7 +155,7 @@ async fn maintenance_rejects_mutations_but_serves_reads() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert!(body.contains(r#""code":"MAINTENANCE""#), "{body}");
 
-    // Las lecturas siguen, y /readyz informa del mantenimiento sin dejar de estar listo.
+    // Reads continue, and /readyz reports maintenance while remaining ready.
     let (status, _, _) = send(
         &env.router,
         get(
@@ -200,8 +200,8 @@ async fn metrics_count_requests_uploads_and_errors() {
         "onepack_maintenance ",
         "onepack_data_dir_free_bytes ",
     ] {
-        assert!(text.contains(expected), "falta {expected}:\n{text}");
+        assert!(text.contains(expected), "missing {expected}:\n{text}");
     }
-    // Ningún dato de petición en las etiquetas.
+    // No request data in the labels.
     assert!(!text.contains("metric.pkg") && !text.contains("internal"));
 }

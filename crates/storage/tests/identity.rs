@@ -23,14 +23,14 @@ async fn principal(store: &Store, name: &str, admin: bool) -> onepack_core::Prin
 fn valid(outcome: AuthOutcome) -> onepack_core::AuthContext {
     match outcome {
         AuthOutcome::Valid(ctx) => ctx,
-        AuthOutcome::Invalid(f) => panic!("esperaba token válido: {f:?}"),
+        AuthOutcome::Invalid(f) => panic!("expected a valid token: {f:?}"),
     }
 }
 
 fn invalid(outcome: AuthOutcome) -> AuthFailure {
     match outcome {
         AuthOutcome::Invalid(f) => f,
-        AuthOutcome::Valid(_) => panic!("esperaba token inválido"),
+        AuthOutcome::Valid(_) => panic!("expected an invalid token"),
     }
 }
 
@@ -69,7 +69,7 @@ async fn revoked_expired_and_wrong_tokens_fail() {
     assert!(store.revoke_token(&revoked.id, "test").await.unwrap());
     assert!(
         !store.revoke_token(&revoked.id, "test").await.unwrap(),
-        "revocar dos veces no hace nada"
+        "revoking twice does nothing"
     );
     assert_eq!(
         invalid(store.authenticate(&revoked.token).await.unwrap()),
@@ -110,7 +110,7 @@ async fn revoked_expired_and_wrong_tokens_fail() {
         AuthFailure::Malformed
     );
 
-    // Los demás tokens del principal siguen siendo válidos.
+    // The principal's other tokens remain valid.
     valid(store.authenticate(&good.token).await.unwrap());
 }
 
@@ -147,7 +147,7 @@ async fn grants_can_be_replaced_and_removed() {
     assert_eq!(grants[0].role, Role::Reader);
     assert!(
         grants[0].publish_patterns.is_empty(),
-        "el reemplazo borra los patrones anteriores"
+        "replacing it clears the previous patterns"
     );
 
     assert!(store.remove_grant(&p, &feed, "test").await.unwrap());
@@ -168,7 +168,7 @@ async fn database_never_contains_the_secret() {
             let bytes = std::fs::read(entry.path()).unwrap();
             assert!(
                 !bytes.windows(secret.len()).any(|w| w == secret.as_bytes()),
-                "{} contiene el secreto",
+                "{} contains the secret",
                 entry.path().display()
             );
         }

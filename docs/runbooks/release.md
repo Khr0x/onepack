@@ -20,7 +20,7 @@ Before the first tag, and whenever the workflow changes:
 
 1. GitHub → *Actions* → *Release* → *Run workflow* on `main`.
 2. The binaries carry version `0.0.0-dev.<sha>` and are kept as run artifacts (`release`), with no GitHub release.
-3. Download the `release` artifact and check the signature as in [installation](install.md#1-descargar-y-verificar), using `--certificate-identity "https://github.com/Khr0x/onepack/.github/workflows/release.yml@refs/heads/main"`.
+3. Download the `release` artifact and check the signature as in [installation](install.md#1-download-and-verify), using `--certificate-identity "https://github.com/Khr0x/onepack/.github/workflows/release.yml@refs/heads/main"`.
 
 ## Publishing a version
 

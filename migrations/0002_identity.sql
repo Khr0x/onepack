@@ -1,4 +1,4 @@
--- Identidades, tokens y permisos (Fase 4: ADR-010, ADR-012).
+-- Identities, tokens, and permissions (Phase 4: ADR-010, ADR-012).
 
 CREATE TABLE principal (
     id          INTEGER PRIMARY KEY,
@@ -9,7 +9,7 @@ CREATE TABLE principal (
     created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 ) STRICT;
 
--- El secreto nunca se guarda: solo su verificador SHA-256 (ADR-010).
+-- The secret is never stored: only its SHA-256 verifier (ADR-010).
 CREATE TABLE token (
     id           TEXT    PRIMARY KEY CHECK (length(id) = 16),
     principal_id INTEGER NOT NULL REFERENCES principal (id),
@@ -31,7 +31,7 @@ CREATE TABLE feed_grant (
     PRIMARY KEY (principal_id, feed_id)
 ) STRICT;
 
--- Sin filas: el grant permite publicar cualquier id del feed.
+-- No rows: the grant allows publishing any package id in the feed.
 CREATE TABLE grant_publish_pattern (
     principal_id INTEGER NOT NULL,
     feed_id      INTEGER NOT NULL,

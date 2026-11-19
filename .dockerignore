@@ -3,3 +3,24 @@ target/
 **/bin/
 **/obj/
 *.nupkg
+
+# Never copy local data, databases, or secrets into an image
+data/
+.env
+.env.*
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+initial-admin-token
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc

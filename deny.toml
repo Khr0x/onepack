@@ -10,9 +10,9 @@ yanked = "deny"
 [licenses]
 version = 2
 confidence-threshold = 0.9
-# Sin dependencias todavía; la lista se mantiene como política.
+# No dependencies yet; the list is kept as policy.
 unused-allowed-license = "allow"
-# Permisivas habituales del ecosistema Rust. Ampliar solo con revisión.
+# Common permissive licenses in the Rust ecosystem. Expand only after review.
 allow = [
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
@@ -26,7 +26,7 @@ allow = [
 ]
 
 [licenses.private]
-# Los crates del workspace no se publican (publish = false).
+# Workspace crates are not published (publish = false).
 ignore = true
 
 [bans]
@@ -37,6 +37,6 @@ allow-wildcard-paths = true
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# Temporal: pin revisado de sqlx 0.9.1 mientras no está en crates.io
-# (RUSTSEC-2026-0459). Retirar al publicar sqlx 0.9.1.
+# Temporary: reviewed pin of sqlx 0.9.1 while it is not on crates.io
+# (RUSTSEC-2026-0459). Remove once sqlx 0.9.1 is published.
 allow-git = ["https://github.com/transact-rs/sqlx"]

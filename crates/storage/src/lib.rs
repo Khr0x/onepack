@@ -1,4 +1,4 @@
-//! Persistencia: metadatos en SQLite y blobs direccionados por SHA-256 (ADR-004, ADR-005).
+//! Persistence: metadata in SQLite and blobs addressed by SHA-256 (ADR-004, ADR-005).
 
 mod admin;
 pub mod blobs;
@@ -35,11 +35,11 @@ const DB_FILE: &str = "metadata.sqlite";
 
 #[derive(Debug)]
 pub enum StoreError {
-    /// No hay base de datos en el directorio de datos.
+    /// There is no database in the data directory.
     NotInitialized(PathBuf),
-    /// Hay migraciones sin aplicar: hay que ejecutar `onepackd migrate`.
+    /// There are unapplied migrations: `onepackd migrate` must be run.
     PendingMigrations(usize),
-    /// La base fue migrada por una versión más nueva de onepackd.
+    /// The database was migrated by a newer version of onepackd.
     SchemaTooNew {
         version: i64,
     },
@@ -88,7 +88,7 @@ impl From<sqlx::Error> for StoreError {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct MigrationReport {
     pub applied: usize,
-    /// Copia de la base previa a migrar, si había datos (ADR-020).
+    /// Copy of the database before migrating, if there was data (ADR-020).
     pub backup: Option<PathBuf>,
 }
 
@@ -99,14 +99,14 @@ pub struct GcReport {
 }
 
 pub struct Store {
-    /// Un único escritor: SQLite admite un solo escritor a la vez (ADR-004).
+    /// A single writer: SQLite allows only one writer at a time (ADR-004).
     writer: SqlitePool,
     reader: SqlitePool,
     data_dir: PathBuf,
     blobs: BlobStore,
 }
 
-/// Solo lectura y sin pragmas que escriban (el modo WAL se fija al abrir para escribir).
+/// Read-only and without writing pragmas (WAL mode is set when opening for writing).
 fn read_only_options(db: &Path) -> SqliteConnectOptions {
     SqliteConnectOptions::new()
         .filename(db)
@@ -123,8 +123,8 @@ fn connect_options(db: &Path) -> SqliteConnectOptions {
         .busy_timeout(Duration::from_secs(5))
 }
 
-/// Aplica las migraciones pendientes. Si la base ya tenía esquema, guarda antes una copia
-/// consistente en `backups/` con `VACUUM INTO`.
+/// Applies pending migrations. If the database already had a schema, it first stores a
+/// consistent copy in `backups/` with `VACUUM INTO`.
 pub async fn migrate(data_dir: &Path) -> Result<MigrationReport, StoreError> {
     tokio::fs::create_dir_all(data_dir).await?;
     let db = data_dir.join(DB_FILE);
@@ -165,14 +165,14 @@ pub async fn migrate(data_dir: &Path) -> Result<MigrationReport, StoreError> {
     Ok(report)
 }
 
-/// Estado del esquema sin modificar nada (para `onepackd migrate --check`).
+/// Schema state without modifying anything (for `onepackd migrate --check`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SchemaStatus {
-    /// Última migración aplicada; `None` si el directorio no está inicializado.
+    /// Last applied migration; `None` if the directory is not initialized.
     pub current: Option<i64>,
-    /// Última migración que conoce esta versión de onepackd.
+    /// Last migration known to this version of onepackd.
     pub latest: i64,
-    /// Migraciones pendientes, en orden.
+    /// Pending migrations, in order.
     pub pending: Vec<i64>,
 }
 
@@ -228,7 +228,7 @@ fn check_not_newer(applied: &[i64]) -> Result<(), StoreError> {
 }
 
 impl Store {
-    /// Abre un directorio de datos ya migrado. No crea ni migra la base.
+    /// Opens an already migrated data directory. It does not create or migrate the database.
     pub async fn open(data_dir: &Path) -> Result<Self, StoreError> {
         let db = data_dir.join(DB_FILE);
         if !tokio::fs::try_exists(&db).await? {
@@ -330,8 +330,8 @@ impl Store {
             .collect())
     }
 
-    /// Publica una versión siguiendo ADR-006: el blob queda durable antes de confirmar los
-    /// metadatos, y metadatos + auditoría se confirman en una única transacción corta.
+    /// Publishes a version following ADR-006: the blob becomes durable before committing the
+    /// metadata, and metadata + audit are committed in a single short transaction.
     pub async fn publish(
         &self,
         feed: &Feed,
@@ -339,7 +339,7 @@ impl Store {
         staged: StagedBlob,
         actor: Option<&str>,
     ) -> Result<(), PublishError> {
-        // Comprobación previa barata; la garantía la da la restricción UNIQUE.
+        // Cheap prior check; the guarantee is provided by the UNIQUE constraint.
         if let Some(existing) = self
             .version(feed, &version.package_key, &version.version_key)
             .await
@@ -350,8 +350,8 @@ impl Store {
             return Err(PublishError::Conflict { identical });
         }
 
-        // Comprobación previa de cuotas para no persistir el blob en vano; la garantía la da
-        // la comprobación dentro de la transacción.
+        // Prior quota check so as not to persist the blob in vain; the guarantee is provided by
+        // the check inside the transaction.
         let quota = self.feed_quota(feed).await.map_err(db_err)?;
         let usage = self.feed_usage(feed).await.map_err(db_err)?;
         if let Some(kind) = quota.exceeded_by(usage, staged.size()) {
@@ -373,7 +373,7 @@ impl Store {
             .await
         {
             Ok(None) => Ok(()),
-            // El blob queda huérfano y lo recoge la limpieza (ADR-006).
+            // The blob becomes orphaned and cleanup picks it up (ADR-006).
             Ok(Some(kind)) => {
                 self.audit_quota(feed, version, kind, actor).await;
                 Err(PublishError::QuotaExceeded(kind))
@@ -382,7 +382,7 @@ impl Store {
                 if e.as_database_error()
                     .is_some_and(|d| d.is_unique_violation()) =>
             {
-                // Carrera con otra publicación de la misma identidad: ganó la otra.
+                // Race with another publication of the same identity: the other one won.
                 let existing = self
                     .version(feed, &version.package_key, &version.version_key)
                     .await
@@ -404,8 +404,8 @@ impl Store {
         actor: Option<&str>,
     ) -> Result<Option<QuotaKind>, sqlx::Error> {
         let mut tx = self.writer.begin().await?;
-        // Dentro de la transacción del único escritor: dos publicaciones concurrentes no
-        // pueden superar juntas la cuota.
+        // Inside the single writer's transaction: two concurrent publications cannot
+        // exceed the quota together.
         let quota = quota_row(
             &sqlx::query("SELECT max_storage_bytes, max_versions FROM feed WHERE id = ?")
                 .bind(feed.id)
@@ -502,7 +502,7 @@ impl Store {
         Ok(usage_row(&row))
     }
 
-    /// Fija las cuotas de un feed. No afecta a lo ya publicado aunque lo supere.
+    /// Sets a feed's quotas. It does not affect what is already published even if that exceeds them.
     pub async fn set_feed_quota(
         &self,
         feed: &Feed,
@@ -559,8 +559,8 @@ impl Store {
         }
     }
 
-    /// Auditoría de un intento denegado. Un fallo al auditar se registra en el log y no
-    /// cambia la respuesta.
+    /// Audit of a denied attempt. A failure to audit is logged and does not
+    /// change the response.
     pub async fn record_denied(
         &self,
         action: &str,
@@ -609,7 +609,7 @@ impl Store {
         Ok(row.map(|r| to_published(&r)))
     }
 
-    /// Versiones de un paquete, sin orden garantizado: el orden depende del formato.
+    /// Versions of a package, with no guaranteed order: the order depends on the format.
     pub async fn versions(
         &self,
         feed: &Feed,
@@ -629,8 +629,8 @@ impl Store {
         Ok(rows.iter().map(to_published).collect())
     }
 
-    /// Elimina subidas abandonadas y blobs que ninguna versión referencia, con un periodo de
-    /// gracia para no competir con publicaciones en curso (ADR-006).
+    /// Deletes abandoned uploads and blobs that no version references, with a grace
+    /// period so as not to compete with ongoing publications (ADR-006).
     pub async fn gc(&self, grace: Duration) -> Result<GcReport, StoreError> {
         let mut report = GcReport {
             staging_removed: self.blobs.clean_staging(grace).await?,
@@ -657,7 +657,7 @@ impl Store {
         Ok(report)
     }
 
-    /// Comprobaciones de arranque: el directorio de datos admite escritura y hay espacio libre.
+    /// Startup checks: the data directory is writable and there is free space.
     pub async fn check_data_dir(data_dir: &Path, min_free_bytes: u64) -> Result<u64, StoreError> {
         let probe = data_dir.join("staging").join(".write-probe");
         tokio::fs::write(&probe, b"ok").await?;
@@ -722,7 +722,7 @@ fn db_err(e: StoreError) -> PublishError {
 fn sqlx_to_publish(e: sqlx::Error) -> PublishError {
     match e {
         sqlx::Error::Io(io) => PublishError::from(io),
-        // SQLITE_FULL (13): base de datos o disco lleno.
+        // SQLITE_FULL (13): database or disk full.
         e if e
             .as_database_error()
             .and_then(|d| d.code())
@@ -742,7 +742,7 @@ mod tests {
     async fn migrating_existing_schema_takes_a_backup_first() {
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join(DB_FILE);
-        // Simula una instalación anterior con solo la primera migración aplicada.
+        // Simulates an earlier installation with only the first migration applied.
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(connect_options(&db).create_if_missing(true))

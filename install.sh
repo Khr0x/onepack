@@ -1,13 +1,13 @@
 #!/bin/sh
-# Instala el CLI onepack desde GitHub Releases.
+# Installs the onepack CLI from GitHub Releases.
 #
 #   curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | sh
 #
 # Variables:
-#   ONEPACK_VERSION=0.1.0          versión a instalar (sin la "v")
+#   ONEPACK_VERSION=0.1.0          version to install (without the "v")
 #   ONEPACK_INSTALL_DIR=~/.local/bin
-#   ONEPACK_INSTALL_SERVER=1       instala también onepackd (Linux)
-#   ONEPACK_BASE_URL=...           base alternativa (mirror o file://)
+#   ONEPACK_INSTALL_SERVER=1       also installs onepackd (Linux)
+#   ONEPACK_BASE_URL=...           alternative base (mirror or file://)
 set -eu
 umask 077
 

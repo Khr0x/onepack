@@ -26,7 +26,7 @@ onepack token create --principal ci --name pipeline --expires-in-days 90
 1. Store the new token in the pipeline secret ([guide](../guide-zero-to-ci.md)) **before** re-running it.
 2. Check that the old token no longer works: `onepack --token-env OLD whoami` exits with code 3. With `onepack exec`, the error says the credential is not valid; with `dotnet restore` directly, NuGet only shows `NU1301` and the server logs `authentication rejected reason="revoked"`.
 3. Re-run the pipeline: it must restore.
-4. Review what the token did while it was leaked: `onepack audit list --limit 100` (actor `ci`) and the *last used* column (`ÚLTIMO USO`) of `onepack token list`.
+4. Review what the token did while it was leaked: `onepack audit list --limit 100` (actor `ci`) and the *last used* column (`LAST USED`) of `onepack token list`.
 
 **Done when:** the pipeline restores with the new token and `token list` shows the old one as revoked.
 
@@ -38,7 +38,7 @@ Goal: nobody can download the vulnerable version, and whoever had it sees why.
 onepack package block --feed internal Hemia.Core 1.4.0 --reason "CVE-2026-0001"
 ```
 
-1. On a machine with no cache (empty `NUGET_PACKAGES`), a restore that needs it fails with `410 (PACKAGE_BLOCKED - version blocked by the registry)` ([security](../security.md#bloqueo-de-versiones)). The version is still listed as deprecated in the metadata.
+1. On a machine with no cache (empty `NUGET_PACKAGES`), a restore that needs it fails with `410 (PACKAGE_BLOCKED - version blocked by the registry)` ([security](../security.md#version-blocking)). The version is still listed as deprecated in the metadata.
 2. Publish the fixed version (for example, `1.4.1`) from CI and update the project reference.
 3. When blocking is no longer needed, or if it was a mistake: `onepack package unblock --feed internal Hemia.Core 1.4.0 --reason "..."`.
 
@@ -50,7 +50,7 @@ Local NuGet caches that already had the version are **not** invalidated: blockin
 
 Goal: the service comes back on another machine (or the same one, with an empty disk) from the latest backup, with the same public URL.
 
-Follow [backup and restore](backup-restore.md#restaurar). In short, on the new machine:
+Follow [backup and restore](backup-restore.md#restore). In short, on the new machine:
 
 ```bash
 onepackd restore --from /path/to/backup --data-dir /var/lib/onepack

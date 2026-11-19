@@ -1,4 +1,4 @@
-//! Estado común de una ejecución: opciones globales, contexto, credencial y cliente HTTP.
+//! Common state for a run: global options, context, credential, and HTTP client.
 
 use std::cell::OnceCell;
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ use crate::credentials::{self, Credential};
 use crate::error::{CliError, CliResult, exit};
 use crate::output::Out;
 
-/// Opciones globales (ver `main.rs`).
+/// Global options (see `main.rs`).
 #[derive(Debug, Clone)]
 pub struct Global {
     pub context: Option<String>,
@@ -31,7 +31,7 @@ pub struct App {
     capabilities: OnceCell<Capabilities>,
 }
 
-/// Contexto resuelto: nombre (si viene de la configuración) y destino.
+/// Resolved context: name (if it comes from the configuration) and target.
 #[derive(Debug, Clone)]
 pub struct Target {
     pub name: Option<String>,
@@ -49,7 +49,7 @@ impl App {
         })
     }
 
-    /// `--url` tiene prioridad sobre el contexto (útil en pipelines sin configuración).
+    /// `--url` takes precedence over the context (useful in pipelines without configuration).
     pub fn target(&self) -> CliResult<Target> {
         if let Some(url) = &self.global.url {
             return Ok(Target {
@@ -94,7 +94,7 @@ impl App {
         })?)
     }
 
-    /// Cliente autenticado con la credencial del contexto.
+    /// Client authenticated with the context credential.
     pub fn client_with_timeout(&self, default_timeout: Duration) -> CliResult<Client> {
         let target = self.target()?;
         let credential = self.credential(&target)?;
@@ -105,7 +105,7 @@ impl App {
         self.client_with_timeout(DEFAULT_TIMEOUT)
     }
 
-    /// Falla con un error claro si el servidor no ofrece la capacidad (N/N-1, ADR-015).
+    /// Fails with a clear error if the server does not offer the capability (N/N-1, ADR-015).
     pub fn require(&self, client: &Client, capability: &str) -> CliResult<()> {
         let caps = match self.capabilities.get() {
             Some(c) => c,
@@ -130,7 +130,7 @@ impl App {
     }
 }
 
-/// Escapa un segmento de ruta.
+/// Escapes a path segment.
 pub fn seg(value: &str) -> String {
     onepack_api_client::client::encode_query(value)
 }

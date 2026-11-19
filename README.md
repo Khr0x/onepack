@@ -131,8 +131,11 @@ Use HTTPS for deployments beyond local development. For service accounts, restri
 | --- | --- |
 | Getting started | [Publish and restore packages locally and in CI](docs/guide-zero-to-ci.md) |
 | CLI | [Installation](docs/install-cli.md) · [Command reference and credentials](docs/cli.md) |
+| Architecture | [Components, data flow, and deployment](docs/architecture.md) |
 | API | [Administration API reference](docs/api.md) |
 | Compatibility | [NuGet resources and verified clients](docs/compatibility.md) |
+| Versioning | [SemVer, compatibility, and support](docs/versioning.md) |
+| Roadmap | [v1, v2, and scope](docs/roadmap.md) |
 | Deployment | [Server, systemd, containers, and TLS](docs/runbooks/install.md) |
 | Security | [Package inspection, quotas, rate limits, and version blocking](docs/security.md) |
 | Operations | [Health checks, metrics, and logging](docs/operations.md) |
@@ -144,6 +147,15 @@ For connection and permission issues, start with:
 ```bash
 onepack doctor --feed internal
 ```
+
+## Project policies
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Maintainers](MAINTAINERS.md)
+- [Changelog](CHANGELOG.md)
 
 ## Contributing
 

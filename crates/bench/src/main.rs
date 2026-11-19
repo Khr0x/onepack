@@ -1,8 +1,8 @@
-//! Carga de lectura de metadatos contra `onepackd` (Fase 7): varios clientes concurrentes
-//! piden, en rueda, service index, flat container, registro y búsqueda durante un tiempo
-//! fijo. Imprime latencias (p50/p95/p99) y throughput en JSON.
+//! Metadata read load against `onepackd` (Phase 7): several concurrent clients
+//! request, in turn, the service index, flat container, registration, and search for a fixed
+//! time. It prints latencies (p50/p95/p99) and throughput as JSON.
 //!
-//! Uso: `onepack-bench <url> <feed> <token> <paquete> [concurrencia] [segundos]`
+//! Usage: `onepack-bench <url> <feed> <token> <package> [concurrency] [seconds]`
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -18,7 +18,7 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 5 {
-        eprintln!("uso: onepack-bench <url> <feed> <token> <paquete> [concurrencia] [segundos]");
+        eprintln!("usage: onepack-bench <url> <feed> <token> <package> [concurrency] [seconds]");
         std::process::exit(2);
     }
     let (url, feed, token, package) = (&args[1], &args[2], &args[3], args[4].to_lowercase());
@@ -35,7 +35,7 @@ fn main() {
         ("search", format!("{base}/query?q=bench&take=20")),
     ]);
 
-    // Calentamiento: una petición por recurso, y comprobación de que responden.
+    // Warm-up: one request per resource, and a check that they respond.
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(30)))
         .build()

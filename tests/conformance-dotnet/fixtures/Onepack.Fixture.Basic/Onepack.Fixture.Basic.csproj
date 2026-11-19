@@ -5,7 +5,7 @@
     <PackageId>Onepack.Fixture.Basic</PackageId>
     <Version>1.0.0</Version>
     <Authors>onepack</Authors>
-    <Description>Paquete de prueba mínimo para las pruebas de conformidad NuGet.</Description>
+    <Description>Minimal test package for NuGet conformance tests.</Description>
   </PropertyGroup>
 
 </Project>

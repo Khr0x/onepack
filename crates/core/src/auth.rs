@@ -1,11 +1,11 @@
-//! Identidades y autorización (ADR-010, ADR-012).
+//! Identities and authorization (ADR-010, ADR-012).
 //!
-//! La decisión de autorización es pura y vive aquí; la autenticación (verificar el token) la
-//! hace la capa de persistencia y la extracción de credenciales, la capa HTTP.
+//! The authorization decision is pure and lives here; authentication (verifying the token) is
+//! done by the persistence layer, and credential extraction by the HTTP layer.
 
 use std::fmt;
 
-/// Nombre de principal: `[a-z0-9._-]`, de 1 a 64 caracteres, empieza por letra o dígito.
+/// Principal name: `[a-z0-9._-]`, 1 to 64 characters, starts with a letter or digit.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PrincipalName(String);
 
@@ -47,9 +47,9 @@ impl fmt::Display for PrincipalName {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrincipalKind {
-    /// Persona.
+    /// Person.
     User,
-    /// Cuenta de servicio (p. ej. un pipeline de CI).
+    /// Service account (e.g. a CI pipeline).
     Service,
 }
 
@@ -75,11 +75,11 @@ pub struct Principal {
     pub id: i64,
     pub name: PrincipalName,
     pub kind: PrincipalKind,
-    /// Administrator: rol global sobre identidades, permisos, configuración y todos los feeds.
+    /// Administrator: global role over identities, permissions, configuration, and all feeds.
     pub is_admin: bool,
 }
 
-/// Roles por feed, acumulativos: Reader ⊂ Publisher ⊂ Maintainer.
+/// Per-feed roles, cumulative: Reader ⊂ Publisher ⊂ Maintainer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Role {
     Reader,
@@ -106,14 +106,14 @@ impl Role {
     }
 }
 
-/// Lo que una solicitud necesita hacer sobre un feed.
+/// What a request needs to do on a feed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
-    /// Buscar, consultar metadatos y descargar.
+    /// Search, query metadata, and download.
     Read,
-    /// Publicar nuevas versiones (sujeto a los prefijos del grant).
+    /// Publish new versions (subject to the grant prefixes).
     Publish,
-    /// Gestionar visibilidad y bloqueos.
+    /// Manage visibility and blocks.
     Maintain,
 }
 
@@ -126,7 +126,7 @@ impl Access {
         }
     }
 
-    /// Nombre del permiso para mensajes de error (`packages:publish`).
+    /// Permission name for error messages (`packages:publish`).
     pub fn scope(self) -> &'static str {
         match self {
             Self::Read => "packages:read",
@@ -136,8 +136,8 @@ impl Access {
     }
 }
 
-/// Patrón de publicación: id exacto o prefijo terminado en `*` (`Hemia.Payments.*`).
-/// Sin distinguir mayúsculas, como los ids NuGet. Es una política del registro, no del protocolo.
+/// Publish pattern: exact id or prefix ending in `*` (`Hemia.Payments.*`).
+/// Case-insensitive, like NuGet ids. It is a registry policy, not a protocol one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublishPattern(String);
 
@@ -160,7 +160,7 @@ impl PublishPattern {
         &self.0
     }
 
-    /// `package_key` es la clave de identidad del paquete (ya en minúsculas).
+    /// `package_key` is the package identity key (already lowercase).
     pub fn matches(&self, package_key: &str) -> bool {
         match self.0.strip_suffix('*') {
             Some(prefix) => package_key.starts_with(prefix),
@@ -173,11 +173,11 @@ impl PublishPattern {
 pub struct Grant {
     pub feed_id: i64,
     pub role: Role,
-    /// Vacío: puede publicar cualquier id del feed.
+    /// Empty: can publish any id in the feed.
     pub publish_patterns: Vec<PublishPattern>,
 }
 
-/// Identidad autenticada de una solicitud.
+/// Authenticated identity of a request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthContext {
     pub principal: Principal,
@@ -187,11 +187,11 @@ pub struct AuthContext {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Denial {
-    /// Sin acceso de lectura al feed: se responde como si no existiera (ADR-012).
+    /// No read access to the feed: it responds as if it did not exist (ADR-012).
     NotFound,
-    /// Puede ver el feed, pero su rol no alcanza para la operación.
+    /// Can see the feed, but their role is not enough for the operation.
     MissingScope(Access),
-    /// Puede publicar en el feed, pero no ese id.
+    /// Can publish to the feed, but not that id.
     PrefixDenied,
 }
 
@@ -210,7 +210,7 @@ impl AuthContext {
         self.grants.iter().find(|g| g.feed_id == feed_id)
     }
 
-    /// Comprueba el acceso a un feed sin considerar el id del paquete.
+    /// Checks access to a feed without considering the package id.
     pub fn check_feed(&self, feed_id: i64, access: Access) -> Result<(), Denial> {
         if self.principal.is_admin {
             return Ok(());
@@ -222,7 +222,7 @@ impl AuthContext {
         }
     }
 
-    /// Comprueba que puede publicar un id concreto en el feed.
+    /// Checks that a specific id can be published to the feed.
     pub fn check_publish(&self, feed_id: i64, package_key: &str) -> Result<(), Denial> {
         self.check_feed(feed_id, Access::Publish)?;
         if self.principal.is_admin {
@@ -239,7 +239,7 @@ impl AuthContext {
         }
     }
 
-    /// Actor para auditoría.
+    /// Actor for auditing.
     pub fn actor(&self) -> String {
         format!("{} (token {})", self.principal.name, self.token_id)
     }
@@ -336,7 +336,7 @@ mod tests {
             c.check_publish(1, "hemia.logging"),
             Err(Denial::PrefixDenied)
         );
-        // El grant restringe la publicación, no la lectura.
+        // The grant restricts publishing, not reading.
         assert_eq!(c.check_feed(1, Access::Read), Ok(()));
     }
 

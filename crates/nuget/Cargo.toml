@@ -1,6 +1,6 @@
 [package]
 name = "onepack-nuget"
-description = "Adaptador NuGet: lectura de paquetes, normalización y protocolo V3."
+description = "NuGet adapter: package reading, normalization, and V3 protocol."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

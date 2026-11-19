@@ -1,8 +1,8 @@
--- Modo mantenimiento (Fase 7: ADR-017).
+-- Maintenance mode (Phase 7: ADR-017).
 --
--- Una sola fila mientras está activo. `onepackd backup` la crea y la borra al terminar; como
--- lo comparten procesos distintos (CLI y servidor), vive en la base. `expires_at` evita que
--- un backup interrumpido deje el servidor en mantenimiento para siempre.
+-- A single row while active. `onepackd backup` creates it and deletes it when done; because
+-- different processes (CLI and server) share it, it lives in the database. `expires_at` prevents
+-- an interrupted backup from leaving the server in maintenance forever.
 
 CREATE TABLE maintenance (
     id         INTEGER PRIMARY KEY CHECK (id = 1),

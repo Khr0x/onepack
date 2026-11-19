@@ -1,8 +1,8 @@
-//! Identificadores de paquete NuGet.
+//! NuGet package identifiers.
 
 use std::fmt;
 
-/// Longitud máxima de `PackageIdValidator`.
+/// Maximum length of `PackageIdValidator`.
 pub const MAX_ID_LEN: usize = 100;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +20,7 @@ impl fmt::Display for InvalidPackageId {
 impl std::error::Error for InvalidPackageId {}
 
 impl PackageId {
-    /// Valida contra `^\w+([.-]\w+)*$` con un máximo de 100 caracteres, como `PackageIdValidator`.
+    /// Validates against `^\w+([.-]\w+)*$` with a maximum of 100 characters, like `PackageIdValidator`.
     pub fn parse(input: &str) -> Result<Self, InvalidPackageId> {
         let valid = input.chars().count() <= MAX_ID_LEN
             && input
@@ -33,12 +33,12 @@ impl PackageId {
         }
     }
 
-    /// Id tal como lo escribió el autor.
+    /// Id as written by the author.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
-    /// Clave de identidad: los ids NuGet no distinguen mayúsculas.
+    /// Identity key: NuGet ids are case-insensitive.
     pub fn identity(&self) -> String {
         self.0.to_lowercase()
     }
@@ -50,7 +50,7 @@ impl fmt::Display for PackageId {
     }
 }
 
-/// Aproximación de `\w` de .NET (letras, dígitos y `_`).
+/// Approximation of .NET's `\w` (letters, digits, and `_`).
 fn is_word_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }

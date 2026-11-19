@@ -1,9 +1,9 @@
-//! Operación del servidor (Fase 7): salud, preparación, métricas Prometheus y modo
-//! mantenimiento (ADR-017).
+//! Server operations (Phase 7): health, readiness, Prometheus metrics, and maintenance
+//! mode (ADR-017).
 //!
-//! `/healthz` y `/readyz` no requieren credencial: los usan balanceadores, orquestadores y
-//! systemd, y no revelan datos. `/metrics` solo se sirve en el listener de operación
-//! (`--ops-listen`), pensado para una interfaz interna.
+//! `/healthz` and `/readyz` do not require a credential: they are used by load balancers, orchestrators, and
+//! systemd, and do not reveal data. `/metrics` is served only on the operations listener
+//! (`--ops-listen`), intended for an internal interface.
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -23,7 +23,7 @@ use crate::AppState;
 use crate::auth::Surface;
 use crate::nuget_api::ApiError;
 
-/// Segundos que se sugiere esperar durante un mantenimiento.
+/// Suggested number of seconds to wait during maintenance.
 pub const MAINTENANCE_RETRY_SECS: u64 = 30;
 
 const LATENCY_BUCKETS: [f64; 11] = [
@@ -37,8 +37,8 @@ struct Histogram {
     sum: f64,
 }
 
-/// Métricas del proceso. Las etiquetas tienen cardinalidad acotada: superficie, método
-/// estándar, código de estado y códigos de error estables; nunca rutas ni ids.
+/// Process metrics. Labels have bounded cardinality: surface, standard
+/// method, status code, and stable error codes; never routes or ids.
 #[derive(Default)]
 pub struct Metrics {
     requests: Mutex<BTreeMap<(&'static str, &'static str, u16), u64>>,
@@ -84,7 +84,7 @@ impl Metrics {
         h.sum += secs;
     }
 
-    /// Error devuelto, por código estable (rate limit, cuotas, paquetes rechazados…).
+    /// Error returned, by stable code (rate limit, quotas, rejected packages…).
     pub fn record_error(&self, code: &'static str) {
         *self
             .errors
@@ -94,7 +94,7 @@ impl Metrics {
             .or_default() += 1;
     }
 
-    /// Resultado de una subida: `published`, `conflict` o `rejected`.
+    /// Result of an upload: `published`, `conflict`, or `rejected`.
     pub fn record_upload(&self, outcome: &'static str) {
         *self
             .uploads
@@ -114,7 +114,7 @@ impl Metrics {
             "# HELP onepack_build_info onepackd version.\n# TYPE onepack_build_info gauge\nonepack_build_info{{version=\"{}\"}} 1\n",
             env!("CARGO_PKG_VERSION")
         );
-        out.push_str("# HELP onepack_http_requests_total Peticiones HTTP atendidas.\n# TYPE onepack_http_requests_total counter\n");
+        out.push_str("# HELP onepack_http_requests_total HTTP requests served.\n# TYPE onepack_http_requests_total counter\n");
         for ((surface, method, status), n) in
             self.requests.lock().expect("mutex not poisoned").iter()
         {
@@ -164,7 +164,7 @@ impl Metrics {
     }
 }
 
-/// Resta la subida en curso al terminar el handler, también si falla.
+/// Subtracts the in-progress upload when the handler finishes, including on failure.
 pub struct UploadGuard;
 
 impl Drop for UploadGuard {
@@ -173,7 +173,7 @@ impl Drop for UploadGuard {
     }
 }
 
-/// Cuenta peticiones y latencias. Va por fuera de la autenticación: también cuenta los `401`.
+/// Counts requests and latencies. It runs outside authentication: it also counts `401`s.
 pub async fn track(req: Request, next: Next) -> Response {
     let surface = match Surface::of(req.uri().path()) {
         _ if is_probe(req.uri().path()) => "probe",
@@ -196,7 +196,7 @@ pub fn is_probe(path: &str) -> bool {
     matches!(path, "/healthz" | "/readyz")
 }
 
-/// En mantenimiento, las mutaciones reciben `503` con `Retry-After`; las lecturas siguen.
+/// During maintenance, mutations receive `503` with `Retry-After`; reads continue.
 pub async fn maintenance_guard(
     State(state): State<Arc<AppState>>,
     req: Request,
@@ -223,7 +223,7 @@ pub async fn healthz() -> Json<serde_json::Value> {
     Json(json!({ "status": "ok" }))
 }
 
-/// Preparado si la base responde y el almacenamiento es accesible.
+/// Ready if the database responds and storage is accessible.
 pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
     let database = match state.store.ping().await {
         Ok(()) => "ok".to_owned(),
@@ -279,7 +279,7 @@ pub async fn metrics_text(State(state): State<Arc<AppState>>) -> Response {
         .into_response()
 }
 
-/// Router del listener de operación: métricas y sondas, sin autenticación.
+/// Operations listener router: metrics and probes, without authentication.
 pub fn ops_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/metrics", get(metrics_text))

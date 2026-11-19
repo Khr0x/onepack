@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Benchmark reproducible de onepackd (Fase 7).
+"""Reproducible benchmark for onepackd (Phase 7).
 
-Mide, con binarios release:
-  - arranque: desde que se lanza el proceso hasta que /readyz responde 200;
-  - RSS en reposo;
-  - latencia de metadatos (service index, flat container, registro, búsqueda) con un feed
-    de 200 paquetes x 5 versiones y 16 clientes concurrentes (onepack-bench);
-  - memoria durante la subida y la descarga de un paquete de 200 MiB.
+Measures, with release binaries:
+  - startup: from launching the process until /readyz returns 200;
+  - idle RSS;
+  - metadata latency (service index, flat container, registration, search) with a feed
+    of 200 packages x 5 versions and 16 concurrent clients (onepack-bench);
+  - memory while uploading and downloading a 200 MiB package.
 
-Modos:
-  scripts/bench.py             onepackd nativo en esta máquina.
-  scripts/bench.py --docker    onepackd en la imagen de packaging/container, limitado a
-                               2 vCPU y 1 GiB (perfil objetivo). La memoria se lee del cgroup
-                               (memoria anónima, sin caché de páginas) cuando es posible.
+Modes:
+  scripts/bench.py             native onepackd on this machine.
+  scripts/bench.py --docker    onepackd in the packaging/container image, limited to
+                               2 vCPU and 1 GiB (target profile). Memory is read from the cgroup
+                               (anonymous memory, excluding page cache) when possible.
 
-Escribe el informe en Markdown en stdout y los datos en JSON en --out (bench-results.json).
+Writes the report as Markdown to stdout and the data as JSON to --out (bench-results.json).
 """
 
 import argparse
@@ -60,11 +60,11 @@ def wait_ready(base, timeout=30):
         if http_status(f"{base}/readyz") == 200:
             return
         time.sleep(0.005)
-    raise SystemExit("onepackd no llegó a ready")
+    raise SystemExit("onepackd did not become ready")
 
 
 class Native:
-    label = "nativo"
+    label = "native"
 
     def __init__(self, work):
         self.work, self.data, self.proc = work, os.path.join(work, "data"), None
@@ -94,7 +94,7 @@ class Native:
 
 
 class Docker:
-    label = "contenedor (2 vCPU, 1 GiB)"
+    label = "container (2 vCPU, 1 GiB)"
 
     def __init__(self, work):
         self.work, self.volume, self.name = work, "onepack-bench", "onepack-bench"
@@ -146,7 +146,7 @@ class Docker:
 
 
 class Tee:
-    """Escribe el informe también en el resumen del job de GitHub Actions."""
+    """Also writes the report to the GitHub Actions job summary."""
 
     def __init__(self, *streams):
         self.streams = streams
@@ -179,8 +179,8 @@ def sample_peak(server, stop, peak):
 
 
 def measure_peak(server, action):
-    """Memoria máxima durante `action` y la de justo antes, para aislar el coste de la
-    transferencia de lo que ya retenía el proceso."""
+    """Peak memory during `action` and just before it, to isolate the cost of the
+    transfer from what the process already retained."""
     before = server.memory_mib()
     stop, peak = threading.Event(), [before]
     t = threading.Thread(target=sample_peak, args=(server, stop, peak))
@@ -207,11 +207,11 @@ def main():
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         sys.stdout = Tee(sys.stdout, open(os.environ["GITHUB_STEP_SUMMARY"], "a"))
 
-    print("==> compilando (release)", file=sys.stderr)
+    print("==> building (release)", file=sys.stderr)
     run("cargo", "build", "--release", "--locked", "-p", "onepack-server", "-p", "onepack-cli",
         "-p", "onepack-bench", cwd=ROOT)
     if args.docker:
-        print("==> construyendo la imagen", file=sys.stderr)
+        print("==> building the image", file=sys.stderr)
         run("docker", "build", "-q", "-f", "packaging/container/Containerfile", "-t", IMAGE, ".",
             cwd=ROOT)
 
@@ -227,12 +227,12 @@ def main():
                    ONEPACK_KEYRING="off", ONEPACK_NO_INPUT="1")
         cli = lambda *a: run(onepack, "--url", base, *a, env=env)  # noqa: E731
 
-        print("==> arranque", file=sys.stderr)
+        print("==> startup", file=sys.stderr)
         results["startup_s"] = server.start()
         time.sleep(3)
         results["idle_rss_mib"] = server.memory_mib()
 
-        print(f"==> publicando {PACKAGES * VERSIONS} versiones", file=sys.stderr)
+        print(f"==> publishing {PACKAGES * VERSIONS} versions", file=sys.stderr)
         cli("feed", "create", "bench")
         pkgs = os.path.join(work, "pkgs")
         os.makedirs(pkgs)
@@ -249,12 +249,12 @@ def main():
         results["publish_small_per_s"] = len(files) / (time.monotonic() - t0)
         results["loaded_rss_mib"] = server.memory_mib()
 
-        print("==> latencia de metadatos", file=sys.stderr)
+        print("==> metadata latency", file=sys.stderr)
         bench = run(os.path.join(ROOT, "target/release/onepack-bench"), base, "bench", token,
                     "Bench.Pkg0", str(args.concurrency), str(args.seconds))
         results["metadata"] = json.loads(bench)
 
-        print(f"==> paquete de {LARGE_MIB} MiB", file=sys.stderr)
+        print(f"==> {LARGE_MIB} MiB package", file=sys.stderr)
         large = os.path.join(work, "Bench.Large.1.0.0.nupkg")
         nupkg(large, "Bench.Large", "1.0.0", os.urandom(LARGE_MIB << 20))
         before, peak, secs = measure_peak(server, lambda: cli("--timeout", "600", "package", "push",
@@ -284,24 +284,24 @@ def main():
 def report(r):
     m = r["metadata"]
     ok = lambda cond: "✅" if cond else "❌"  # noqa: E731
-    print(f"### Benchmark onepackd — {r['mode']}\n")
-    print(f"Host: {r['host']}, {r['cpus_host']} CPU lógicas.\n")
-    print("| Medida | Resultado | Objetivo | |\n|---|---|---|---|")
-    print(f"| Arranque hasta `ready` | {r['startup_s']:.2f} s | < 2 s | {ok(r['startup_s'] < 2)} |")
-    print(f"| RSS en reposo | {r['idle_rss_mib']:.1f} MiB | < 100 MiB | {ok(r['idle_rss_mib'] < 100)} |")
-    print(f"| p95 metadatos ({m['concurrency']} clientes) | {m['all']['p95_ms']:.1f} ms | < 50 ms | "
+    print(f"### onepackd benchmark — {r['mode']}\n")
+    print(f"Host: {r['host']}, {r['cpus_host']} logical CPUs.\n")
+    print("| Metric | Result | Target | |\n|---|---|---|---|")
+    print(f"| Startup until `ready` | {r['startup_s']:.2f} s | < 2 s | {ok(r['startup_s'] < 2)} |")
+    print(f"| Idle RSS | {r['idle_rss_mib']:.1f} MiB | < 100 MiB | {ok(r['idle_rss_mib'] < 100)} |")
+    print(f"| Metadata p95 ({m['concurrency']} clients) | {m['all']['p95_ms']:.1f} ms | < 50 ms | "
           f"{ok(m['all']['p95_ms'] < 50)} |")
     for kind in ("upload_large", "download_large"):
-        label = "Subida" if kind == "upload_large" else "Descarga"
+        label = "Upload" if kind == "upload_large" else "Download"
         t = r[kind]
         growth = t["peak_mib"] - t["before_mib"]
-        print(f"| {label} de {r['large_mib']} MiB: memoria adicional | +{growth:.1f} MiB "
-              f"(de {t['before_mib']:.1f} a {t['peak_mib']:.1f} MiB, {t['seconds']:.1f} s) | "
-              f"acotada: < 100 MiB, sin depender del tamaño | {ok(growth < 100)} |")
-    print(f"\nCon {PACKAGES * VERSIONS} versiones cargadas: RSS {r['loaded_rss_mib']:.1f} MiB; "
-          f"{m['requests_per_second']:.0f} peticiones/s de metadatos, {m['errors']} errores; "
-          f"publicación de paquetes pequeños: {r['publish_small_per_s']:.0f}/s.\n")
-    print("| Recurso | p50 | p95 | p99 |\n|---|---|---|---|")
+        print(f"| {label} of {r['large_mib']} MiB: extra memory | +{growth:.1f} MiB "
+              f"(from {t['before_mib']:.1f} to {t['peak_mib']:.1f} MiB, {t['seconds']:.1f} s) | "
+              f"bounded: < 100 MiB, independent of size | {ok(growth < 100)} |")
+    print(f"\nWith {PACKAGES * VERSIONS} versions loaded: RSS {r['loaded_rss_mib']:.1f} MiB; "
+          f"{m['requests_per_second']:.0f} metadata requests/s, {m['errors']} errors; "
+          f"small package publishing: {r['publish_small_per_s']:.0f}/s.\n")
+    print("| Resource | p50 | p95 | p99 |\n|---|---|---|---|")
     for name, s in m["by_resource"].items():
         print(f"| {name} | {s['p50_ms']:.1f} ms | {s['p95_ms']:.1f} ms | {s['p99_ms']:.1f} ms |")
 

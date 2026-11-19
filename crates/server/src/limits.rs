@@ -1,5 +1,5 @@
-//! Protección frente a saturación (ADR-014): presupuesto de inspección, concurrencia de
-//! subidas y limitación de peticiones por principal y por IP.
+//! Protection against saturation (ADR-014): inspection budget, upload
+//! concurrency, and rate limiting per principal and per IP.
 
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -17,17 +17,17 @@ use crate::AppState;
 use crate::auth::Surface;
 use crate::nuget_api::ApiError;
 
-/// Límites configurables del servidor.
+/// Configurable server limits.
 #[derive(Debug, Clone)]
 pub struct Limits {
-    /// Tamaño comprimido máximo de un paquete.
+    /// Maximum compressed size of a package.
     pub max_package_bytes: u64,
     pub inspection: InspectionLimits,
-    /// Subidas simultáneas; las que excedan reciben `503` sin leer el cuerpo.
+    /// Simultaneous uploads; those that exceed get `503` without reading the body.
     pub max_concurrent_uploads: usize,
-    /// Inspecciones simultáneas de paquetes, en hilos aparte de los que atienden descargas.
+    /// Simultaneous package inspections, on threads separate from those serving downloads.
     pub max_concurrent_inspections: usize,
-    /// Tiempo máximo para recibir el cuerpo de una subida.
+    /// Maximum time to receive an upload body.
     pub upload_timeout: Duration,
     pub principal_rate: RateLimit,
     pub ip_rate: RateLimit,
@@ -48,8 +48,8 @@ impl Default for Limits {
     }
 }
 
-/// Cubo de fichas: `per_second` sostenidas con ráfagas de hasta `burst`. `per_second = 0`
-/// desactiva el límite.
+/// Token bucket: `per_second` sustained with bursts of up to `burst`. `per_second = 0`
+/// disables the limit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RateLimit {
     pub per_second: u32,
@@ -66,8 +66,8 @@ impl RateLimit {
     }
 }
 
-/// Número máximo de claves recordadas. Al superarlo se olvidan los cubos llenos (clientes
-/// inactivos), de modo que una avalancha de IPs distintas no hace crecer la memoria sin fin.
+/// Maximum number of remembered keys. When exceeded, full buckets (inactive clients)
+/// are forgotten, so that an avalanche of different IPs does not grow memory without bound.
 const MAX_KEYS: usize = 100_000;
 
 struct Bucket {
@@ -88,7 +88,7 @@ impl<K: Eq + Hash> RateLimiter<K> {
         }
     }
 
-    /// Consume una ficha. Si no quedan, devuelve cuánto esperar hasta la siguiente.
+    /// Consumes a token. If none remain, returns how long to wait until the next one.
     pub fn check(&self, key: K) -> Result<(), Duration> {
         self.check_at(key, Instant::now())
     }
@@ -121,10 +121,10 @@ impl<K: Eq + Hash> RateLimiter<K> {
     }
 }
 
-/// Límite por IP, antes de autenticar: frena también los intentos con credenciales
-/// inválidas. La IP es la del socket; detrás de un reverse proxy todas las peticiones
-/// comparten la del proxy (ADR-018: no se confía en `X-Forwarded-For`), así que allí conviene
-/// subir este límite o desactivarlo y apoyarse en el límite por principal.
+/// Per-IP limit, before authenticating: it also throttles attempts with invalid
+/// credentials. The IP is the socket's; behind a reverse proxy all requests
+/// share the proxy's IP (ADR-018: `X-Forwarded-For` is not trusted), so there it is advisable
+/// to raise this limit or disable it and rely on the per-principal limit.
 pub async fn limit_by_ip(State(state): State<Arc<AppState>>, req: Request, next: Next) -> Response {
     let extensions = req.extensions();
     let ip: Option<IpAddr> = extensions
@@ -158,9 +158,9 @@ mod tests {
         }
         let wait = limiter.check_at("a", t0).unwrap_err();
         assert!(wait <= Duration::from_millis(100), "{wait:?}");
-        // Otra clave tiene su propio cubo.
+        // Another key has its own bucket.
         assert!(limiter.check_at("b", t0).is_ok());
-        // Tras 100 ms vuelve a haber una ficha.
+        // After 100 ms there is one token again.
         assert!(
             limiter
                 .check_at("a", t0 + Duration::from_millis(100))
@@ -189,7 +189,7 @@ mod tests {
         for key in 0..MAX_KEYS {
             limiter.check_at(key, t0).unwrap();
         }
-        // Un segundo después todos los cubos están llenos y se pueden olvidar.
+        // A second later all buckets are full and can be forgotten.
         limiter
             .check_at(MAX_KEYS, t0 + Duration::from_secs(1))
             .unwrap();

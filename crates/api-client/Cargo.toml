@@ -1,6 +1,6 @@
 [package]
 name = "onepack-api-client"
-description = "Contratos y cliente de la API administrativa /api/v1."
+description = "Administrative API contracts and client for /api/v1."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,7 +15,7 @@ ureq = { version = "3.4.2", optional = true, features = ["platform-verifier"] }
 base64 = { version = "0.23.1", optional = true }
 
 [features]
-# Cliente HTTP bloqueante para `onepack`. El servidor solo usa los contratos.
+# Blocking HTTP client for `onepack`. The server only uses the contracts.
 client = ["dep:ureq", "dep:base64"]
 
 [lints]

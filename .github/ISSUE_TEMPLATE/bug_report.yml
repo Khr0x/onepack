@@ -1,0 +1,88 @@
+name: Bug report
+description: Report a reproducible problem in onepack.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Remove tokens, credentials, private package
+        contents, and data directory contents from logs before posting.
+        For security vulnerabilities, use the private security advisory link
+        instead of this form.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: A clear description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal commands or steps that reproduce the problem.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the error code and relevant output.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: onepack version
+      description: Output of `onepack --version` and `onepackd --version`.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Server (onepackd)
+        - CLI (onepack)
+        - NuGet protocol
+        - Authentication or permissions
+        - Storage, backup, or restore
+        - Container or systemd
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, .NET SDK version, and installation method.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or additional context
+      description: Redact secrets and private package data.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed tokens, credentials, and private package data from the report.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true

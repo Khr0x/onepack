@@ -1,8 +1,8 @@
-//! Formato y verificación de tokens opacos (ADR-010).
+//! Format and verification of opaque tokens (ADR-010).
 //!
-//! `opk_<id>_<secreto>`: `id` son 16 caracteres hex públicos (para buscar y auditar) y el
-//! secreto, 64 caracteres hex (256 bits). Solo se guarda `sha256(secreto)`; con esa entropía
-//! no hace falta un hash lento.
+//! `opk_<id>_<secret>`: `id` is 16 public hex characters (for lookup and auditing) and the
+//! secret, 64 hex characters (256 bits). Only `sha256(secret)` is stored; with that entropy
+//! a slow hash is not needed.
 
 use sha2::{Digest, Sha256};
 
@@ -12,7 +12,7 @@ const SECRET_LEN: usize = 64;
 
 pub struct GeneratedToken {
     pub id: String,
-    /// Token completo para entregar al usuario una sola vez.
+    /// Full token to hand to the user only once.
     pub token: String,
     pub verifier: String,
 }
@@ -31,7 +31,7 @@ pub fn generate() -> Result<GeneratedToken, getrandom::Error> {
     })
 }
 
-/// Separa un token en `(id, secreto)` si tiene el formato correcto.
+/// Splits a token into `(id, secret)` if it has the correct format.
 pub fn parse(token: &str) -> Option<(&str, &str)> {
     let rest = token.strip_prefix(TOKEN_PREFIX)?;
     let (id, secret) = rest.split_once('_')?;
@@ -43,7 +43,7 @@ pub fn verifier(secret: &str) -> String {
     hex(&Sha256::digest(secret.as_bytes()))
 }
 
-/// Comparación en tiempo constante para cadenas de igual longitud.
+/// Constant-time comparison for strings of equal length.
 pub fn constant_time_eq(a: &str, b: &str) -> bool {
     a.len() == b.len()
         && a.bytes()

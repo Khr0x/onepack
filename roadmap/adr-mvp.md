@@ -1,330 +1,330 @@
-# Architecture Decision Records — MVP registro privado NuGet
+# Architecture Decision Records — MVP private NuGet registry
 
-> Decisiones de arquitectura del MVP descrito en [mvp-registro-privado-paquetes-nuget.md](mvp-registro-privado-paquetes-nuget.md) y planificado en [roadmap-mvp.md](roadmap-mvp.md).
+> Architecture decisions for the MVP described in [mvp-private-nuget-registry.md](mvp-private-nuget-registry.md) and planned in [roadmap-mvp.md](roadmap-mvp.md).
 >
-> Última actualización: 2026-10-03
+> Last updated: 2026-10-03
 
 ---
 
-## Cómo usar este documento
+## How to use this document
 
-- Cada ADR registra **una** decisión, su contexto, alternativas y consecuencias.
-- Un ADR `Aceptado` no se edita en su fondo: si la decisión cambia, se crea un ADR nuevo que lo **reemplaza** y el anterior pasa a `Reemplazado por ADR-XXX`.
-- Correcciones de redacción, enlaces o la sección *Revisar cuando* sí pueden editarse.
-- Cada fase del roadmap indica qué ADRs deben estar `Aceptado` antes de pasar a `EN PROGRESO`.
+- Each ADR records **one** decision, its context, alternatives and consequences.
+- An `Accepted` ADR is not substantively edited: if the decision changes, a new ADR is created that **supersedes** it, and the previous one becomes `Superseded by ADR-XXX`.
+- Wording fixes, links or the *Review when* section may be edited.
+- Each roadmap phase states which ADRs must be `Accepted` before moving to `IN PROGRESS`.
 
-### Estatus de ADR
+### ADR status
 
-| Estatus | Significado |
+| Status | Meaning |
 |---|---|
-| 📝 `Propuesto` | Redactado, pendiente de revisión. No vincula todavía. |
-| 🧪 `Condicionado` | Aceptado de forma provisional hasta superar una validación concreta (indicada en el ADR). |
-| ✅ `Aceptado` | Vigente. El código debe respetarlo. |
-| ❌ `Rechazado` | Evaluado y descartado. Se conserva como registro. |
-| ♻️ `Reemplazado por ADR-XXX` | Fue vigente; otra decisión lo sustituye. |
-| 🗄️ `Obsoleto` | Ya no aplica (p. ej. el componente desapareció), sin reemplazo directo. |
+| 📝 `Proposed` | Drafted, pending review. Not binding yet. |
+| 🧪 `Conditional` | Provisionally accepted until a specific validation is passed (stated in the ADR). |
+| ✅ `Accepted` | In force. Code must comply with it. |
+| ❌ `Rejected` | Evaluated and discarded. Kept as a record. |
+| ♻️ `Superseded by ADR-XXX` | Was in force; another decision replaces it. |
+| 🗄️ `Obsolete` | No longer applies (e.g. the component disappeared), with no direct replacement. |
 
-### Plantilla
+### Template
 
 ```markdown
 <a id="adr-XXX"></a>
-## ADR-XXX — Título en forma de decisión
+## ADR-XXX — Title in decision form
 
-**Estatus:** 📝 Propuesto · **Fecha:** AAAA-MM-DD · **Fase:** N · **Relacionados:** ADR-YYY
+**Status:** 📝 Proposed · **Date:** YYYY-MM-DD · **Phase:** N · **Related:** ADR-YYY
 
-### Contexto
-Qué problema o fuerza obliga a decidir.
+### Context
+What problem or force requires a decision.
 
-### Decisión
-Lo que se hará, en una o pocas frases afirmativas.
+### Decision
+What will be done, in one or a few affirmative sentences.
 
-### Alternativas consideradas
-- Opción — por qué no.
+### Alternatives considered
+- Option — why not.
 
-### Consecuencias
-- Positivas / negativas / obligaciones que genera.
+### Consequences
+- Positive / negative / obligations it creates.
 
-### Revisar cuando
-Señal concreta que justificaría reabrir la decisión.
+### Review when
+Concrete signal that would justify reopening the decision.
 ```
 
 ---
 
-## Índice
+## Index
 
-| ADR | Decisión | Estatus | Fase |
+| ADR | Decision | Status | Phase |
 |---|---|---|---|
-| [001](#adr-001) | MVP: registro NuGet privado, una organización, un nodo | ✅ Aceptado | 0 |
-| [002](#adr-002) | Rust + Tokio + Axum como stack del servidor y CLI | ✅ Aceptado | 1 |
-| [003](#adr-003) | Monolito modular en un workspace de crates | ✅ Aceptado | 0 |
-| [004](#adr-004) | SQLite en WAL con `synchronous=FULL` para metadatos | ✅ Aceptado | 2 |
-| [005](#adr-005) | Blobs direccionados por SHA-256 en filesystem local, bytes originales | ✅ Aceptado | 2 |
-| [006](#adr-006) | Blob durable antes de confirmar metadatos | ✅ Aceptado | 2 |
-| [007](#adr-007) | Versiones inmutables y `409` ante duplicados | ✅ Aceptado | 2 |
-| [008](#adr-008) | Normalización NuGet propia validada contra `NuGet.Versioning` | ✅ Aceptado | 1 |
-| [009](#adr-009) | Recursos NuGet V3 anunciados en el MVP | ✅ Aceptado | 1, 3 |
-| [010](#adr-010) | Tokens opacos con verificador hash, no JWT | ✅ Aceptado | 4 |
-| [011](#adr-011) | Tres contextos de autenticación separados | ✅ Aceptado | 4 |
-| [012](#adr-012) | Roles por feed y restricción opcional por prefijo | ✅ Aceptado | 4 |
-| [013](#adr-013) | `listed` y `availability` como estados independientes | ✅ Aceptado | 3, 5 |
-| [014](#adr-014) | Paquetes como contenido no confiable con presupuesto de inspección | ✅ Aceptado | 5 |
-| [015](#adr-015) | `onepackd` y `onepack` separados; CLI con contrato estable | ✅ Aceptado | 6 |
-| [016](#adr-016) | Credenciales NuGet vía `onepack exec`; credential provider pospuesto | ✅ Aceptado | 6 |
-| [017](#adr-017) | Backup consistente en modo mantenimiento | ✅ Aceptado | 7 |
-| [018](#adr-018) | `public_url` explícito y blobs solo a través del servidor | ✅ Aceptado | 3, 7 |
-| [019](#adr-019) | Conformidad probada con clientes .NET reales, sin .NET en runtime | ✅ Aceptado | 0, 1 |
-| [020](#adr-020) | Migraciones forward-only con backup previo | ✅ Aceptado | 2, 7 |
+| [001](#adr-001) | MVP: private NuGet registry, one organization, one node | ✅ Accepted | 0 |
+| [002](#adr-002) | Rust + Tokio + Axum as the server and CLI stack | ✅ Accepted | 1 |
+| [003](#adr-003) | Modular monolith in a crate workspace | ✅ Accepted | 0 |
+| [004](#adr-004) | SQLite in WAL with `synchronous=FULL` for metadata | ✅ Accepted | 2 |
+| [005](#adr-005) | Blobs addressed by SHA-256 on local filesystem, original bytes | ✅ Accepted | 2 |
+| [006](#adr-006) | Durable blob before confirming metadata | ✅ Accepted | 2 |
+| [007](#adr-007) | Immutable versions and `409` on duplicates | ✅ Accepted | 2 |
+| [008](#adr-008) | Own NuGet normalization validated against `NuGet.Versioning` | ✅ Accepted | 1 |
+| [009](#adr-009) | NuGet V3 resources announced in the MVP | ✅ Accepted | 1, 3 |
+| [010](#adr-010) | Opaque tokens with a hash verifier, not JWT | ✅ Accepted | 4 |
+| [011](#adr-011) | Three separate authentication contexts | ✅ Accepted | 4 |
+| [012](#adr-012) | Per-feed roles and optional prefix restriction | ✅ Accepted | 4 |
+| [013](#adr-013) | `listed` and `availability` as independent states | ✅ Accepted | 3, 5 |
+| [014](#adr-014) | Packages as untrusted content with an inspection budget | ✅ Accepted | 5 |
+| [015](#adr-015) | `onepackd` and `onepack` separated; CLI with a stable contract | ✅ Accepted | 6 |
+| [016](#adr-016) | NuGet credentials via `onepack exec`; credential provider postponed | ✅ Accepted | 6 |
+| [017](#adr-017) | Consistent backup in maintenance mode | ✅ Accepted | 7 |
+| [018](#adr-018) | Explicit `public_url` and blobs only through the server | ✅ Accepted | 3, 7 |
+| [019](#adr-019) | Conformance proven with real .NET clients, without .NET at runtime | ✅ Accepted | 0, 1 |
+| [020](#adr-020) | Forward-only migrations with a prior backup | ✅ Accepted | 2, 7 |
 
 ---
 
 <a id="adr-001"></a>
-## ADR-001 — MVP: registro NuGet privado, una organización, un nodo
+## ADR-001 — MVP: private NuGet registry, one organization, one node
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-03 · **Fase:** 0 · **Relacionados:** ADR-002, ADR-004
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-03 · **Phase:** 0 · **Related:** ADR-002, ADR-004
 
-### Contexto
-Existen alternativas ligeras (BaGet, BaGetter). "NuGet self-hosted y ligero" no diferencia. Cada funcionalidad adicional (proxy, S3, SSO, UI, multinodo) abre un frente propio de compatibilidad, seguridad y operación.
+### Context
+Lightweight alternatives exist (BaGet, BaGetter). "Lightweight self-hosted NuGet" does not differentiate. Each additional feature (proxy, S3, SSO, UI, multinode) opens its own front in compatibility, security and operations.
 
-### Decisión
-El MVP es un registro **privado** de paquetes NuGet, para **una organización**, con **varios feeds**, en **un único nodo**, operado **desde CLI**. La diferenciación es: instalación simple, operación completa desde terminal, credenciales acotadas, versiones inmutables y recuperación predecible.
+### Decision
+The MVP is a **private** NuGet package registry, for **one organization**, with **several feeds**, on a **single node**, operated **from the CLI**. The differentiation is: simple installation, complete operation from the terminal, scoped credentials, immutable versions and predictable recovery.
 
-Fuera del MVP: UI web, proxy de nuget.org, feeds virtuales, S3, PostgreSQL, HA, SSO, npm/PyPI, símbolos, antimalware.
+Out of the MVP: web UI, nuget.org proxy, virtual feeds, S3, PostgreSQL, HA, SSO, npm/PyPI, symbols, antimalware.
 
-### Alternativas consideradas
-- **Registro multiformato desde el inicio** — multiplica el trabajo de compatibilidad antes de validar demanda.
-- **Proxy universal de dependencias** — introduce acceso saliente, credenciales upstream y colisiones de identidad; es un proyecto de seguridad propio.
-- **Multi-tenant SaaS** — exige aislamiento y operación que no aportan a la validación inicial.
+### Alternatives considered
+- **Multiformat registry from the start** — multiplies compatibility work before validating demand.
+- **Universal dependency proxy** — introduces outbound access, upstream credentials and identity collisions; it is a security project of its own.
+- **Multi-tenant SaaS** — requires isolation and operations that do not contribute to the initial validation.
 
-### Consecuencias
-- Los proyectos usan simultáneamente el feed privado y nuget.org con `packageSourceMapping`.
-- El dominio debe quedar desacoplado de NuGet para no cerrar la puerta a otros formatos (ver ADR-003).
-- Cualquier inclusión de funcionalidades excluidas requiere un ADR nuevo.
+### Consequences
+- Projects use the private feed and nuget.org simultaneously with `packageSourceMapping`.
+- The domain must remain decoupled from NuGet so as not to close the door to other formats (see ADR-003).
+- Any inclusion of excluded features requires a new ADR.
 
-### Revisar cuando
-El piloto (Fase 8) muestre que una funcionalidad excluida es condición para adoptar el producto.
+### Review when
+The pilot (Phase 8) shows that an excluded feature is a condition for adopting the product.
 
 ---
 
 <a id="adr-002"></a>
-## ADR-002 — Rust + Tokio + Axum como stack del servidor y CLI
+## ADR-002 — Rust + Tokio + Axum as the server and CLI stack
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 1 · **Relacionados:** ADR-008, ADR-019
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 1 · **Related:** ADR-008, ADR-019
 
-### Contexto
-El producto prioriza binarios nativos, pocos componentes, control de recursos y un CLI central. C#/ASP.NET Core reduciría el riesgo de NuGet al reutilizar `NuGet.Packaging`, `NuGet.Versioning` y `NuGet.Protocol`.
+### Context
+The product prioritizes native binaries, few components, resource control and a central CLI. C#/ASP.NET Core would reduce NuGet risk by reusing `NuGet.Packaging`, `NuGet.Versioning` and `NuGet.Protocol`.
 
-### Decisión
-Servidor y CLI en **Rust**: Tokio, Axum, Tower/tower-http, SQLx (SQLite), clap, reqwest, serde (JSON/TOML).
+### Decision
+Server and CLI in **Rust**: Tokio, Axum, Tower/tower-http, SQLx (SQLite), clap, reqwest, serde (JSON/TOML).
 
-**Condición:** la decisión se ratifica solo si el spike de la Fase 1 demuestra publish/restore con `dotnet` real y cero divergencias de normalización frente a `NuGet.Versioning`. Si no, se crea un ADR que lo reemplace a favor de C#.
+**Condition:** the decision is ratified only if the Phase 1 spike demonstrates publish/restore with real `dotnet` and zero normalization divergences against `NuGet.Versioning`. Otherwise, an ADR is created to replace it in favor of C#.
 
-**Validación:** condición cumplida el 2026-10-04: 0 divergencias frente a `NuGet.Versioning` y E2E con `dotnet` en verde ([CI](https://github.com/Khr0x/onepack/actions/runs/37176042099), [informe](../docs/spikes/fase-1-compatibilidad-nuget.md)).
+**Validation:** condition met on 2026-10-04: 0 divergences against `NuGet.Versioning` and a green E2E with `dotnet` ([CI](https://github.com/Khr0x/onepack/actions/runs/37176042099), [report](../docs/spikes/phase-1-nuget-compatibility.md)).
 
-### Alternativas consideradas
-- **C# / ASP.NET Core** — menor riesgo de compatibilidad; runtime más pesado y CLI menos nativo. Descartada tras el spike de la Fase 1.
-- **Go** — viable, sin ventaja clara frente a Rust y con el mismo trabajo de compatibilidad NuGet.
+### Alternatives considered
+- **C# / ASP.NET Core** — lower compatibility risk; heavier runtime and a less native CLI. Discarded after the Phase 1 spike.
+- **Go** — viable, with no clear advantage over Rust and the same NuGet compatibility work.
 
-### Consecuencias
-- Hay que implementar en Rust la normalización de versiones y la lectura del `.nuspec` (ver ADR-008).
-- .NET se usa solo en pruebas (ver ADR-019).
-- Sin Redis, Elasticsearch ni colas externas.
+### Consequences
+- Version normalization and `.nuspec` reading must be implemented in Rust (see ADR-008).
+- .NET is used only in tests (see ADR-019).
+- No Redis, Elasticsearch or external queues.
 
-### Revisar cuando
-Falle el gate de la Fase 1, o el coste acumulado de compatibilidad NuGet supere de forma sostenida al del resto del producto.
+### Review when
+The Phase 1 gate fails, or the accumulated cost of NuGet compatibility sustainably exceeds that of the rest of the product.
 
 ---
 
 <a id="adr-003"></a>
-## ADR-003 — Monolito modular en un workspace de crates
+## ADR-003 — Modular monolith in a crate workspace
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-03 · **Fase:** 0 · **Relacionados:** ADR-001
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-03 · **Phase:** 0 · **Related:** ADR-001
 
-### Contexto
-Un único nodo y un equipo pequeño no justifican microservicios, pero el dominio no debe convertirse en "reglas NuGet" si se añaden formatos.
+### Context
+A single node and a small team do not justify microservices, but the domain must not become "NuGet rules" if formats are added.
 
-### Decisión
-Un proceso servidor con dos superficies HTTP (NuGet y `/api/v1`), organizado en crates:
+### Decision
+A server process with two HTTP surfaces (NuGet and `/api/v1`), organized into crates:
 
-| Crate | Responsabilidad | No puede depender de |
+| Crate | Responsibility | Cannot depend on |
 |---|---|---|
-| `core` | Dominio: feeds, versiones, permisos, casos de uso | `nuget`, `sqlx`, `axum` |
-| `nuget` | Adaptador: lectura de paquetes, normalización, rutas del protocolo | `server`, `cli` |
-| `storage` | Persistencia SQLite y `BlobStore` | `nuget`, `axum` |
-| `api-client` | Contratos de la API admin compartidos | `server` |
-| `server` | Binario `onepackd`, composición y HTTP | — |
-| `cli` | Binario `onepack` | `server`, `storage` |
+| `core` | Domain: feeds, versions, permissions, use cases | `nuget`, `sqlx`, `axum` |
+| `nuget` | Adapter: package reading, normalization, protocol routes | `server`, `cli` |
+| `storage` | SQLite persistence and `BlobStore` | `nuget`, `axum` |
+| `api-client` | Shared admin API contracts | `server` |
+| `server` | `onepackd` binary, composition and HTTP | — |
+| `cli` | `onepack` binary | `server`, `storage` |
 
-Tareas de mantenimiento internas en el mismo proceso. Sin plugins dinámicos.
+Internal maintenance tasks in the same process. No dynamic plugins.
 
-### Alternativas consideradas
-- **Microservicios** — coste operativo sin beneficio a esta escala.
-- **Crate único** — más rápido al inicio, pero las fronteras se erosionan sin que el compilador lo impida.
+### Alternatives considered
+- **Microservices** — operational cost with no benefit at this scale.
+- **Single crate** — faster at the start, but boundaries erode without the compiler preventing it.
 
-### Consecuencias
-- Las reglas de dependencia se verifican en CI con `scripts/check-crate-deps.sh` (sobre `cargo tree`, incluye dependencias transitivas). Los paquetes se llaman `onepack-<crate>`.
-- Añadir un formato = nuevo crate adaptador, no cambios en `core`.
+### Consequences
+- Dependency rules are verified in CI with `scripts/check-crate-deps.sh` (over `cargo tree`, including transitive dependencies). Packages are named `onepack-<crate>`.
+- Adding a format = a new adapter crate, no changes in `core`.
 
-### Revisar cuando
-Aparezca un requisito real de escalar una superficie de forma independiente.
+### Review when
+A real requirement appears to scale a surface independently.
 
 ---
 
 <a id="adr-004"></a>
-## ADR-004 — SQLite en WAL con `synchronous=FULL` para metadatos
+## ADR-004 — SQLite in WAL with `synchronous=FULL` for metadata
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-001, ADR-017
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 2 · **Related:** ADR-001, ADR-017
 
-### Contexto
-El MVP no debe exigir instalar otra base de datos. SQLite en WAL admite lectores concurrentes y **un solo escritor**, y no es apto para compartirse por filesystem de red.
+### Context
+The MVP must not require installing another database. SQLite in WAL supports concurrent readers and **a single writer**, and is not suitable for sharing over a network filesystem.
 
-### Decisión
-- SQLite como único almacén de metadatos, en modo WAL.
-- `synchronous=FULL` por defecto (durabilidad ante pérdida de energía), evaluando su coste en benchmarks.
-- Escrituras serializadas por un único punto de escritura; transacciones cortas; `busy_timeout` configurado.
-- Restricciones de integridad en la base (`UNIQUE`, `FOREIGN KEY`), no solo en código.
-- Un servidor activo, disco local. **No** réplicas compartiendo el archivo.
+### Decision
+- SQLite as the only metadata store, in WAL mode.
+- `synchronous=FULL` by default (durability against power loss), evaluating its cost in benchmarks.
+- Writes serialized by a single write point; short transactions; `busy_timeout` configured.
+- Integrity constraints in the database (`UNIQUE`, `FOREIGN KEY`), not only in code.
+- One active server, local disk. **No** replicas sharing the file.
 
-### Alternativas consideradas
-- **PostgreSQL** — añade un componente a instalar y operar; se reserva para cuando haya necesidad de multinodo demostrada.
-- **`synchronous=NORMAL`** — mejor rendimiento, pero puede perder transacciones confirmadas ante pérdida de energía.
+### Alternatives considered
+- **PostgreSQL** — adds a component to install and operate; reserved for when a multinode need is demonstrated.
+- **`synchronous=NORMAL`** — better performance, but can lose committed transactions on power loss.
 
-### Consecuencias
-- Techo de escritura conocido; aceptable para el volumen de publicación esperado.
-- Las descargas no deben generar escrituras síncronas (contadores agregados en memoria y volcados por lotes).
-- El backup debe usar la API de backup de SQLite (ver ADR-017).
+### Consequences
+- Known write ceiling; acceptable for the expected publication volume.
+- Downloads must not generate synchronous writes (counters aggregated in memory and flushed in batches).
+- Backup must use the SQLite backup API (see ADR-017).
 
-### Revisar cuando
-Los benchmarks muestren contención de escritura relevante o se requiera más de un nodo.
+### Review when
+Benchmarks show relevant write contention or more than one node is required.
 
 ---
 
 <a id="adr-005"></a>
-## ADR-005 — Blobs direccionados por SHA-256 en filesystem local, bytes originales
+## ADR-005 — Blobs addressed by SHA-256 on local filesystem, original bytes
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-006, ADR-018
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 2 · **Related:** ADR-006, ADR-018
 
-### Contexto
-Los `.nupkg` pueden ser grandes; guardarlos en SQLite penaliza la base y el backup. Se necesita poder responder "¿cuál es el archivo exacto que distribuimos?".
+### Context
+`.nupkg` files can be large; storing them in SQLite penalizes the database and backups. It must be possible to answer "what is the exact file we distribute?".
 
-### Decisión
-- El `.nupkg` se guarda **exactamente** como se recibió, en `blobs/sha256/<2>/<2>/<hash>`.
-- El hash sirve para integridad y deduplicación; **nunca** como credencial ni como ruta pública.
-- Acceso a través de una abstracción `BlobStore` mínima (put desde staging, get en streaming, exists, delete).
-- El `.nuspec` se sirve extrayéndolo del blob (o cacheado), no reempaquetando.
+### Decision
+- The `.nupkg` is stored **exactly** as received, at `blobs/sha256/<2>/<2>/<hash>`.
+- The hash serves integrity and deduplication; **never** as a credential or as a public path.
+- Access through a minimal `BlobStore` abstraction (put from staging, streaming get, exists, delete).
+- The `.nuspec` is served by extracting it from the blob (or cached), not by repackaging.
 
-### Alternativas consideradas
-- **Blobs en SQLite** — base enorme, backups lentos, peor streaming.
-- **Ruta por id/versión** — rompe deduplicación y complica la inmutabilidad.
-- **Descomprimir y reempaquetar** — altera los bytes y rompe firmas del autor.
+### Alternatives considered
+- **Blobs in SQLite** — huge database, slow backups, worse streaming.
+- **Path by id/version** — breaks deduplication and complicates immutability.
+- **Decompress and repackage** — alters the bytes and breaks author signatures.
 
-### Consecuencias
-- Un mismo blob puede estar referenciado por varias versiones/feeds; el borrado requiere conteo de referencias y periodo de gracia.
-- Habilita un futuro driver S3 sin cambiar el dominio.
+### Consequences
+- The same blob can be referenced by several versions/feeds; deletion requires reference counting and a grace period.
+- Enables a future S3 driver without changing the domain.
 
-### Revisar cuando
-Se implemente almacenamiento S3 compatible (primera evolución).
+### Review when
+S3-compatible storage is implemented (first evolution).
 
 ---
 
 <a id="adr-006"></a>
-## ADR-006 — Blob durable antes de confirmar metadatos
+## ADR-006 — Durable blob before confirming metadata
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-004, ADR-005, ADR-007
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 2 · **Related:** ADR-004, ADR-005, ADR-007
 
-### Contexto
-SQLite y el filesystem no comparten transacción. Hay que elegir qué inconsistencia se tolera ante una caída.
+### Context
+SQLite and the filesystem do not share a transaction. One must choose which inconsistency is tolerated on a crash.
 
-### Decisión
-Orden fijo de publicación:
+### Decision
+Fixed publish order:
 
-1. Autenticar, autorizar, comprobar cuota.
-2. Recibir en streaming a `staging/` con límite de tamaño.
-3. Calcular hash e inspeccionar con límites (ADR-014).
-4. Validar identidad, versión y metadatos.
-5. `fsync` del archivo, `rename` atómico a su ruta definitiva, `fsync` del directorio.
-6. Transacción única: metadatos de versión + referencia al blob + evento de auditoría.
-7. Responder `201`; la versión es visible desde el commit.
+1. Authenticate, authorize, check quota.
+2. Receive by streaming to `staging/` with a size limit.
+3. Compute hash and inspect with limits (ADR-014).
+4. Validate identity, version and metadata.
+5. `fsync` the file, atomic `rename` to its final path, `fsync` the directory.
+6. Single transaction: version metadata + blob reference + audit event.
+7. Respond `201`; the version is visible from the commit.
 
-Se tolera un **blob huérfano** (eliminable); nunca una **versión sin blob**. Ninguna transacción SQLite permanece abierta durante la subida.
+An **orphan blob** is tolerated (deletable); never a **version without a blob**. No SQLite transaction remains open during the upload.
 
-### Alternativas consideradas
-- **Metadatos primero, blob después** — puede exponer versiones sin artefacto.
-- **Estado "pendiente" en BD durante la subida** — más escrituras y estados intermedios visibles.
+### Alternatives considered
+- **Metadata first, blob later** — can expose versions without an artifact.
+- **"Pending" state in the DB during the upload** — more writes and visible intermediate states.
 
-### Consecuencias
-- Tarea de mantenimiento que limpia staging y blobs sin referencias tras un periodo de gracia, pausada durante backups.
-- `onepackd check` verifica la invariante BD → blob.
+### Consequences
+- Maintenance task that cleans staging and unreferenced blobs after a grace period, paused during backups.
+- `onepackd check` verifies the DB → blob invariant.
 
-### Revisar cuando
-Se introduzca un `BlobStore` remoto con semántica de consistencia distinta.
+### Review when
+A remote `BlobStore` with different consistency semantics is introduced.
 
 ---
 
 <a id="adr-007"></a>
-## ADR-007 — Versiones inmutables y `409` ante duplicados
+## ADR-007 — Immutable versions and `409` on duplicates
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2 · **Relacionados:** ADR-006, ADR-008, ADR-013
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 2 · **Related:** ADR-006, ADR-008, ADR-013
 
-### Contexto
-Reemplazar el contenido de una versión publicada rompe la reproducibilidad y la trazabilidad, y el protocolo NuGet prevé `409` para identidades existentes.
+### Context
+Replacing the content of a published version breaks reproducibility and traceability, and the NuGet protocol provides `409` for existing identities.
 
-### Decisión
-- Identidad: `feed + normalized_package_id + normalized_version`, con `UNIQUE` en la base.
-- Una versión publicada **no se reemplaza ni se borra** desde la API en el MVP. Para corregir, se publica otra versión; para retirar, unlist o block (ADR-013).
-- Duplicado → `409`.
-- `onepack package push --skip-existing-identical` trata el duplicado como éxito **solo** si el hash coincide; con bytes distintos sigue siendo error.
+### Decision
+- Identity: `feed + normalized_package_id + normalized_version`, with `UNIQUE` in the database.
+- A published version **is not replaced or deleted** from the API in the MVP. To correct, publish another version; to withdraw, unlist or block (ADR-013).
+- Duplicate → `409`.
+- `onepack package push --skip-existing-identical` treats the duplicate as success **only** if the hash matches; with different bytes it remains an error.
 
-### Alternativas consideradas
-- **Permitir sobrescritura con permiso de admin** — rompe cachés de clientes y la auditoría.
-- **Hard delete** — se pospone; si llega, será una operación administrativa auditada, no parte del flujo normal.
+### Alternatives considered
+- **Allow overwrite with admin permission** — breaks client caches and auditing.
+- **Hard delete** — postponed; if it arrives, it will be an audited administrative operation, not part of the normal flow.
 
-### Consecuencias
-- La carrera de dos publicaciones simultáneas se resuelve en la base: una gana, la otra recibe `409`.
-- Los errores de publicación cuestan una versión; hay que documentarlo.
+### Consequences
+- The race between two simultaneous publications is resolved in the database: one wins, the other receives `409`.
+- Publication errors cost a version; this must be documented.
 
-### Revisar cuando
-Exista un requisito legal de eliminación (p. ej. contenido filtrado por error) — requerirá un ADR de purga auditada.
+### Review when
+A legal deletion requirement exists (e.g. content leaked by mistake) — it will require an audited purge ADR.
 
 ---
 
 <a id="adr-008"></a>
-## ADR-008 — Normalización NuGet propia validada contra `NuGet.Versioning`
+## ADR-008 — Own NuGet normalization validated against `NuGet.Versioning`
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 1 · **Relacionados:** ADR-002, ADR-019
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 1 · **Related:** ADR-002, ADR-019
 
-### Contexto
-Las versiones NuGet no son SemVer puro: cuarto segmento, equivalencias (`1.0` ≡ `1.0.0`), metadatos de build ignorados en la identidad, ids case-insensitive. Un error aquí produce duplicados o colisiones.
+### Context
+NuGet versions are not pure SemVer: fourth segment, equivalences (`1.0` ≡ `1.0.0`), build metadata ignored in identity, case-insensitive ids. A mistake here produces duplicates or collisions.
 
-### Decisión
-- Implementar en el crate `nuget` la normalización de ids y versiones, y la comparación de versiones.
-- Validarla con un **corpus de casos generado por `NuGet.Versioning`** (programa .NET de prueba) y ejecutado en CI.
-- No usar una librería SemVer genérica como fuente de verdad.
+### Decision
+- Implement id and version normalization, and version comparison, in the `nuget` crate.
+- Validate it with a **corpus of cases generated by `NuGet.Versioning`** (test .NET program) and run in CI.
+- Do not use a generic SemVer library as the source of truth.
 
-### Alternativas consideradas
-- **Crate SemVer genérico** — no cubre las reglas NuGet.
-- **Llamar a .NET en runtime** — rompe ADR-002 y ADR-019.
+### Alternatives considered
+- **Generic SemVer crate** — does not cover NuGet rules.
+- **Call .NET at runtime** — breaks ADR-002 and ADR-019.
 
-### Consecuencias
-- Cualquier divergencia detectada en el corpus es un bug bloqueante.
-- El corpus crece con cada caso raro encontrado en el piloto.
+### Consequences
+- Any divergence detected in the corpus is a blocking bug.
+- The corpus grows with each rare case found in the pilot.
 
-### Revisar cuando
-NuGet cambie sus reglas de versionado.
+### Review when
+NuGet changes its versioning rules.
 
 ---
 
 <a id="adr-009"></a>
-## ADR-009 — Recursos NuGet V3 anunciados en el MVP
+## ADR-009 — NuGet V3 resources announced in the MVP
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 1, 3 · **Relacionados:** ADR-013, ADR-018
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 1, 3 · **Related:** ADR-013, ADR-018
 
-### Contexto
-El cliente descubre capacidades en el service index. Anunciar un recurso sin cumplir su contrato provoca fallos difíciles de diagnosticar.
+### Context
+The client discovers capabilities in the service index. Announcing a resource without fulfilling its contract causes failures that are hard to diagnose.
 
-### Decisión
-El service index anuncia **solo** estos recursos, y únicamente cuando estén completos:
+### Decision
+The service index announces **only** these resources, and only when they are complete:
 
-| Recurso | Ruta |
+| Resource | Path |
 |---|---|
 | `PackageBaseAddress/3.0.0` | `/nuget/{feed}/v3/flat/` |
 | `RegistrationsBaseUrl/3.6.0` | `/nuget/{feed}/v3/registration/` |
@@ -332,338 +332,338 @@ El service index anuncia **solo** estos recursos, y únicamente cuando estén co
 | `SearchAutocompleteService` | `/nuget/{feed}/v3/autocomplete` |
 | `PackagePublish/2.0.0` | `/nuget/{feed}/v2/package` |
 
-No se implementa la API V2 (OData). `PackagePublish/2.0.0` es el recurso de publicación de V3, no la API V2.
+The V2 API (OData) is not implemented. `PackagePublish/2.0.0` is the V3 publish resource, not the V2 API.
 
-**Precisión (Fase 3, 2026-10-04).** La búsqueda y el autocompletado se anuncian también bajo `/3.0.0-beta`, `/3.0.0-rc` y `/3.5.0` (mismo endpoint), porque cada versión del cliente busca un tipo distinto; `/3.5.0` exige el filtro `packageType`, que está implementado. `RegistrationsBaseUrl/3.6.0` se sirve sin gzip: los clientes aceptan respuestas sin comprimir.
+**Clarification (Phase 3, 2026-10-04).** Search and autocomplete are also announced under `/3.0.0-beta`, `/3.0.0-rc` and `/3.5.0` (same endpoint), because each client version looks for a different type; `/3.5.0` requires the `packageType` filter, which is implemented. `RegistrationsBaseUrl/3.6.0` is served without gzip: clients accept uncompressed responses.
 
-### Alternativas consideradas
-- **Implementar V2 OData** — amplía superficie para clientes antiguos sin demanda.
-- **Anunciar todo desde el spike** — confunde a clientes mientras falten recursos.
+### Alternatives considered
+- **Implement V2 OData** — expands the surface for old clients with no demand.
+- **Announce everything from the spike** — confuses clients while resources are missing.
 
-### Consecuencias
-- Se publica una matriz de clientes comprobados en lugar de prometer "compatibilidad total".
-- Búsqueda debe respetar paginación, prerelease y `semVerLevel`.
+### Consequences
+- A matrix of tested clients is published instead of promising "full compatibility".
+- Search must respect pagination, prerelease and `semVerLevel`.
 
-### Revisar cuando
-Un cliente relevante del piloto requiera un recurso no implementado (p. ej. `ReadmeUriTemplate`, `RepositorySignatures`).
+### Review when
+A relevant pilot client requires an unimplemented resource (e.g. `ReadmeUriTemplate`, `RepositorySignatures`).
 
 ---
 
 <a id="adr-010"></a>
-## ADR-010 — Tokens opacos con verificador hash, no JWT
+## ADR-010 — Opaque tokens with a hash verifier, not JWT
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 4 · **Relacionados:** ADR-011, ADR-012
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 4 · **Related:** ADR-011, ADR-012
 
-### Contexto
-Se necesita expiración, revocación inmediata y permisos acotados. Los JWT de larga duración no se revocan sin una lista de bloqueo, lo que anula su ventaja.
+### Context
+Expiration, immediate revocation and scoped permissions are needed. Long-lived JWTs are not revoked without a blocklist, which nullifies their advantage.
 
-### Decisión
-- Token = prefijo identificable (p. ej. `pkg_`) + id público corto + secreto aleatorio ≥ 256 bits.
-- Se almacena el id y un **verificador** (SHA-256 del secreto; suficiente por su alta entropía), nunca el token recuperable. Comparación en tiempo constante.
-- Se muestra una sola vez al crearlo.
-- Expiración obligatoria (configurable), revocación inmediata, `last_used_at` actualizado de forma agregada.
+### Decision
+- Token = identifiable prefix (e.g. `pkg_`) + short public id + random secret ≥ 256 bits.
+- The id and a **verifier** are stored (SHA-256 of the secret; sufficient due to its high entropy), never the recoverable token. Constant-time comparison.
+- It is shown only once when created.
+- Mandatory expiration (configurable), immediate revocation, `last_used_at` updated in aggregate.
 
-### Alternativas consideradas
-- **JWT** — revocación compleja, riesgo de tokens de larga vida.
-- **Argon2/bcrypt para el verificador** — innecesario con secretos de alta entropía y costoso por request.
-- **API key global** — sin trazabilidad ni mínimo privilegio.
+### Alternatives considered
+- **JWT** — complex revocation, risk of long-lived tokens.
+- **Argon2/bcrypt for the verifier** — unnecessary with high-entropy secrets and costly per request.
+- **Global API key** — no traceability or least privilege.
 
-### Consecuencias
-- Cada request autenticada consulta la base (mitigable con caché corta e invalidación al revocar).
-- El prefijo permite detección por escáneres de secretos.
+### Consequences
+- Each authenticated request queries the database (mitigable with a short cache and invalidation on revocation).
+- The prefix enables detection by secret scanners.
 
-### Revisar cuando
-Se integre SSO/OIDC o federación de identidades de CI (p. ej. OIDC de GitHub Actions).
+### Review when
+SSO/OIDC or CI identity federation is integrated (e.g. GitHub Actions OIDC).
 
 ---
 
 <a id="adr-011"></a>
-## ADR-011 — Tres contextos de autenticación separados
+## ADR-011 — Three separate authentication contexts
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 4 · **Relacionados:** ADR-010, ADR-016
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 4 · **Related:** ADR-010, ADR-016
 
-### Contexto
-Los clientes NuGet autentican lectura y publicación por mecanismos distintos, y el CLI administrativo tiene su propio canal.
+### Context
+NuGet clients authenticate reads and publishes by different mechanisms, and the administrative CLI has its own channel.
 
-### Decisión
+### Decision
 
-| Contexto | Mecanismo |
+| Context | Mechanism |
 |---|---|
-| API administrativa `/api/v1` | `Authorization: Bearer <token>` |
-| Lectura NuGet (index, flat, registration, search, autocomplete) | Basic sobre HTTPS; usuario ignorado o informativo, contraseña = token. `401` + `WWW-Authenticate: Basic` |
-| Publicación NuGet | `X-NuGet-ApiKey: <token>` |
+| Administrative API `/api/v1` | `Authorization: Bearer <token>` |
+| NuGet read (index, flat, registration, search, autocomplete) | Basic over HTTPS; user ignored or informative, password = token. `401` + `WWW-Authenticate: Basic` |
+| NuGet publish | `X-NuGet-ApiKey: <token>` |
 
-Todos resuelven al mismo modelo de principal y permisos. La autorización se aplica en **todas** las rutas, incluidas `HEAD` y respuestas condicionales.
+All resolve to the same principal and permission model. Authorization is applied on **all** routes, including `HEAD` and conditional responses.
 
-**Precisión (Fase 4, 2026-10-04).** El contexto se determina por la superficie, no por la operación: en las rutas NuGet se aceptan tanto Basic como `X-NuGet-ApiKey`, porque `dotnet nuget push` consulta el service index con Basic (tras el `401`) y publica con la API key. La API administrativa acepta **solo** Bearer: así un navegador que haya cacheado credenciales Basic no puede usarlas contra ella.
+**Clarification (Phase 4, 2026-10-04).** The context is determined by the surface, not by the operation: NuGet routes accept both Basic and `X-NuGet-ApiKey`, because `dotnet nuget push` queries the service index with Basic (after the `401`) and publishes with the API key. The administrative API accepts **only** Bearer: thus a browser that has cached Basic credentials cannot use them against it.
 
-### Alternativas consideradas
-- **Un solo mecanismo** — no es compatible con lo que envían los clientes NuGet.
-- **Proteger solo la publicación** — expone paquetes privados.
+### Alternatives considered
+- **A single mechanism** — not compatible with what NuGet clients send.
+- **Protect only publishing** — exposes private packages.
 
-### Consecuencias
-- Test automatizado que recorre todas las rutas registradas y verifica que exigen autenticación.
-- `anonymous_read=false` por defecto.
+### Consequences
+- Automated test that walks all registered routes and verifies they require authentication.
+- `anonymous_read=false` by default.
 
-### Revisar cuando
-Se implemente el credential provider (ADR-016) o lectura anónima por feed.
+### Review when
+The credential provider (ADR-016) or anonymous read per feed is implemented.
 
 ---
 
 <a id="adr-012"></a>
-## ADR-012 — Roles por feed y restricción opcional por prefijo
+## ADR-012 — Per-feed roles and optional prefix restriction
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 4 · **Relacionados:** ADR-010, ADR-011
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 4 · **Related:** ADR-010, ADR-011
 
-### Contexto
-Una cuenta de CI debe poder publicar solo lo suyo. NuGet no tiene namespaces en el protocolo.
+### Context
+A CI account must be able to publish only what belongs to it. NuGet has no namespaces in the protocol.
 
-### Decisión
-- Grants por `(principal, feed, rol)` con roles acumulativos: **Reader** ⊂ **Publisher** ⊂ **Maintainer**; **Administrator** es global (identidades, permisos, configuración).
-- Restricción opcional de publicación por patrones de prefijo de id (`Hemia.Payments.*`), como **política del registro**.
-- Feeds sin permiso de lectura responden `404` para no revelar su existencia.
-- Bootstrap: `onepackd init` genera la credencial admin inicial en un archivo `0600`; sin contraseña por defecto ni registro público de admins.
+### Decision
+- Grants per `(principal, feed, role)` with cumulative roles: **Reader** ⊂ **Publisher** ⊂ **Maintainer**; **Administrator** is global (identities, permissions, configuration).
+- Optional publish restriction by id prefix patterns (`Hemia.Payments.*`), as **registry policy**.
+- Feeds without read permission respond `404` to avoid revealing their existence.
+- Bootstrap: `onepackd init` generates the initial admin credential in a `0600` file; no default password or public admin registry.
 
-### Alternativas consideradas
-- **ACL por paquete** — granularidad sin demanda probada.
-- **Roles globales sin feeds** — rompe el aislamiento por cliente.
+### Alternatives considered
+- **Per-package ACL** — granularity with no proven demand.
+- **Global roles without feeds** — breaks per-client isolation.
 
-### Consecuencias
-- Errores de autorización con códigos estables (`AUTH_SCOPE_MISSING`, `AUTH_PREFIX_DENIED`).
-- Los cambios de grants se auditan.
+### Consequences
+- Authorization errors with stable codes (`AUTH_SCOPE_MISSING`, `AUTH_PREFIX_DENIED`).
+- Grant changes are audited.
 
-### Revisar cuando
-Aparezcan requisitos de grupos/equipos o SSO.
+### Review when
+Group/team or SSO requirements appear.
 
 ---
 
 <a id="adr-013"></a>
-## ADR-013 — `listed` y `availability` como estados independientes
+## ADR-013 — `listed` and `availability` as independent states
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 3, 5 · **Relacionados:** ADR-007
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 3, 5 · **Related:** ADR-007
 
-### Contexto
-En NuGet, unlist retira de búsqueda pero el paquete sigue descargable. Eso no sirve para responder a incidentes.
+### Context
+In NuGet, unlist removes a package from search but it remains downloadable. That is not useful for responding to incidents.
 
-### Decisión
-Cada versión tiene dos atributos ortogonales:
+### Decision
+Each version has two orthogonal attributes:
 
 ```text
-listed:       true | false          (descubrimiento; Publisher+ vía protocolo NuGet)
-availability: available | blocked   (descarga; Maintainer+ vía /api/v1, con motivo)
+listed:       true | false          (discovery; Publisher+ via NuGet protocol)
+availability: available | blocked   (download; Maintainer+ via /api/v1, with reason)
 ```
 
-- `listed=false`: fuera de búsqueda y autocompletado; presente en flat container y registros con `listed=false`; descargable.
-- `blocked`: el servidor rechaza la descarga del `.nupkg` y `.nuspec`; visible para Maintainer/Admin.
+- `listed=false`: out of search and autocomplete; present in the flat container and registrations with `listed=false`; downloadable.
+- `blocked`: the server rejects download of the `.nupkg` and `.nuspec`; visible to Maintainer/Admin.
 
-### Alternativas consideradas
-- **Un único estado** — mezcla una operación de curación con una de seguridad.
+### Alternatives considered
+- **A single state** — mixes a curation operation with a security one.
 
-### Consecuencias
-- Se documenta que bloquear no elimina copias ya descargadas en cachés de clientes.
-- Bloqueos y desbloqueos se auditan con motivo.
+### Consequences
+- It is documented that blocking does not delete copies already downloaded in client caches.
+- Blocks and unblocks are audited with a reason.
 
-**Precisión (Fase 5, 2026-10-04).** Una versión bloqueada sigue en el flat container y en los registros (anunciada como obsoleta, sin publicar el motivo) y sale de la búsqueda. Así `restore` falla con un error explícito en lugar de resolver otra versión en silencio. La descarga responde `410` con el código `PACKAGE_BLOCKED` en el cuerpo y en la frase de estado, que es lo que muestran los clientes .NET. Desbloquear también exige motivo.
+**Clarification (Phase 5, 2026-10-04).** A blocked version remains in the flat container and registrations (announced as deprecated, without publishing the reason) and leaves search. Thus `restore` fails with an explicit error instead of silently resolving another version. Download responds `410` with the code `PACKAGE_BLOCKED` in the body and in the status phrase, which is what .NET clients display. Unblocking also requires a reason.
 
-### Revisar cuando
-Se requiera cuarentena automática (p. ej. tras un escáner).
+### Review when
+Automatic quarantine is required (e.g. after a scanner).
 
 ---
 
 <a id="adr-014"></a>
-## ADR-014 — Paquetes como contenido no confiable con presupuesto de inspección
+## ADR-014 — Packages as untrusted content with an inspection budget
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 5 · **Relacionados:** ADR-006
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 5 · **Related:** ADR-006
 
-### Contexto
-Un `.nupkg` es un ZIP con XML: expuesto a ZIP bombs, XML bombs, path traversal y fallos de parser.
+### Context
+A `.nupkg` is a ZIP with XML: exposed to ZIP bombs, XML bombs, path traversal and parser failures.
 
-### Decisión
-- Límites configurables: tamaño comprimido, número de entradas, tamaño descomprimido por entrada y total, tamaño del `.nuspec`, profundidad XML, tiempo de inspección.
-- Leer solo lo necesario del ZIP en memoria acotada; **no** extraer a disco.
-- Parser XML sin DTD ni entidades externas.
-- Rechazar rutas peligrosas.
-- Inspección con concurrencia limitada, aislada de la atención de descargas.
-- Nunca ejecutar ni descargar nada referenciado por el paquete.
-- No anunciar análisis antimalware ni validación de firmas.
+### Decision
+- Configurable limits: compressed size, number of entries, uncompressed size per entry and total, `.nuspec` size, XML depth, inspection time.
+- Read only what is needed from the ZIP into bounded memory; **do not** extract to disk.
+- XML parser without DTD or external entities.
+- Reject dangerous paths.
+- Inspection with limited concurrency, isolated from download service.
+- Never execute or download anything referenced by the package.
+- Do not advertise antimalware analysis or signature validation.
 
-### Alternativas consideradas
-- **Confiar en publicadores autenticados** — un token comprometido o un paquete defectuoso tumbaría el servicio.
-- **Escaneo antimalware integrado** — fuera del MVP; requeriría dependencias externas.
+### Alternatives considered
+- **Trust authenticated publishers** — a compromised token or a defective package would bring down the service.
+- **Built-in antimalware scanning** — outside the MVP; would require external dependencies.
 
-### Consecuencias
-- Paquetes legítimos muy grandes pueden requerir ajustar límites; los límites son del registro, no de NuGet.
-- Suite `tests/security` con artefactos maliciosos sintéticos.
+### Consequences
+- Very large legitimate packages may require adjusting limits; limits belong to the registry, not NuGet.
+- `tests/security` suite with synthetic malicious artifacts.
 
-**Precisión (Fase 5, 2026-10-04).** Los límites, sus valores por defecto y los códigos de error están en [docs/security.md](../docs/security.md). El número de entradas se lee del registro de fin del ZIP antes de cargar el directorio central; los tamaños descomprimidos se validan con los declarados y solo se descomprime el `.nuspec`, con lectura cortada en el límite. Las rutas se validan también con el escape `%XX` resuelto. La concurrencia de subidas no encola (`503` con `Retry-After`) y el límite por IP se aplica antes de autenticar, con la IP del socket (ADR-018).
+**Clarification (Phase 5, 2026-10-04).** The limits, their default values and the error codes are in [docs/security.md](../docs/security.md). The number of entries is read from the ZIP end record before loading the central directory; uncompressed sizes are validated against the declared ones and only the `.nuspec` is decompressed, with reading cut off at the limit. Paths are also validated with the `%XX` escape resolved. Upload concurrency does not queue (`503` with `Retry-After`) and the per-IP limit is applied before authenticating, with the socket IP (ADR-018).
 
-### Revisar cuando
-Se añada verificación de firmas o integración con escáneres.
+### Review when
+Signature verification or scanner integration is added.
 
 ---
 
 <a id="adr-015"></a>
-## ADR-015 — `onepackd` y `onepack` separados; CLI con contrato estable
+## ADR-015 — `onepackd` and `onepack` separated; CLI with a stable contract
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 6 · **Relacionados:** ADR-003, ADR-016
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 6 · **Related:** ADR-003, ADR-016
 
-### Contexto
-El CLI es la interfaz principal del producto, usada por personas y por pipelines.
+### Context
+The CLI is the product's main interface, used by people and by pipelines.
 
-### Decisión
-- `onepackd` (servidor) y `onepack` (cliente) son binarios distintos que comparten contratos vía `api-client`. Instalar `onepack` no implica el servidor.
-- Contrato del CLI: `--json` con esquema estable, códigos de salida documentados, `--no-input`, timeouts, datos a stdout y diagnóstico a stderr.
-- Credenciales: entrada sin eco o `--token-stdin`; keychain del SO; **sin fallback silencioso a texto plano** (si no hay keychain, error explícito y opción `--token-env`).
-- Reintentos solo en operaciones idempotentes.
-- Negociación de capacidades con el servidor (`/api/v1/capabilities`), compatibilidad N/N-1.
-- Errores con código, acción sugerida y `request_id`, nunca con secretos.
+### Decision
+- `onepackd` (server) and `onepack` (client) are distinct binaries that share contracts via `api-client`. Installing `onepack` does not imply the server.
+- CLI contract: `--json` with a stable schema, documented exit codes, `--no-input`, timeouts, data to stdout and diagnostics to stderr.
+- Credentials: no-echo input or `--token-stdin`; OS keychain; **no silent fallback to plain text** (if there is no keychain, explicit error and `--token-env` option).
+- Retries only on idempotent operations.
+- Capability negotiation with the server (`/api/v1/capabilities`), N/N-1 compatibility.
+- Errors with code, suggested action and `request_id`, never with secrets.
 
-### Alternativas consideradas
-- **Un solo binario con subcomandos de servidor y cliente** — obliga a distribuir el servidor a todas las estaciones.
-- **Script sobre `curl`** — sin manejo de credenciales ni contrato estable.
+### Alternatives considered
+- **A single binary with server and client subcommands** — forces distributing the server to every workstation.
+- **Script over `curl`** — no credential handling or stable contract.
 
-**Precisión (Fase 6, 2026-10-04).** Los códigos de salida y el contrato de salida están en [docs/cli.md](../docs/cli.md); la forma del `--json` está fijada por un snapshot en las pruebas. `ONEPACK_KEYRING=off` desactiva el keychain de forma explícita (CI, contenedores): `login` falla con `KEYCHAIN_UNAVAILABLE` en lugar de guardar el token en otro sitio. Un servidor sin `/api/v1/capabilities` (anterior a la Fase 6) se trata como uno sin capacidades administrativas. El `request_id` lo genera siempre el servidor y viaja en `X-Request-Id`.
+**Clarification (Phase 6, 2026-10-04).** Exit codes and the output contract are in [docs/cli.md](../docs/cli.md); the shape of `--json` is fixed by a snapshot in the tests. `ONEPACK_KEYRING=off` explicitly disables the keychain (CI, containers): `login` fails with `KEYCHAIN_UNAVAILABLE` instead of storing the token elsewhere. A server without `/api/v1/capabilities` (before Phase 6) is treated as one without administrative capabilities. The `request_id` is always generated by the server and travels in `X-Request-Id`.
 
-### Consecuencias
-- Cambios incompatibles en `--json` o códigos de salida exigen versión mayor del CLI.
-- `onepack doctor` se trata como funcionalidad de producto, no como utilidad de depuración.
+### Consequences
+- Incompatible changes in `--json` or exit codes require a major CLI version.
+- `onepack doctor` is treated as product functionality, not as a debugging utility.
 
-### Revisar cuando
-Se añada UI web o SDK de terceros sobre `/api/v1`.
+### Review when
+A web UI or third-party SDK is added over `/api/v1`.
 
 ---
 
 <a id="adr-016"></a>
-## ADR-016 — Credenciales NuGet vía `onepack exec`; credential provider pospuesto
+## ADR-016 — NuGet credentials via `onepack exec`; credential provider postponed
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 6 · **Relacionados:** ADR-011, ADR-015
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 6 · **Related:** ADR-011, ADR-015
 
-### Contexto
-Guardar un token en el CLI no hace que `dotnet restore` lo lea. El cifrado de contraseñas en `NuGet.Config` solo funciona en Windows.
+### Context
+Storing a token in the CLI does not make `dotnet restore` read it. Password encryption in `NuGet.Config` only works on Windows.
 
-### Decisión
-- **CI:** credenciales inyectadas por mecanismos estándar de NuGet (`NuGetPackageSourceCredentials_{source}` o `dotnet nuget add source` con secretos del pipeline).
-- **Desarrollo local:** `onepack exec --feed X -- <comando>` define las variables de credencial solo en el entorno del proceso hijo.
-- `onepack nuget init` genera `NuGet.Config` **sin secretos**, con `packageSourceMapping`, preservando lo existente y mostrando el diff.
-- El credential provider multiplataforma se pospone a la primera evolución.
+### Decision
+- **CI:** credentials injected by standard NuGet mechanisms (`NuGetPackageSourceCredentials_{source}` or `dotnet nuget add source` with pipeline secrets).
+- **Local development:** `onepack exec --feed X -- <command>` defines the credential variables only in the child process environment.
+- `onepack nuget init` generates `NuGet.Config` **without secrets**, with `packageSourceMapping`, preserving what exists and showing the diff.
+- The cross-platform credential provider is postponed to the first evolution.
 
-### Alternativas consideradas
-- **Escribir el token en `NuGet.Config`** — texto plano fuera de Windows; riesgo de commit accidental.
-- **Credential provider en el MVP** — mejor experiencia en IDE, pero protocolo de plugin adicional y más superficie.
+### Alternatives considered
+- **Write the token in `NuGet.Config`** — plain text outside Windows; risk of accidental commit.
+- **Credential provider in the MVP** — better IDE experience, but an additional plugin protocol and more surface.
 
-**Precisión (Fase 6, 2026-10-04).** La clave de fuente es `onepack_<feed>` (con `-` cambiado por `_`), de modo que la variable `NuGetPackageSourceCredentials_onepack_<feed>` es válida en cualquier shell. Si el `NuGet.Config` no tenía `packageSourceMapping`, `nuget init` mapea sus otras fuentes (y `nuget.org` si el archivo hereda fuentes) a `*`, para no romper restores existentes.
+**Clarification (Phase 6, 2026-10-04).** The source key is `onepack_<feed>` (with `-` replaced by `_`), so the `NuGetPackageSourceCredentials_onepack_<feed>` variable is valid in any shell. If the `NuGet.Config` had no `packageSourceMapping`, `nuget init` maps its other sources (and `nuget.org` if the file inherits sources) to `*`, so as not to break existing restores.
 
-### Consecuencias
-- La experiencia en IDE requiere configuración manual documentada durante el MVP.
-- Se documenta que `packageSourceMapping` no garantiza confidencialidad absoluta de ids, y que las pruebas de procedencia usan cachés limpias.
+### Consequences
+- The IDE experience requires documented manual configuration during the MVP.
+- It is documented that `packageSourceMapping` does not guarantee absolute id confidentiality, and that provenance tests use clean caches.
 
-### Revisar cuando
-El piloto identifique el uso desde IDE como fricción principal.
+### Review when
+The pilot identifies IDE use as the main friction.
 
 ---
 
 <a id="adr-017"></a>
-## ADR-017 — Backup consistente en modo mantenimiento
+## ADR-017 — Consistent backup in maintenance mode
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 7 · **Relacionados:** ADR-004, ADR-005, ADR-006
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 7 · **Related:** ADR-004, ADR-005, ADR-006
 
-### Contexto
-Un backup de la base sin blobs no recupera el registro. Copiar el archivo SQLite activo sin coordinación no es fiable.
+### Context
+A database backup without blobs does not recover the registry. Copying the active SQLite file without coordination is not reliable.
 
-### Decisión
-- `onepackd backup` activa modo mantenimiento: rechaza mutaciones (`503` con `Retry-After`) y pausa la limpieza de blobs; las lecturas continúan.
-- Copia la base con la **SQLite Online Backup API**, los blobs referenciados y la configuración necesaria (sin secretos de TLS salvo indicación explícita).
-- Genera un manifiesto con hashes y versión de esquema.
-- `onepackd restore` exige directorio vacío y verifica el manifiesto.
-- **Criterio de éxito:** restaurar en otro servidor y que un proyecto ejecute `dotnet restore` con éxito.
+### Decision
+- `onepackd backup` activates maintenance mode: rejects mutations (`503` with `Retry-After`) and pauses blob cleanup; reads continue.
+- Copies the database with the **SQLite Online Backup API**, the referenced blobs and the necessary configuration (without TLS secrets unless explicitly indicated).
+- Generates a manifest with hashes and schema version.
+- `onepackd restore` requires an empty directory and verifies the manifest.
+- **Success criterion:** restore on another server and have a project run `dotnet restore` successfully.
 
-### Alternativas consideradas
-- **Backup en caliente sin pausa** — riesgo de blobs recolectados entre la copia de BD y la de blobs.
-- **Delegar en snapshots del filesystem** — válido como complemento, no como único mecanismo portable.
+### Alternatives considered
+- **Hot backup without pause** — risk of blobs collected between the DB copy and the blob copy.
+- **Delegate to filesystem snapshots** — valid as a complement, not as the only portable mechanism.
 
-**Precisión (Fase 7, 2026-10-04).** La base se copia con `VACUUM INTO` y no con la Online Backup API: sqlx no expone esa API y llamarla directamente exigiría código `unsafe`, que el workspace prohíbe. `VACUUM INTO` produce igualmente una copia consistente (una transacción de lectura) y compacta. Los blobs que se copian son los que referencia esa copia, verificados contra su hash. El modo mantenimiento vive en la base (lo comparten el proceso de backup y el servidor) y caduca solo, para que un backup interrumpido no deje el registro bloqueado. La configuración del servicio (flags y variables de entorno) no está en el directorio de datos y no entra en el backup; se documenta que hay que guardarla aparte. `restore` aplica las migraciones si el backup es de una versión anterior. Detalle en [docs/runbooks/backup-restore.md](../docs/runbooks/backup-restore.md).
+**Clarification (Phase 7, 2026-10-04).** The database is copied with `VACUUM INTO` and not with the Online Backup API: sqlx does not expose that API and calling it directly would require `unsafe` code, which the workspace forbids. `VACUUM INTO` also produces a consistent copy (a read transaction) and compacts. The blobs that are copied are those referenced by that copy, verified against their hash. Maintenance mode lives in the database (shared by the backup process and the server) and expires on its own, so an interrupted backup does not leave the registry locked. Service configuration (flags and environment variables) is not in the data directory and is not included in the backup; it is documented that it must be stored separately. `restore` applies migrations if the backup is from an older version. Detail in [docs/runbooks/backup-restore.md](../docs/runbooks/backup-restore.md).
 
-### Consecuencias
-- Ventana corta sin publicaciones durante el backup; se documenta.
-- Backup incremental y en caliente quedan para evolución.
+### Consequences
+- Short window without publications during the backup; documented.
+- Incremental and hot backup are left for evolution.
 
-### Revisar cuando
-El tamaño de datos haga inaceptable la ventana de mantenimiento.
+### Review when
+Data size makes the maintenance window unacceptable.
 
 ---
 
 <a id="adr-018"></a>
-## ADR-018 — `public_url` explícito y blobs solo a través del servidor
+## ADR-018 — Explicit `public_url` and blobs only through the server
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 3, 7 · **Relacionados:** ADR-005, ADR-009, ADR-011
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 3, 7 · **Related:** ADR-005, ADR-009, ADR-011
 
-### Contexto
-Detrás de un reverse proxy, derivar URLs de la cabecera `Host` permite envenenamiento de URLs. Servir blobs directamente desde el proxy eludiría la autorización.
+### Context
+Behind a reverse proxy, deriving URLs from the `Host` header allows URL poisoning. Serving blobs directly from the proxy would bypass authorization.
 
-### Decisión
-- `server.public_url` es obligatorio y es la única base para URLs absolutas del service index y recursos.
-- TLS directo o terminado en reverse proxy; el servidor escucha por defecto en `127.0.0.1`.
-- Los blobs se sirven **solo** por el servidor, tras autorización. Los ejemplos de Nginx/Caddy no exponen el directorio de datos.
+### Decision
+- `server.public_url` is mandatory and is the only base for absolute URLs of the service index and resources.
+- TLS directly or terminated at the reverse proxy; the server listens on `127.0.0.1` by default.
+- Blobs are served **only** by the server, after authorization. The Nginx/Caddy examples do not expose the data directory.
 
-### Alternativas consideradas
-- **Derivar de `Host`/`X-Forwarded-*`** — manipulable.
-- **`X-Accel-Redirect`/`X-Sendfile`** — optimización válida a futuro si se mantiene la autorización previa; no en el MVP.
+### Alternatives considered
+- **Derive from `Host`/`X-Forwarded-*`** — manipulable.
+- **`X-Accel-Redirect`/`X-Sendfile`** — valid future optimization if prior authorization is maintained; not in the MVP.
 
-### Consecuencias
-- Un cambio de dominio requiere cambiar configuración y reiniciar.
+### Consequences
+- A domain change requires changing configuration and restarting.
 
-### Revisar cuando
-Las descargas grandes saturen el proceso y se necesite delegar el envío de bytes.
+### Review when
+Large downloads saturate the process and byte serving needs to be delegated.
 
 ---
 
 <a id="adr-019"></a>
-## ADR-019 — Conformidad probada con clientes .NET reales, sin .NET en runtime
+## ADR-019 — Conformance proven with real .NET clients, without .NET at runtime
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-03 · **Fase:** 0, 1 · **Relacionados:** ADR-002, ADR-008, ADR-009
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-03 · **Phase:** 0, 1 · **Related:** ADR-002, ADR-008, ADR-009
 
-### Contexto
-Probar solo con el CLI propio puede ocultar incompatibilidades compartidas entre cliente y servidor.
+### Context
+Testing only with one's own CLI can hide incompatibilities shared between client and server.
 
-### Decisión
-- `tests/conformance-dotnet` usa `dotnet` SDK, `nuget.exe` y pequeños programas .NET (p. ej. con `NuGet.Versioning`) como **referencia de pruebas**.
-- Los paquetes de prueba se crean con herramientas oficiales (`dotnet pack`).
-- Las pruebas de restore usan cachés aisladas (`NUGET_PACKAGES` temporal).
-- .NET **no** es dependencia del servidor desplegado.
+### Decision
+- `tests/conformance-dotnet` uses `dotnet` SDK, `nuget.exe` and small .NET programs (e.g. with `NuGet.Versioning`) as a **test reference**.
+- Test packages are created with official tools (`dotnet pack`).
+- Restore tests use isolated caches (temporary `NUGET_PACKAGES`).
+- .NET **is not** a dependency of the deployed server.
 
-### Alternativas consideradas
-- **Fixtures estáticos de respuestas** — no detectan regresiones de comportamiento de clientes.
+### Alternatives considered
+- **Static response fixtures** — do not detect client behavior regressions.
 
-### Consecuencias
-- CI necesita SDK .NET y, para `nuget.exe`, un runner Windows.
-- Se mantiene una matriz de clientes comprobados con versiones exactas.
+### Consequences
+- CI needs the .NET SDK and, for `nuget.exe`, a Windows runner.
+- A matrix of tested clients with exact versions is maintained.
 
-### Revisar cuando
-Se añada otro formato (npm, PyPI), que requerirá su propia suite de conformidad.
+### Review when
+Another format (npm, PyPI) is added, which will require its own conformance suite.
 
 ---
 
 <a id="adr-020"></a>
-## ADR-020 — Migraciones forward-only con backup previo
+## ADR-020 — Forward-only migrations with a prior backup
 
-**Estatus:** ✅ Aceptado · **Fecha:** 2026-10-03 · **Aceptado:** 2026-10-04 · **Fase:** 2, 7 · **Relacionados:** ADR-004, ADR-017
+**Status:** ✅ Accepted · **Date:** 2026-10-03 · **Accepted:** 2026-10-04 · **Phase:** 2, 7 · **Related:** ADR-004, ADR-017
 
-### Contexto
-Volver al binario anterior no revierte una migración de datos. Las migraciones "down" rara vez se prueban.
+### Context
+Going back to the previous binary does not revert a data migration. "Down" migrations are rarely tested.
 
-### Decisión
-- Migraciones SQLx embebidas en `onepackd`, numeradas y **solo hacia adelante**.
-- Al arrancar: comprobar versión de esquema; si hay migraciones pendientes, exigir `onepackd migrate` (o flag explícito), que genera un backup previo.
-- Un binario se niega a arrancar con un esquema más nuevo que el que conoce.
-- El rollback consiste en restaurar el backup previo con el binario anterior.
+### Decision
+- SQLx migrations embedded in `onepackd`, numbered and **forward only**.
+- On startup: check the schema version; if there are pending migrations, require `onepackd migrate` (or an explicit flag), which generates a prior backup.
+- A binary refuses to start with a schema newer than the one it knows.
+- Rollback consists of restoring the prior backup with the previous binary.
 
-### Alternativas consideradas
-- **Migraciones automáticas silenciosas al arrancar** — sorpresas en actualizaciones.
-- **Migraciones reversibles** — coste de mantenimiento sin garantía real.
+### Alternatives considered
+- **Silent automatic migrations on startup** — surprises during upgrades.
+- **Reversible migrations** — maintenance cost with no real guarantee.
 
-### Consecuencias
-- Notas de versión indican si una release incluye migración.
-- Prueba de actualización N-1 → N en CI.
+### Consequences
+- Release notes indicate whether a release includes a migration.
+- N-1 → N upgrade test in CI.
 
-### Revisar cuando
-Se adopte PostgreSQL o despliegues multinodo.
+### Review when
+PostgreSQL or multinode deployments are adopted.

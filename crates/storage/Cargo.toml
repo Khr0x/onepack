@@ -1,6 +1,6 @@
 [package]
 name = "onepack-storage"
-description = "Persistencia de onepack: metadatos SQLite y almacén de blobs."
+description = "onepack persistence: SQLite metadata and blob store."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -20,7 +20,7 @@ tokio = { version = "1.54.1", features = ["fs", "io-util", "rt", "macros", "time
 tracing = "0.1.44"
 
 [features]
-# Puntos de fallo para las pruebas de recuperación. Nunca en builds de release.
+# Fault injection points for recovery tests. Never in release builds.
 fault-injection = []
 
 [lints]

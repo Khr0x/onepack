@@ -1,8 +1,8 @@
-//! Suite de seguridad de la Fase 5 (ADR-013, ADR-014): paquetes maliciosos sintéticos,
-//! ráfagas de peticiones, versiones bloqueadas y cuotas.
+//! Phase 5 security suite (ADR-013, ADR-014): synthetic malicious packages,
+//! request bursts, blocked versions, and quotas.
 //!
-//! Se ejecuta con `cargo test -p onepack-server --test security`. Los artefactos se generan
-//! en cada prueba; ninguno se guarda en el repositorio.
+//! Run with `cargo test -p onepack-server --test security`. Artifacts are generated
+//! for each test; none are stored in the repository.
 
 use std::io::{Cursor, Write};
 use std::net::SocketAddr;
@@ -224,8 +224,8 @@ fn count_files(dir: &Path) -> usize {
         .sum()
 }
 
-/// Comprueba un rechazo controlado: código esperado, nada persistido ni en staging y la
-/// denegación auditada.
+/// Checks a controlled rejection: expected code, nothing persisted or in staging, and the
+/// denial audited.
 async fn assert_rejected(env: &Env, reply: &Reply, status: StatusCode, code: &str) {
     assert_eq!(reply.status, status, "{}", reply.body);
     assert!(
@@ -234,8 +234,8 @@ async fn assert_rejected(env: &Env, reply: &Reply, status: StatusCode, code: &st
         reply.body
     );
     assert_eq!(env.version_count().await, 0);
-    assert_eq!(env.staging_files(), 0, "staging debe quedar vacío");
-    assert_eq!(env.blob_files(), 0, "no debe persistirse ningún blob");
+    assert_eq!(env.staging_files(), 0, "staging must stay empty");
+    assert_eq!(env.blob_files(), 0, "no blob must be persisted");
     let audit = env.audit().await;
     let last = audit.last().unwrap();
     assert_eq!(
@@ -248,8 +248,8 @@ async fn assert_rejected(env: &Env, reply: &Reply, status: StatusCode, code: &st
     );
 }
 
-/// Sustituye el tamaño descomprimido declarado de cada entrada (cabecera local y directorio
-/// central) por `size`. Así se fabrica una ZIP bomb sin tener que comprimir gigabytes.
+/// Replaces each entry's declared uncompressed size (local header and central directory)
+/// with `size`. This forges a ZIP bomb without having to compress gigabytes.
 fn forge_uncompressed_size(zip: &mut [u8], size: u32) {
     let mut i = 0;
     while i + 4 <= zip.len() {
@@ -276,7 +276,7 @@ async fn zip_bomb_with_forged_sizes_is_rejected_without_decompressing() {
         ("A.nuspec", nuspec("A", "1.0.0").as_bytes()),
         ("lib/payload.bin", b"tiny"),
     ]);
-    // ~4 GiB declarados por entrada.
+    // ~4 GiB declared per entry.
     forge_uncompressed_size(&mut bomb, u32::MAX - 1);
     let started = Instant::now();
     let reply = env.push(&bomb).await;
@@ -310,7 +310,7 @@ async fn zip_bomb_with_real_compression_is_rejected() {
     ]);
     assert!(
         bomb.len() < 200 << 10,
-        "la bomba comprime: {} bytes",
+        "the bomb compresses: {} bytes",
         bomb.len()
     );
     let reply = env.push(&bomb).await;
@@ -327,7 +327,7 @@ async fn zip_bomb_with_real_compression_is_rejected() {
 #[tokio::test]
 async fn oversized_nuspec_is_cut_at_the_limit() {
     let env = env(limits()).await;
-    // 16 MiB de espacios dentro del .nuspec: comprime a unos pocos KiB.
+    // 16 MiB of spaces inside the .nuspec: compresses to a few KiB.
     let huge = format!(
         "<package><metadata><id>A</id><version>1.0.0</version><description>{}</description></metadata></package>",
         " ".repeat(16 << 20)
@@ -342,7 +342,7 @@ async fn oversized_nuspec_is_cut_at_the_limit() {
     )
     .await;
 
-    // Con el tamaño declarado falseado a la baja, la lectura se corta igualmente.
+    // Even with the declared size forged lower, reading is still cut off.
     let mut liar = honest.clone();
     forge_uncompressed_size(&mut liar, 100);
     let reply = env.push(&liar).await;
@@ -412,7 +412,7 @@ async fn external_entities_are_never_resolved() {
     assert_rejected(&env, &reply, StatusCode::BAD_REQUEST, "PACKAGE_INVALID").await;
     assert!(!reply.body.contains("root:"));
 
-    // Sin DTD, una entidad desconocida tampoco se resuelve.
+    // Without a DTD, an unknown entity is not resolved either.
     let undefined = "<package><metadata><id>A</id><version>1.0.0</version><description>&xxe;</description></metadata></package>";
     let reply = env
         .push(&zip_with(&[("A.nuspec", undefined.as_bytes())]))
@@ -439,7 +439,7 @@ async fn deeply_nested_xml_is_rejected() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Rutas
+// Paths
 // ---------------------------------------------------------------------------------------------
 
 #[tokio::test]
@@ -465,7 +465,7 @@ async fn path_traversal_is_rejected_and_nothing_is_written_outside_staging() {
         let reply = env.push(&package).await;
         assert_rejected(&env, &reply, StatusCode::BAD_REQUEST, "PACKAGE_UNSAFE_PATH").await;
     }
-    // Nada se extrae: ni en el directorio de datos ni junto a él.
+    // Nothing is extracted: neither in the data directory nor next to it.
     let parent = env.dir.path().parent().unwrap();
     for dir in [env.dir.path(), parent] {
         assert!(!dir.join(marker).exists());
@@ -486,10 +486,10 @@ async fn duplicate_entries_are_rejected() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ráfagas
+// Bursts
 // ---------------------------------------------------------------------------------------------
 
-/// Cuerpo que se queda abierto hasta que se suelta el emisor: simula una subida lenta.
+/// Body that stays open until the sender is dropped: simulates a slow upload.
 fn stalled_body() -> (mpsc::Sender<Bytes>, Body) {
     let (tx, rx) = mpsc::channel::<Bytes>(1);
     let stream = futures_util::stream::unfold(rx, |mut rx| async move {
@@ -508,7 +508,7 @@ async fn upload_burst_degrades_with_503_without_queueing() {
     })
     .await;
 
-    // Dos subidas lentas ocupan todas las plazas.
+    // Two slow uploads take all the slots.
     let mut slow = Vec::new();
     for _ in 0..2 {
         let (tx, body) = stalled_body();
@@ -520,10 +520,10 @@ async fn upload_burst_degrades_with_503_without_queueing() {
         let req = push_request(&env.admin, body);
         slow.push((tx, tokio::spawn(async move { router.oneshot(req).await })));
     }
-    // Cada subida lenta abre su archivo de staging en cuanto tiene plaza.
+    // Each slow upload opens its staging file as soon as it gets a slot.
     let deadline = Instant::now() + Duration::from_secs(20);
     while env.staging_files() < 2 {
-        assert!(Instant::now() < deadline, "las subidas lentas no empezaron");
+        assert!(Instant::now() < deadline, "the slow uploads did not start");
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     for _ in 0..20 {
@@ -536,12 +536,12 @@ async fn upload_burst_degrades_with_503_without_queueing() {
         );
         assert!(reply.body.starts_with("UPLOADS_BUSY: "), "{}", reply.body);
         assert!(reply.headers.contains_key(header::RETRY_AFTER));
-        // Los rechazos no leen el cuerpo ni dejan nada en staging.
+        // Rejections do not read the body or leave anything in staging.
         assert_eq!(env.staging_files(), 2);
     }
     assert_eq!(env.version_count().await, 0);
 
-    // Al cortar las subidas lentas se liberan las plazas.
+    // Cutting off the slow uploads frees the slots.
     for (tx, task) in slow {
         drop(tx);
         let res = task.await.unwrap().unwrap();
@@ -587,9 +587,9 @@ async fn requests_are_rate_limited_per_principal() {
     assert_eq!(reply.status, StatusCode::TOO_MANY_REQUESTS);
     assert!(reply.body.starts_with("RATE_LIMITED: "));
     assert!(reply.headers.contains_key(header::RETRY_AFTER));
-    // Otro principal tiene su propio cupo.
+    // Another principal has its own quota.
     assert_eq!(env.get(&index, &env.admin).await.status, StatusCode::OK);
-    // La API administrativa responde el mismo límite en JSON.
+    // The admin API returns the same limit in JSON.
     let reply = env
         .api(Method::GET, "/api/v1/whoami", &env.reader, None)
         .await;
@@ -607,7 +607,7 @@ async fn requests_are_rate_limited_per_ip_before_authentication() {
     let attacker: SocketAddr = "203.0.113.7:40000".parse().unwrap();
     env.router = env.router.layer(MockConnectInfo(attacker));
     let index = format!("/nuget/{FEED}/v3/index.json");
-    // Credenciales inválidas: cuentan igual, así que frenan la fuerza bruta.
+    // Invalid credentials: they count the same, so they slow down brute force.
     for _ in 0..3 {
         assert_eq!(
             env.get(&index, "opk_0000000000000000_bad").await.status,
@@ -620,7 +620,7 @@ async fn requests_are_rate_limited_per_ip_before_authentication() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Versiones bloqueadas
+// Blocked versions
 // ---------------------------------------------------------------------------------------------
 
 #[tokio::test]
@@ -638,8 +638,8 @@ async fn blocked_version_cannot_be_downloaded_but_stays_visible() {
     let nupkg_url = format!("/nuget/{FEED}/v3/flat/hemia.core/1.0.0/hemia.core.1.0.0.nupkg");
     let nuspec_url = format!("/nuget/{FEED}/v3/flat/hemia.core/1.0.0/hemia.core.nuspec");
 
-    // Solo Maintainer o administrador bloquea, y siempre con motivo.
-    let reason = json!({ "reason": "CVE-2026-0001: ejecución remota" });
+    // Only a Maintainer or administrator can block, and always with a reason.
+    let reason = json!({ "reason": "CVE-2026-0001: remote code execution" });
     let reply = env
         .api(
             Method::POST,
@@ -668,7 +668,7 @@ async fn blocked_version_cannot_be_downloaded_but_stays_visible() {
     assert_eq!(reply.json()["availability"], "blocked");
     assert_eq!(reply.json()["changed"], true);
 
-    // La descarga falla con un error explícito, también para el administrador.
+    // The download fails with an explicit error, also for the administrator.
     for token in [&env.reader, &env.admin] {
         for url in [&nupkg_url, &nuspec_url] {
             let reply = env.get(url, token).await;
@@ -688,12 +688,12 @@ async fn blocked_version_cannot_be_downloaded_but_stays_visible() {
             );
         }
     }
-    // La otra versión se descarga con normalidad.
+    // The other version downloads normally.
     let other = format!("/nuget/{FEED}/v3/flat/hemia.core/1.1.0/hemia.core.1.1.0.nupkg");
     assert_eq!(env.get(&other, &env.reader).await.status, StatusCode::OK);
 
-    // Sigue en los metadatos (para que restore falle con un mensaje claro) y se anuncia
-    // como obsoleta; desaparece de la búsqueda.
+    // It stays in the metadata (so that restore fails with a clear message) and is announced
+    // as deprecated; it disappears from search.
     let flat = env
         .get(
             &format!("/nuget/{FEED}/v3/flat/hemia.core/index.json"),
@@ -721,7 +721,7 @@ async fn blocked_version_cannot_be_downloaded_but_stays_visible() {
     );
     assert!(
         !blocked.to_string().contains("CVE-2026-0001"),
-        "el motivo no se publica"
+        "the reason is not published"
     );
     let search = env
         .get(&format!("/nuget/{FEED}/v3/query?q=hemia"), &env.reader)
@@ -730,21 +730,24 @@ async fn blocked_version_cannot_be_downloaded_but_stays_visible() {
     assert_eq!(search["data"][0]["version"], "1.1.0");
     assert_eq!(search["data"][0]["versions"].as_array().unwrap().len(), 1);
 
-    // El motivo lo ve quien mantiene el feed; un lector ve solo el estado.
+    // The reason is visible to whoever maintains the feed; a reader sees only the state.
     let state = env.api(Method::GET, &api, &env.admin, None).await.json();
     assert_eq!(state["availability"], "blocked");
-    assert_eq!(state["blocked_reason"], "CVE-2026-0001: ejecución remota");
+    assert_eq!(
+        state["blocked_reason"],
+        "CVE-2026-0001: remote code execution"
+    );
     let state = env.api(Method::GET, &api, &env.reader, None).await.json();
     assert_eq!(state["availability"], "blocked");
     assert_eq!(state["blocked_reason"], Value::Null);
 
-    // Desbloquear también exige motivo y restaura la descarga.
+    // Unblocking also requires a reason and restores the download.
     let reply = env
         .api(
             Method::POST,
             &format!("{api}/unblock"),
             &env.admin,
-            Some(json!({ "reason": "falso positivo" })),
+            Some(json!({ "reason": "false positive" })),
         )
         .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
@@ -763,7 +766,7 @@ async fn blocked_version_cannot_be_downloaded_but_stays_visible() {
     assert_eq!(actions[0].0, "package.block");
     assert!(actions[0].1.contains("CVE-2026-0001"));
     assert_eq!(actions[1].0, "package.unblock");
-    assert!(actions[1].1.contains("falso positivo"));
+    assert!(actions[1].1.contains("false positive"));
     assert!(
         audit
             .iter()
@@ -772,7 +775,7 @@ async fn blocked_version_cannot_be_downloaded_but_stays_visible() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Cuotas
+// Quotas
 // ---------------------------------------------------------------------------------------------
 
 #[tokio::test]
@@ -804,7 +807,7 @@ async fn version_quota_rejects_with_specific_code() {
         reply.body
     );
     assert_eq!(env.version_count().await, 1);
-    assert_eq!(env.blob_files(), blobs, "nada persistido");
+    assert_eq!(env.blob_files(), blobs, "nothing persisted");
     assert_eq!(env.staging_files(), 0);
     let audit = env.audit().await;
     let last = audit.last().unwrap();
@@ -844,7 +847,7 @@ async fn storage_quota_rejects_with_specific_code() {
     assert_eq!(env.version_count().await, 1);
     assert_eq!(env.blob_files(), 1);
 
-    // Sin cuota se vuelve a publicar.
+    // Without a quota it can be published again.
     env.store
         .set_feed_quota(&feed, FeedQuota::default(), "test")
         .await

@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Depende de Onepack.Fixture.Basic con un rango: el restore debe elegir 1.1.0 entre
-       1.0.0, 1.1.0 y 2.0.0. Al empaquetarlo, Basic se resuelve desde las fuentes adicionales
-       de restore (RestoreAdditionalProjectSources). -->
+  <!-- Depends on Onepack.Fixture.Basic with a range: restore must choose 1.1.0 among
+       1.0.0, 1.1.0, and 2.0.0. When packing, Basic is resolved from the additional
+       restore sources (RestoreAdditionalProjectSources). -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>Onepack.Fixture.Ranged</PackageId>
     <Version>1.0.0</Version>
     <Authors>onepack</Authors>
-    <Description>Paquete de prueba con una dependencia por rango.</Description>
+    <Description>Test package with a range dependency.</Description>
   </PropertyGroup>
 
   <ItemGroup>

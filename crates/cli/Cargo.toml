@@ -1,6 +1,6 @@
 [package]
 name = "onepack-cli"
-description = "CLI administrativo de onepack."
+description = "onepack administrative CLI."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

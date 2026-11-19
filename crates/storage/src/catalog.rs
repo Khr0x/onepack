@@ -1,4 +1,4 @@
-//! Consultas de catálogo (búsqueda, visibilidad) y relleno de metadatos (Fase 3).
+//! Catalog queries (search, visibility) and metadata backfill (Phase 3).
 
 use onepack_core::{Feed, PublishedVersion};
 use sqlx::Row;
@@ -6,14 +6,14 @@ use sqlx::Row;
 use crate::identity::audit;
 use crate::{Store, StoreError, to_published};
 
-/// Versión publicada antes de existir la columna `metadata` (migración 0003).
+/// Version published before the `metadata` column existed (migration 0003).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MissingMetadata {
     pub version_id: i64,
     pub blob_sha256: String,
 }
 
-/// Resultado de cambiar el estado de una versión.
+/// Result of changing a version's state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VersionChange {
     NotFound,
@@ -22,8 +22,8 @@ pub enum VersionChange {
 }
 
 impl Store {
-    /// Versiones listadas y disponibles de un feed, con los filtros de prerelease y SemVer 2.0.0. La búsqueda
-    /// por texto y el orden los aplica el adaptador del formato.
+    /// Listed and available versions of a feed, with the prerelease and SemVer 2.0.0 filters. The text
+    /// search and ordering are applied by the format adapter.
     pub async fn listed_versions(
         &self,
         feed: &Feed,
@@ -48,7 +48,7 @@ impl Store {
         Ok(rows.iter().map(to_published).collect())
     }
 
-    /// Lista u oculta una versión (unlist/relist de NuGet). No afecta a la descarga (ADR-013).
+    /// Lists or hides a version (NuGet unlist/relist). Does not affect download (ADR-013).
     pub async fn set_listed(
         &self,
         feed: &Feed,
@@ -102,8 +102,8 @@ impl Store {
         Ok(VersionChange::Changed)
     }
 
-    /// Bloquea o desbloquea la descarga de una versión (ADR-013). El motivo es obligatorio y
-    /// queda en la auditoría.
+    /// Blocks or unblocks the download of a version (ADR-013). The reason is mandatory and
+    /// is recorded in the audit.
     pub async fn set_blocked(
         &self,
         feed: &Feed,
@@ -159,7 +159,7 @@ impl Store {
         Ok(VersionChange::Changed)
     }
 
-    /// Motivo del bloqueo vigente de una versión, si está bloqueada.
+    /// Reason for a version's current block, if it is blocked.
     pub async fn blocked_reason(
         &self,
         feed: &Feed,

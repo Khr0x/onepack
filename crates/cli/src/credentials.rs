@@ -1,13 +1,13 @@
-//! Credenciales del CLI (ADR-015): keychain del sistema o variable de entorno. Nunca se
-//! escriben en archivos y nunca hay fallback silencioso a texto plano.
+//! CLI credentials (ADR-015): system keychain or environment variable. They are never
+//! written to files and there is never a silent fallback to plaintext.
 //!
-//! Orden de resolución:
-//! 1. `--token-env VAR`: el token está en la variable `VAR` (pipelines).
+//! Resolution order:
+//! 1. `--token-env VAR`: the token is in the `VAR` variable (pipelines).
 //! 2. `ONEPACK_TOKEN`.
-//! 3. El keychain del sistema, con la entrada del contexto (`onepack login`).
+//! 3. The system keychain, with the context entry (`onepack login`).
 //!
-//! `ONEPACK_KEYRING=off` desactiva el keychain (contenedores, CI): `login` falla de forma
-//! explícita en vez de guardar el token en otro sitio.
+//! `ONEPACK_KEYRING=off` disables the keychain (containers, CI): `login` fails
+//! explicitly instead of storing the token somewhere else.
 
 use crate::error::{CliError, CliResult, exit};
 
@@ -56,7 +56,7 @@ pub struct Credential {
 
 impl std::fmt::Debug for Credential {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // El secreto nunca aparece en trazas ni en mensajes de error.
+        // The secret never appears in traces or error messages.
         f.debug_struct("Credential")
             .field("token_id", &token_id(&self.token))
             .field("source", &self.source)
@@ -64,7 +64,7 @@ impl std::fmt::Debug for Credential {
     }
 }
 
-/// Parte pública del token (`opk_<id>_…`): identifica el token sin revelar el secreto.
+/// Public part of the token (`opk_<id>_…`): identifies the token without revealing the secret.
 pub fn token_id(token: &str) -> Option<&str> {
     token
         .strip_prefix("opk_")
@@ -95,7 +95,7 @@ fn entry(context: &str) -> CliResult<keyring_core::Entry> {
     keyring_core::Entry::new(SERVICE, context).map_err(keychain_unavailable)
 }
 
-/// Token para un contexto. `Ok(None)` si no hay ninguno configurado.
+/// Token for a context. `Ok(None)` if none is configured.
 pub fn resolve(context: Option<&str>, token_env: Option<&str>) -> CliResult<Option<Credential>> {
     if let Some(var) = token_env {
         return match std::env::var(var) {
@@ -135,7 +135,7 @@ pub fn resolve(context: Option<&str>, token_env: Option<&str>) -> CliResult<Opti
     }
 }
 
-/// Comprueba que hay keychain sin leer ni modificar nada.
+/// Checks that a keychain is available without reading or modifying anything.
 pub fn ensure_available(context: &str) -> CliResult<()> {
     entry(context).map(|_| ())
 }
@@ -146,7 +146,7 @@ pub fn store(context: &str, token: &str) -> CliResult<()> {
         .map_err(keychain_unavailable)
 }
 
-/// Borra la credencial del contexto. `false` si no había ninguna.
+/// Deletes the context credential. `false` if there was none.
 pub fn delete(context: &str) -> CliResult<bool> {
     match entry(context)?.delete_credential() {
         Ok(()) => Ok(true),

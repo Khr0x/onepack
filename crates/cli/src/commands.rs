@@ -1,5 +1,5 @@
-//! Subcomandos de administración, paquetes y auditoría. Cada uno devuelve el código de
-//! salida; los datos salen por `Out::data` (texto o JSON).
+//! Administration, package, and audit subcommands. Each returns the exit
+//! code; data goes out through `Out::data` (text or JSON).
 
 use std::time::Duration;
 
@@ -25,7 +25,7 @@ use crate::{
 const PUSH_TIMEOUT: Duration = Duration::from_secs(600);
 
 // ---------------------------------------------------------------------------------------------
-// Contextos y sesión
+// Contexts and session
 // ---------------------------------------------------------------------------------------------
 
 #[derive(Serialize)]
@@ -134,7 +134,7 @@ pub fn context(mut app: App, cmd: ContextCommand) -> CliResult<i32> {
             }
             app.out
                 .confirm(&format!("Remove context {name} and its token?"), yes)?;
-            // Sin keychain no hay token que borrar; el contexto se elimina igualmente.
+            // Without a keychain there is no token to delete; the context is removed anyway.
             let removed_token = credentials::delete(&name).unwrap_or(false);
             app.config.contexts.remove(&name);
             if app.config.current.as_deref() == Some(name.as_str()) {
@@ -156,13 +156,13 @@ pub fn login(app: &App, token_stdin: bool) -> CliResult<i32> {
         CliError::usage("login stores the token of a context; it cannot be used with --url")
             .with_action("create a context with `onepack context add`")
     })?;
-    // Si no hay keychain, se falla antes de pedir el token (ADR-015: sin texto plano).
+    // If there is no keychain, it fails before asking for the token (ADR-015: no plaintext).
     credentials::ensure_available(&name)?;
     let token = app.out.read_secret(
         &format!("Token for {} ({}): ", name, target.url),
         token_stdin,
     )?;
-    // Se valida antes de guardarlo.
+    // It is validated before being stored.
     let me: WhoAmI = app
         .client_for(&target, Some(token.clone()), crate::app::DEFAULT_TIMEOUT)?
         .get("/whoami")?;
@@ -318,7 +318,7 @@ pub fn feed(app: &App, cmd: FeedCommand) -> CliResult<i32> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Principals, tokens y grants
+// Principals, tokens, and grants
 // ---------------------------------------------------------------------------------------------
 
 fn principal_row(p: &Principal) -> Vec<String> {
@@ -397,7 +397,7 @@ pub fn token(app: &App, cmd: TokenCommand) -> CliResult<i32> {
                     t.id, t.principal, t.expires_at
                 ));
             }
-            // En texto, solo el token va a stdout para poder capturarlo.
+            // In text mode, only the token goes to stdout so it can be captured.
             app.out.data(&t, || t.token.clone());
         }
         TokenCommand::List { principal } => {
@@ -524,7 +524,7 @@ struct PushResult {
     id: String,
     version: String,
     sha256: String,
-    /// `pushed` o `skipped` (ya existía con el mismo contenido).
+    /// `pushed` or `skipped` (it already existed with the same content).
     status: &'static str,
 }
 
@@ -629,7 +629,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
             for file in &files {
                 let bytes = std::fs::read(file)
                     .map_err(|e| CliError::io(&file.display().to_string(), &e))?;
-                // Validación local: se informa antes de subir nada.
+                // Local validation: reported before uploading anything.
                 let manifest = onepack_nuget::read_package(&bytes).map_err(|e| {
                     CliError::new(exit::USAGE, e.code(), format!("{}: {e}", file.display()))
                 })?;
@@ -730,7 +730,7 @@ pub fn package(app: &App, cmd: PackageCommand) -> CliResult<i32> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Auditoría
+// Audit
 // ---------------------------------------------------------------------------------------------
 
 pub fn audit(app: &App, cmd: AuditCommand) -> CliResult<i32> {
@@ -751,7 +751,7 @@ pub fn audit(app: &App, cmd: AuditCommand) -> CliResult<i32> {
     if let Some(a) = &action {
         query.push(format!("action={}", seg(a)));
     }
-    // Solo la primera página: `--limit` es el número de eventos que se quieren ver.
+    // Only the first page: `--limit` is the number of events to view.
     let page: api::Page<AuditEvent> = client.get(&format!("/audit?{}", query.join("&")))?;
     let events = page.items;
     app.out.data(&events, || {

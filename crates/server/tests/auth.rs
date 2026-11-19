@@ -1,5 +1,5 @@
-//! Pruebas bloqueantes de la Fase 4: autenticación obligatoria, aislamiento entre feeds,
-//! roles, prefijos y revocación (ADR-010, ADR-011, ADR-012).
+//! Phase 4 blocking tests: mandatory authentication, isolation between feeds,
+//! roles, prefixes, and revocation (ADR-010, ADR-011, ADR-012).
 
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -101,7 +101,7 @@ async fn env() -> Env {
         reader,
         ci,
     };
-    // Un paquete en cada feed, publicado por el administrador.
+    // One package in each feed, published by the administrator.
     for feed in ["internal", "customer-a"] {
         let admin = env.admin.clone();
         let (status, _) = env
@@ -205,8 +205,8 @@ impl Env {
     }
 }
 
-/// Todas las rutas registradas, más rutas inexistentes. El middleware es global, así que una
-/// ruta nueva queda protegida aunque no se añada aquí.
+/// All registered routes, plus nonexistent routes. The middleware is global, so a
+/// new route is protected even if it is not added here.
 const ROUTES: &[(&str, &str)] = &[
     ("GET", "/nuget/internal/v3/index.json"),
     ("HEAD", "/nuget/internal/v3/index.json"),
@@ -298,7 +298,7 @@ async fn every_route_requires_authentication() {
         };
         assert!(
             challenge.is_some_and(|c| c.starts_with(expected)),
-            "{method} {path}: falta WWW-Authenticate {expected}"
+            "{method} {path}: missing WWW-Authenticate {expected}"
         );
         assert!(
             !String::from_utf8_lossy(&body).contains("Hemia.Secret"),
@@ -330,7 +330,7 @@ async fn invalid_tokens_are_rejected_everywhere() {
         .iter()
         .filter(|(a, _, _)| a == "auth.failure")
         .count();
-    assert_eq!(failures, 6, "cada fallo de autenticación queda auditado");
+    assert_eq!(failures, 6, "every authentication failure is audited");
 }
 
 #[tokio::test]
@@ -426,7 +426,7 @@ async fn no_cross_feed_leaks() {
         if *method != "HEAD" {
             assert_eq!(
                 response, missing.1,
-                "{method} {path}: debe ser indistinguible de un feed inexistente"
+                "{method} {path}: must be indistinguishable from a nonexistent feed"
             );
         }
     }
@@ -485,7 +485,7 @@ async fn publishers_are_limited_to_their_patterns() {
         .await
         .0,
         StatusCode::NOT_FOUND,
-        "la publicación denegada no deja rastro"
+        "the denied publication leaves no trace"
     );
     assert_eq!(
         std::fs::read_dir(env.dir.path().join("staging"))
@@ -494,7 +494,7 @@ async fn publishers_are_limited_to_their_patterns() {
         0
     );
 
-    // Fuera de su feed, el publisher no ve nada.
+    // Outside their feed, the publisher sees nothing.
     let (status, _) = env
         .push(
             "customer-a",
@@ -589,7 +589,7 @@ async fn unlist_requires_publish_rights_on_the_id() {
             None,
         )
         .await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "fuera de su patrón");
+    assert_eq!(status, StatusCode::FORBIDDEN, "outside its pattern");
     assert!(String::from_utf8_lossy(&body).starts_with("AUTH_PREFIX_DENIED"));
 
     let (status, _) = env

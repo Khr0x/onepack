@@ -8,6 +8,10 @@ edition = "2024"
 rust-version = "1.96"
 repository = "https://github.com/Khr0x/onepack"
 license = "Apache-2.0"
+description = "Self-hosted private package registry for NuGet, npm, and PyPI"
+keywords = ["nuget", "package-registry", "self-hosted", "npm", "pypi"]
+categories = ["development-tools", "web-programming"]
+readme = "README.md"
 publish = false
 
 [workspace.dependencies]
@@ -29,7 +33,7 @@ lto = "thin"
 codegen-units = 1
 strip = "symbols"
 
-# Temporal: sqlx 0.9.1 aún no está en crates.io y 0.9.0 limita
-# libsqlite3-sys a <0.38.0 (RUSTSEC-2026-0459). Retirar al publicar 0.9.1.
+# Temporary: sqlx 0.9.1 is not on crates.io yet and 0.9.0 caps
+# libsqlite3-sys below 0.38.0 (RUSTSEC-2026-0459). Remove after 0.9.1 ships.
 [patch.crates-io]
 sqlx = { git = "https://github.com/transact-rs/sqlx", rev = "4f22dcfd42cbc15ea7a977cb38a39ef0ce6b3be4" }

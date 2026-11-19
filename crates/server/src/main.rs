@@ -16,7 +16,7 @@ use tracing_subscriber::EnvFilter;
 
 type CliResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-/// Archivo con la credencial administrativa inicial (permisos 0600).
+/// File with the initial administrative credential (0600 permissions).
 const INITIAL_TOKEN_FILE: &str = "initial-admin-token";
 const INITIAL_TOKEN_TTL_DAYS: i64 = 30;
 
@@ -307,7 +307,7 @@ struct ServeArgs {
     limits: LimitArgs,
 }
 
-/// Límites frente a paquetes no confiables y saturación (ADR-014).
+/// Limits against untrusted packages and saturation (ADR-014).
 #[derive(Args)]
 struct LimitArgs {
     /// Maximum number of entries in a package ZIP.
@@ -380,7 +380,7 @@ impl LimitArgs {
     }
 }
 
-/// Actor de auditoría para los comandos locales: quien tiene acceso al directorio de datos.
+/// Audit actor for local commands: whoever has access to the data directory.
 fn local_actor() -> String {
     let user = std::env::var("USER")
         .or_else(|_| std::env::var("USERNAME"))
@@ -409,11 +409,11 @@ async fn main() -> CliResult {
     match cli.log_format {
         LogFormat::Text => tracing_subscriber::fmt()
             .with_writer(std::io::stderr)
-            // Sin códigos de color cuando el log va a un archivo o a journald.
+            // No color codes when the log goes to a file or journald.
             .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))
             .with_env_filter(filter)
             .init(),
-        // Una línea JSON por evento; los spans incluyen `request_id`.
+        // One JSON line per event; spans include `request_id`.
         LogFormat::Json => tracing_subscriber::fmt()
             .json()
             .with_writer(std::io::stderr)
@@ -576,7 +576,7 @@ async fn init(data_dir: &Path) -> CliResult {
     Ok(())
 }
 
-/// Escribe un secreto en un archivo nuevo, legible solo por el propietario.
+/// Writes a secret to a new file readable only by the owner.
 fn write_secret_file(path: &Path, secret: &str) -> std::io::Result<()> {
     use std::io::Write;
     let mut options = std::fs::OpenOptions::new();
@@ -801,7 +801,7 @@ async fn token(cmd: TokenCommand) -> CliResult {
                 )
                 .await?;
             store.close().await;
-            // Solo el token va a stdout, para poder capturarlo en scripts.
+            // Only the token goes to stdout, so it can be captured in scripts.
             eprintln!(
                 "token {} for {} (expires {}); it will not be shown again",
                 issued.id, principal.name, issued.expires_at
@@ -898,7 +898,7 @@ async fn serve(args: ServeArgs) -> CliResult {
     }
     let listener = tokio::net::TcpListener::bind(args.listen).await?;
     tracing::info!(listen = %args.listen, public_url = %args.public_url, "onepackd listening");
-    // Con la dirección del cliente, para el límite de peticiones por IP.
+    // With the client address, for the per-IP request limit.
     axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
@@ -910,7 +910,7 @@ async fn serve(args: ServeArgs) -> CliResult {
     Ok(())
 }
 
-/// Ctrl+C o SIGTERM (lo que envía systemd al parar el servicio).
+/// Ctrl+C or SIGTERM (what systemd sends when stopping the service).
 async fn shutdown_signal() {
     let ctrl_c = async {
         let _ = tokio::signal::ctrl_c().await;
