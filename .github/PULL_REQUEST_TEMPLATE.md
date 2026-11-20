@@ -28,6 +28,7 @@
 
 - [ ] Code, comments, documentation, and commit messages are in English.
 - [ ] Documentation is updated for behavior, configuration, or operational changes.
+- [ ] `CHANGELOG.md` is updated for user-visible changes.
 - [ ] No tokens, credentials, private package data, or data directory contents are included.
 - [ ] Breaking changes and migrations are described.
 - [ ] The PR is focused and does not mix unrelated changes.
