@@ -37,6 +37,3 @@ allow-wildcard-paths = true
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# Temporary: reviewed pin of sqlx 0.9.1 while it is not on crates.io
-# (RUSTSEC-2026-0459). Remove once sqlx 0.9.1 is published.
-allow-git = ["https://github.com/transact-rs/sqlx"]
