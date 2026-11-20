@@ -79,6 +79,9 @@ jobs:
         run: ./scripts/e2e-acceptance.sh
         env:
           ONEPACK_E2E_SDK: ${{ matrix.sdk }}.100
+      - name: Native macOS Keychain (login, use, logout)
+        if: runner.os == 'macOS'
+        run: ./scripts/e2e-keychain-macos.sh
 
   cli-linux:
     # The other end-to-end tests run the CLI without a keychain and over plain HTTP.
@@ -107,6 +110,9 @@ jobs:
       - name: nuget.exe push / search / install and dotnet restore E2E (ADR-019)
         shell: pwsh
         run: ./tests/conformance-dotnet/e2e-windows.ps1
+      - name: Native Windows Credential Manager (login, use, logout)
+        shell: pwsh
+        run: ./scripts/e2e-keychain-windows.ps1
 
   recovery-backup:
     name: Recovery (1/2) backup on Linux
