@@ -52,9 +52,11 @@ cargo deny check
 Integration and operational checks:
 
 ```bash
-./scripts/e2e-cli.sh          # CLI against a local server
-./scripts/e2e-acceptance.sh   # publish/restore, revocation, backup/restore
-./tests/recovery/disk-full.sh # Linux, requires sudo and tmpfs
+./scripts/e2e-cli.sh              # CLI against a local server
+./scripts/e2e-acceptance.sh       # publish/restore, revocation, backup/restore
+./scripts/e2e-keychain-macos.sh   # native Keychain on macOS
+./scripts/e2e-keychain-windows.ps1 # native Credential Manager on Windows
+./tests/recovery/disk-full.sh     # Linux, requires sudo and tmpfs
 ./tests/ops/container.sh      # container image and probes
 ./tests/ops/systemd.sh        # systemd hardening and restart
 ```

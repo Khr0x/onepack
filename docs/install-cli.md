@@ -86,6 +86,13 @@ onepack completion zsh > "${fpath[1]}/_onepack"
 onepack completion fish > ~/.config/fish/completions/onepack.fish
 ```
 
+## Credentials on macOS and Windows
+
+`onepack login` stores the token in the native system store: **macOS Keychain**
+or **Windows Credential Manager**. `onepack logout` deletes it. The native
+paths are covered by [`scripts/e2e-keychain-macos.sh`](../scripts/e2e-keychain-macos.sh)
+and [`scripts/e2e-keychain-windows.ps1`](../scripts/e2e-keychain-windows.ps1).
+
 ## Credentials on Linux
 
 The CLI never stores a token in plain text ([CLI credentials](cli.md#credentials)). Which option fits depends on the machine:
