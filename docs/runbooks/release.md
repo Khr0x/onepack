@@ -25,7 +25,7 @@ Before the first tag, and whenever the workflow changes:
 ## Publishing a version
 
 1. `main` is green in CI.
-2. Update `version` in the root `Cargo.toml` (for example, `0.1.0`) and `Cargo.lock` (`cargo check`) in a PR. The workflow rejects a tag that does not match that version.
+2. Update `version` in the root `Cargo.toml` (for example, `0.1.0`) and `Cargo.lock` (`cargo check`) in a PR. Move the `Unreleased` section in `CHANGELOG.md` to `## [X.Y.Z] - YYYY-MM-DD` and confirm `scripts/changelog-notes.sh X.Y.Z` prints the notes. The workflow rejects a tag that does not match that version and uses that changelog section for the release.
 3. After the merge, tag and push:
 
    ```bash
@@ -34,7 +34,7 @@ Before the first tag, and whenever the workflow changes:
    git push origin v0.1.0
    ```
 
-4. When the workflow finishes, review the draft release (files, `SHA256SUMS`, signature bundle), write the notes and publish it.
+4. When the workflow finishes, review the draft release (files, `SHA256SUMS`, signature bundle, and the notes generated from `CHANGELOG.md`) and publish it.
 5. Verify that `ghcr.io/khr0x/onepack:vX.Y.Z` is public and pulls on both architectures; if it is still private, change the package visibility in GitHub.
 6. Check the installation from the published release by following [installation](install.md) on a clean machine, and run the quick start from the README.
 
@@ -44,5 +44,6 @@ To repeat the checks with downloaded binaries, unpack `onepack` and `onepackd` i
 
 - A green dry run.
 - The workspace version is `0.1.0` (done in the same change that added the Linux CLI checks).
+- `CHANGELOG.md` has a complete `0.1.0` section and `scripts/changelog-notes.sh 0.1.0` prints it.
 - [CLI installation](../install-cli.md) checked on a clean Linux machine with the dry-run binaries.
 - The GHCR package is public and the quick start (`compose.yaml` + `install.sh`) works on a clean machine.

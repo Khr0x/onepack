@@ -20,7 +20,8 @@ and a web UI are not part of the current architecture.
 | `onepack-bench` | Metadata latency benchmark. Not distributed. |
 
 Dependency direction is enforced by [`scripts/check-crate-deps.sh`](../scripts/check-crate-deps.sh)
-and [ADR-003](../roadmap/adr-mvp.md#adr-003).
+and [ADR-003](../roadmap/adr-mvp.md#adr-003). The ADR index and location
+decision are in [`docs/adr/README.md`](adr/README.md).
 
 ## Request flow
 

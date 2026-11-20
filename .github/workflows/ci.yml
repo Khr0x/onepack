@@ -155,10 +155,12 @@ jobs:
         run: ./tests/ops/container.sh
       - name: Nginx and Caddy examples are valid
         run: ./tests/ops/proxy-configs.sh
-      - name: Quick start files
+      - name: Quick start and release notes
         run: |
           sh -n install.sh
           docker compose config >/dev/null
+          version=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(json.load(sys.stdin)["packages"][0]["version"])')
+          ./scripts/changelog-notes.sh "$version" >/dev/null
 
   benchmark:
     # Reports only (no thresholds enforced) and noisy on shared runners: main and manual runs only.

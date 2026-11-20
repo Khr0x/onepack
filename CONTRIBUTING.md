@@ -70,6 +70,7 @@ No test that was skipped or not run may be reported as passed.
 - Do not log tokens, credentials, private package contents, or data directory
   contents.
 - Update documentation when behavior, configuration, or operations change.
+- Add a `CHANGELOG.md` entry for user-visible changes.
 
 ## Commit messages
 

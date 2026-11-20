@@ -131,7 +131,7 @@ Use HTTPS for deployments beyond local development. For service accounts, restri
 | --- | --- |
 | Getting started | [Publish and restore packages locally and in CI](docs/guide-zero-to-ci.md) |
 | CLI | [Installation](docs/install-cli.md) · [Command reference and credentials](docs/cli.md) |
-| Architecture | [Components, data flow, and deployment](docs/architecture.md) |
+| Architecture | [Components, data flow, and deployment](docs/architecture.md) · [ADRs](docs/adr/README.md) |
 | API | [Administration API reference](docs/api.md) |
 | Compatibility | [NuGet resources and verified clients](docs/compatibility.md) |
 | Versioning | [SemVer, compatibility, and support](docs/versioning.md) |
