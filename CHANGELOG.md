@@ -46,3 +46,4 @@ First public release.
 - RUSTSEC-2026-0381, RUSTSEC-2026-0382, RUSTSEC-2026-0383, and
   RUSTSEC-2026-0386.
 - RUSTSEC-2026-0459 (bundled SQLite) via `libsqlite3-sys` 0.39.1.
+- RUSTSEC-2026-0592 via the transitive `url` dependency, updated to 2.5.9.
