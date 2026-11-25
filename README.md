@@ -66,7 +66,7 @@ docker compose run --rm onepackd init
 docker compose up -d
 ```
 
-Initialization creates the data volume and writes the initial administrative token to `/data/initial-admin-token` in the container.
+Initialization creates the data volume and writes the initial administrative token to `/data/initial-admin-token` in the container. The release image is distroless and has no shell utilities; `onepackd initial-token` reads and removes the file.
 
 ### 2. Install the CLI and create a feed
 
@@ -74,17 +74,18 @@ Initialization creates the data volume and writes the initial administrative tok
 curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
-onepack context add local --url http://127.0.0.1:8080
-docker compose exec -T onepackd cat /data/initial-admin-token | onepack login --token-stdin
+onepack context add local --url http://127.0.0.1:8080 --use
+docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
+  | onepack login --token-stdin
 onepack whoami
 onepack feed create internal
-docker compose exec onepackd rm /data/initial-admin-token
+docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
 ```
 
-`login` stores the credential in the system keychain. On a headless machine without a keychain, supply it through the environment instead:
+`--use` makes `local` the current context even if another one was already active. `login` stores the credential in the system keychain. On a headless machine without a keychain, supply it through the environment instead:
 
 ```bash
-export ONEPACK_TOKEN="$(docker compose exec -T onepackd cat /data/initial-admin-token)"
+export ONEPACK_TOKEN="$(docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data)"
 onepack whoami
 onepack feed create internal
 ```

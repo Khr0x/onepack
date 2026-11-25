@@ -46,7 +46,7 @@ sudo systemctl enable --now onepackd
 curl -fs http://127.0.0.1:8080/readyz
 ```
 
-The initial administrative credential is left in `/var/lib/onepack/initial-admin-token`. Store it in a secrets manager and delete the file ([guide](../guide-zero-to-ci.md#3-set-up-the-cli-as-administrator)).
+The initial administrative credential is left in `/var/lib/onepack/initial-admin-token`. Read it with `sudo -u onepack onepackd initial-token print --data-dir /var/lib/onepack`, store it in a secrets manager, and remove it with `sudo -u onepack onepackd initial-token remove --data-dir /var/lib/onepack` ([guide](../guide-zero-to-ci.md#3-set-up-the-cli-as-administrator)).
 
 The unit:
 
@@ -66,6 +66,15 @@ curl -fsSLO https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/compose.yaml
 docker compose run --rm onepackd init
 docker compose up -d
 ```
+
+The release image has no shell. Read and remove the initial credential with the server binary itself:
+
+```bash
+docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data
+docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
+```
+
+Pipe `print` into `onepack login --token-stdin`; do not copy it into logs or shell history.
 
 To build the image from source, [`packaging/container/Containerfile`](../../packaging/container/Containerfile) uses a static binary on `distroless/static`, unprivileged user 65532, and a `/data` volume:
 

@@ -325,6 +325,40 @@ fn init_creates_owner_only_credential_once() {
 }
 
 #[test]
+fn initial_token_can_be_printed_and_removed() {
+    let data = TempDir::new().unwrap();
+    let token = init(data.path());
+
+    let printed = Command::new(BIN)
+        .args(["initial-token", "print", "--data-dir"])
+        .arg(data.path())
+        .output()
+        .unwrap();
+    assert!(printed.status.success());
+    assert_eq!(String::from_utf8(printed.stdout).unwrap().trim(), token);
+    assert!(!String::from_utf8(printed.stderr).unwrap().contains(&token));
+
+    let removed = Command::new(BIN)
+        .args(["initial-token", "remove", "--data-dir"])
+        .arg(data.path())
+        .output()
+        .unwrap();
+    assert!(removed.status.success());
+    assert!(!data.path().join("initial-admin-token").exists());
+    assert!(!String::from_utf8(removed.stdout).unwrap().contains(&token));
+
+    let again = Command::new(BIN)
+        .args(["initial-token", "remove", "--data-dir"])
+        .arg(data.path())
+        .output()
+        .unwrap();
+    assert!(
+        !again.status.success(),
+        "removing a missing credential file must fail"
+    );
+}
+
+#[test]
 fn tokens_never_reach_the_logs() {
     let data = TempDir::new().unwrap();
     let token = init(data.path());

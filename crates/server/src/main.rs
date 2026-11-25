@@ -101,6 +101,9 @@ enum Command {
     /// Local token management.
     #[command(subcommand)]
     Token(TokenCommand),
+    /// Reads or removes the initial administrative credential file.
+    #[command(subcommand)]
+    InitialToken(InitialTokenCommand),
     /// Local per-feed permission management.
     #[command(subcommand)]
     Grant(GrantCommand),
@@ -239,6 +242,14 @@ enum TokenCommand {
         #[command(flatten)]
         data: DataDir,
     },
+}
+
+#[derive(Subcommand)]
+enum InitialTokenCommand {
+    /// Prints the initial administrative credential to stdout.
+    Print(DataDir),
+    /// Removes the initial administrative credential file.
+    Remove(DataDir),
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -530,6 +541,7 @@ async fn main() -> CliResult {
             println!("principal created: {} ({})", p.name, p.kind.as_str());
         }
         Command::Token(cmd) => token(cmd).await?,
+        Command::InitialToken(cmd) => initial_token(cmd)?,
         Command::Grant(cmd) => grant(cmd).await?,
         Command::Package(cmd) => package(cmd).await?,
         Command::Serve(args) => serve(args).await?,
@@ -573,6 +585,25 @@ async fn init(data_dir: &Path) -> CliResult {
         issued.expires_at,
         path.display()
     );
+    Ok(())
+}
+
+/// Reads or removes the initial credential without relying on shell utilities.
+fn initial_token(cmd: InitialTokenCommand) -> CliResult {
+    match cmd {
+        InitialTokenCommand::Print(DataDir { data_dir }) => {
+            let path = data_dir.join(INITIAL_TOKEN_FILE);
+            let token = std::fs::read_to_string(&path)
+                .map_err(|e| format!("could not read {}: {e}", path.display()))?;
+            print!("{token}");
+        }
+        InitialTokenCommand::Remove(DataDir { data_dir }) => {
+            let path = data_dir.join(INITIAL_TOKEN_FILE);
+            std::fs::remove_file(&path)
+                .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+            println!("removed {}", path.display());
+        }
+    }
     Ok(())
 }
 

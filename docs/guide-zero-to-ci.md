@@ -49,9 +49,11 @@ Go back to the first terminal.
 ## 3. Set up the CLI as administrator
 
 ```bash
-onepack context add local --url http://127.0.0.1:8080
+onepack context add local --url http://127.0.0.1:8080 --use
 onepack login --token-stdin < "$DEMO/data/initial-admin-token"
 ```
+
+`--use` makes `local` the current context even if another context was already active.
 
 `login` validates the token and stores it in the system keychain. If it answers `KEYCHAIN_UNAVAILABLE` (e.g. on a server without a graphical session), pass the token in an environment variable instead:
 

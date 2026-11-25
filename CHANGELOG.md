@@ -12,7 +12,15 @@ Release notes for a tag are generated from the matching version section by
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- The quick start reads and removes the initial administrative credential with
+  `onepackd initial-token`, which works inside the distroless image.
+- `install.sh` installs `onepackd` when `ONEPACK_INSTALL_SERVER=1`, verifies its
+  own release archive, and fails if the archive or checksum is missing. The
+  server is Linux-only.
+- The quick start pins the `local` context with `--use`, so an existing current
+  context cannot redirect login or later commands.
 
 ## [0.1.0] - TBD
 
