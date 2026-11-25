@@ -67,14 +67,17 @@ docker compose run --rm onepackd init
 docker compose up -d
 ```
 
-The release image has no shell. Read and remove the initial credential with the server binary itself:
+The release image has no shell. Read the initial credential with the server binary and pipe it into `login`:
 
 ```bash
-docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data
-docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
+unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
+docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
+  | onepack login --token-stdin
+onepack whoami \
+  && docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
 ```
 
-Pipe `print` into `onepack login --token-stdin`; do not copy it into logs or shell history.
+Removal runs only after `whoami` succeeds. If login fails, keep the file and use the headless flow in the quick start. Do not copy the token into logs or shell history.
 
 To build the image from source, [`packaging/container/Containerfile`](../../packaging/container/Containerfile) uses a static binary on `distroless/static`, unprivileged user 65532, and a `/data` volume:
 

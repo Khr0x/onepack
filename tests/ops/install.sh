@@ -61,6 +61,27 @@ ONEPACK_INSTALL_SERVER=1 run "$work/server" >/dev/null
 [ -x "$work/server/onepack" ] || fail "onepack was not installed"
 [ -x "$work/server/onepackd" ] || fail "onepackd was not installed in server mode"
 
+step "Server archive without the binary preserves both previous binaries"
+mkdir -p "$work/previous" "$work/badserver/onepackd-0.1.0-x86_64-unknown-linux-musl"
+printf 'previous cli\n' >"$work/previous/onepack"
+printf 'previous server\n' >"$work/previous/onepackd"
+chmod +x "$work/previous/onepack" "$work/previous/onepackd"
+printf 'not the server binary\n' >"$work/badserver/onepackd-0.1.0-x86_64-unknown-linux-musl/README"
+cp "$work/previous/onepack" "$work/expected-cli"
+cp "$work/previous/onepackd" "$work/expected-server"
+tar -czf "$mirror/onepackd-0.1.0-x86_64-unknown-linux-musl.tar.gz" \
+  -C "$work/badserver" onepackd-0.1.0-x86_64-unknown-linux-musl
+(cd "$mirror" && hash_files onepack-*.tar.gz onepackd-*.tar.gz >SHA256SUMS)
+if ONEPACK_INSTALL_SERVER=1 run "$work/previous" >/dev/null 2>&1; then
+  fail "server mode succeeded without the onepackd binary"
+fi
+cmp "$work/previous/onepack" "$work/expected-cli" \
+  || fail "the CLI was replaced after the server archive failed"
+cmp "$work/previous/onepackd" "$work/expected-server" \
+  || fail "the previous onepackd was replaced after the server archive failed"
+make_archive onepackd
+(cd "$mirror" && hash_files onepack-*.tar.gz onepackd-*.tar.gz >SHA256SUMS)
+
 step "Missing server archive fails"
 mkdir "$work/missing"
 mv "$mirror/onepackd-0.1.0-x86_64-unknown-linux-musl.tar.gz" "$work/onepackd.tar.gz"

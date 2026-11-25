@@ -19,8 +19,11 @@ Release notes for a tag are generated from the matching version section by
 - `install.sh` installs `onepackd` when `ONEPACK_INSTALL_SERVER=1`, verifies its
   own release archive, and fails if the archive or checksum is missing. The
   server is Linux-only.
-- The quick start pins the `local` context with `--use`, so an existing current
-  context cannot redirect login or later commands.
+- The quick start pins the `local` context with `--use`, clears inherited
+  `ONEPACK_CONTEXT`/`ONEPACK_URL`, and removes the initial credential only after
+  `whoami` succeeds.
+- `install.sh` validates both archives before replacing either binary, so a
+  broken server archive cannot leave a half-updated installation.
 
 ## [0.1.0] - TBD
 

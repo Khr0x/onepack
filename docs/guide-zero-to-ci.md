@@ -49,24 +49,27 @@ Go back to the first terminal.
 ## 3. Set up the CLI as administrator
 
 ```bash
+unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
 onepack context add local --url http://127.0.0.1:8080 --use
 onepack login --token-stdin < "$DEMO/data/initial-admin-token"
 ```
 
-`--use` makes `local` the current context even if another context was already active.
+Clearing inherited destination variables keeps the guide on `local`; `--use` also makes it the current context.
 
 `login` validates the token and stores it in the system keychain. If it answers `KEYCHAIN_UNAVAILABLE` (e.g. on a server without a graphical session), pass the token in an environment variable instead:
 
 ```bash
+unset ONEPACK_CONTEXT ONEPACK_URL
 export ONEPACK_TOKEN="$(cat "$DEMO/data/initial-admin-token")"
 ```
 
-Check the identity and, once the credential is stored, delete the initial credential file:
+Check the identity before removing the file:
 
 ```bash
 onepack whoami
-rm "$DEMO/data/initial-admin-token"   # only if you used `login`; with ONEPACK_TOKEN, store it in a secrets manager first
 ```
+
+Only after that succeeds, and after storing `ONEPACK_TOKEN` in a secrets manager, remove it with `onepack whoami && rm "$DEMO/data/initial-admin-token"`.
 
 `whoami` should show `admin (user, administrator)`.
 

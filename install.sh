@@ -93,16 +93,20 @@ if [ "$SERVER" = 1 ]; then
 fi
 
 tar -xzf "$tmp/$cli_asset" -C "$tmp"
-src="$tmp/onepack-$VERSION-$target"
-[ -f "$src/onepack" ] || fail "the archive does not contain onepack"
+cli_src="$tmp/onepack-$VERSION-$target"
+[ -f "$cli_src/onepack" ] || fail "the archive does not contain onepack"
 
-mkdir -p "$INSTALL_DIR"
-install -m 0755 "$src/onepack" "$INSTALL_DIR/onepack"
+server_src=""
 if [ "$SERVER" = 1 ]; then
   tar -xzf "$tmp/$server_asset" -C "$tmp"
-  src="$tmp/onepackd-$VERSION-$target"
-  [ -f "$src/onepackd" ] || fail "the server archive does not contain onepackd"
-  install -m 0755 "$src/onepackd" "$INSTALL_DIR/onepackd"
+  server_src="$tmp/onepackd-$VERSION-$target"
+  [ -f "$server_src/onepackd" ] || fail "the server archive does not contain onepackd"
+fi
+
+mkdir -p "$INSTALL_DIR"
+install -m 0755 "$cli_src/onepack" "$INSTALL_DIR/onepack"
+if [ "$SERVER" = 1 ]; then
+  install -m 0755 "$server_src/onepackd" "$INSTALL_DIR/onepackd"
   printf 'Installed onepackd at %s/onepackd\n' "$INSTALL_DIR"
 fi
 
