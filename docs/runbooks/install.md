@@ -67,20 +67,21 @@ docker compose run --rm onepackd init
 docker compose up -d
 ```
 
-Install the CLI and select the registry started by Compose. A fresh profile has no context, so `login` would fail with `CONTEXT_MISSING`:
+Install the CLI and clear inherited variables. The login block below selects the registry started by Compose; a fresh profile has no context, so `login` would otherwise fail with `CONTEXT_MISSING`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
-onepack context add local --url http://127.0.0.1:8080 --use
 ```
 
 The release image has no shell. Read the initial credential with the server binary and pipe it into `login`:
 
 ```bash
 unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
-if docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping /data/initial-admin-token." >&2
+elif docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
      | onepack login --token-stdin; then
   onepack whoami \
     && docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
@@ -89,7 +90,7 @@ else
 fi
 ```
 
-Removal runs only when the login that just ran succeeds; if it fails, the file remains for the headless flow in the quick start. Do not copy the token into logs or shell history.
+If the context cannot be saved, the block stops before reading the token. Removal runs only when the login that just ran succeeds; if it fails, the file remains for the headless flow in the quick start. Do not copy the token into logs or shell history.
 
 To build the image from source, [`packaging/container/Containerfile`](../../packaging/container/Containerfile) uses a static binary on `distroless/static`, unprivileged user 65532, and a `/data` volume:
 

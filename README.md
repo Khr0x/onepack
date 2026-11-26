@@ -75,8 +75,9 @@ curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | s
 export PATH="$HOME/.local/bin:$PATH"
 
 unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
-onepack context add local --url http://127.0.0.1:8080 --use
-if docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping /data/initial-admin-token." >&2
+elif docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
      | onepack login --token-stdin; then
   onepack whoami \
     && onepack feed create internal \
@@ -86,15 +87,21 @@ else
 fi
 ```
 
-Clearing the inherited variables keeps the guide on `local`; `--use` also makes it the current context. `login` stores the credential in the system keychain. The removal is inside the `if`, so it depends on the login that just ran, not on a session that was already stored. If login fails, stop: the token file remains for the headless flow below.
+Clearing the inherited variables keeps the guide on `local`; `--use` also makes it the current context. If saving the context fails, the block stops before reading the token. `login` stores the credential in the system keychain. The removal is inside the successful branch, so it depends on the login that just ran, not on a session that was already stored.
 
 On a headless machine without a keychain, supply the token through the environment instead:
 
 ```bash
 unset ONEPACK_CONTEXT ONEPACK_URL
-export ONEPACK_TOKEN="$(docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data)"
-onepack whoami
-onepack feed create internal
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping /data/initial-admin-token." >&2
+elif ONEPACK_TOKEN="$(docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data)"; then
+  export ONEPACK_TOKEN
+  onepack whoami
+  onepack feed create internal
+else
+  echo "Could not read the initial token; keeping /data/initial-admin-token." >&2
+fi
 ```
 
 Store `ONEPACK_TOKEN` in a secrets manager before treating it as saved. Once it is saved, remove the initial file:

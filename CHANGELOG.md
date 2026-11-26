@@ -20,10 +20,12 @@ Release notes for a tag are generated from the matching version section by
   own release archive, and fails if the archive or checksum is missing. The
   server is Linux-only.
 - The quick start pins the `local` context with `--use`, clears inherited
-  `ONEPACK_CONTEXT`/`ONEPACK_URL`, and removes the initial credential only when
-  the login that just ran succeeds.
+  `ONEPACK_CONTEXT`/`ONEPACK_URL`, stops before reading the credential if the
+  context cannot be saved, and removes the initial credential only when the
+  login that just ran succeeds.
 - The container runbook installs the CLI and selects the Compose registry before
-  login, so a fresh profile no longer fails with `CONTEXT_MISSING`.
+  login, so a fresh profile no longer fails with `CONTEXT_MISSING` and a failed
+  selection cannot send the token to a previous registry.
 - `install.sh` validates both archives before replacing either binary, so a
   broken server archive cannot leave a half-updated installation.
 
