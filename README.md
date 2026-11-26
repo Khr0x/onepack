@@ -76,15 +76,17 @@ export PATH="$HOME/.local/bin:$PATH"
 
 unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
 onepack context add local --url http://127.0.0.1:8080 --use
-docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
-  | onepack login --token-stdin
-onepack whoami
-onepack feed create internal
-onepack whoami \
-  && docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
+if docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
+     | onepack login --token-stdin; then
+  onepack whoami \
+    && onepack feed create internal \
+    && docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
+else
+  echo "Login failed; keeping /data/initial-admin-token for the headless flow." >&2
+fi
 ```
 
-Clearing the inherited variables keeps the guide on `local`; `--use` also makes it the current context. `login` stores the credential in the system keychain. The final line removes the file only if `whoami` still succeeds. If login fails, stop: the token file remains for the headless flow below.
+Clearing the inherited variables keeps the guide on `local`; `--use` also makes it the current context. `login` stores the credential in the system keychain. The removal is inside the `if`, so it depends on the login that just ran, not on a session that was already stored. If login fails, stop: the token file remains for the headless flow below.
 
 On a headless machine without a keychain, supply the token through the environment instead:
 

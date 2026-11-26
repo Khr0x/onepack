@@ -51,25 +51,25 @@ Go back to the first terminal.
 ```bash
 unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
 onepack context add local --url http://127.0.0.1:8080 --use
-onepack login --token-stdin < "$DEMO/data/initial-admin-token"
+if onepack login --token-stdin < "$DEMO/data/initial-admin-token"; then
+  onepack whoami \
+    && rm "$DEMO/data/initial-admin-token"
+else
+  echo "Login failed; keeping $DEMO/data/initial-admin-token for the headless flow." >&2
+fi
 ```
 
-Clearing inherited destination variables keeps the guide on `local`; `--use` also makes it the current context.
+Clearing inherited destination variables keeps the guide on `local`; `--use` also makes it the current context. `login` validates the token and stores it in the system keychain. The file is removed only when that same login succeeds and `whoami` confirms it; if login fails, the file remains.
 
-`login` validates the token and stores it in the system keychain. If it answers `KEYCHAIN_UNAVAILABLE` (e.g. on a server without a graphical session), pass the token in an environment variable instead:
+If `login` answers `KEYCHAIN_UNAVAILABLE` (e.g. on a server without a graphical session), pass the token in an environment variable instead:
 
 ```bash
 unset ONEPACK_CONTEXT ONEPACK_URL
 export ONEPACK_TOKEN="$(cat "$DEMO/data/initial-admin-token")"
-```
-
-Check the identity before removing the file:
-
-```bash
 onepack whoami
 ```
 
-Only after that succeeds, and after storing `ONEPACK_TOKEN` in a secrets manager, remove it with `onepack whoami && rm "$DEMO/data/initial-admin-token"`.
+Store `ONEPACK_TOKEN` in a secrets manager before treating it as saved. Once it is saved, remove the file with `rm "$DEMO/data/initial-admin-token"`.
 
 `whoami` should show `admin (user, administrator)`.
 
