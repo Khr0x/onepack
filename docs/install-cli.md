@@ -20,6 +20,8 @@ curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | O
 curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | ONEPACK_INSTALL_SERVER=1 sh
 ```
 
+`ONEPACK_INSTALL_SERVER=1` also installs `onepackd` from its own release archive. The server is published for Linux only: on macOS the script fails instead of silently installing only the CLI, and a missing archive or checksum is an error.
+
 To install in `/usr/local/bin`, run the script with sufficient permissions (`sudo`). The macOS binaries are not notarized yet; Gatekeeper may block them until the release process adds notarization. For a manual download, checksum/Sigstore verification, and shell completion, continue below.
 
 ## Supported platforms

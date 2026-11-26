@@ -27,7 +27,7 @@ user=$(docker image inspect --format '{{.Config.User}}' "$image")
 step "Initializing the data volume"
 docker volume create "$volume" >/dev/null
 docker run --rm -v "$volume:/data" "$image" init >/dev/null
-token=$(docker run --rm -v "$volume:/data" alpine:3 cat /data/initial-admin-token)
+token=$(docker run --rm -v "$volume:/data" "$image" initial-token print --data-dir /data)
 mode=$(docker run --rm -v "$volume:/data" alpine:3 stat -c '%a %u' /data)
 [ "$mode" = "700 65532" ] || fail "volume permissions: $mode"
 
@@ -48,6 +48,12 @@ curl -fs -H "X-NuGet-ApiKey: $token" "http://127.0.0.1:$port/nuget/internal/v3/i
   || fail "service index"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/nuget/internal/v3/index.json")" = 401 ] \
   || fail "without a credential it should be 401"
+
+step "Removing the initial credential with onepackd"
+removed=$(docker run --rm -v "$volume:/data" "$image" initial-token remove --data-dir /data)
+[[ "$removed" != *"$token"* ]] || fail "remove printed the token"
+docker run --rm -v "$volume:/data" alpine:3 test ! -e /data/initial-admin-token \
+  || fail "the initial credential still exists"
 # Read before filtering: with pipefail, head/grep -q close the pipe and docker logs
 # dies with SIGPIPE, which caused false failures and hid a leaked token.
 logs=$(docker logs "$name" 2>&1)

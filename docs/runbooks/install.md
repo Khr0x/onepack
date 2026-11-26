@@ -46,7 +46,7 @@ sudo systemctl enable --now onepackd
 curl -fs http://127.0.0.1:8080/readyz
 ```
 
-The initial administrative credential is left in `/var/lib/onepack/initial-admin-token`. Store it in a secrets manager and delete the file ([guide](../guide-zero-to-ci.md#3-set-up-the-cli-as-administrator)).
+The initial administrative credential is left in `/var/lib/onepack/initial-admin-token`. Read it with `sudo -u onepack onepackd initial-token print --data-dir /var/lib/onepack`, store it in a secrets manager, and remove it with `sudo -u onepack onepackd initial-token remove --data-dir /var/lib/onepack` ([guide](../guide-zero-to-ci.md#3-set-up-the-cli-as-administrator)).
 
 The unit:
 
@@ -66,6 +66,31 @@ curl -fsSLO https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/compose.yaml
 docker compose run --rm onepackd init
 docker compose up -d
 ```
+
+Install the CLI and clear inherited variables. The login block below selects the registry started by Compose; a fresh profile has no context, so `login` would otherwise fail with `CONTEXT_MISSING`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
+```
+
+The release image has no shell. Read the initial credential with the server binary and pipe it into `login`:
+
+```bash
+unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping /data/initial-admin-token." >&2
+elif docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
+     | onepack login --token-stdin; then
+  onepack whoami \
+    && docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
+else
+  echo "Login failed; keeping /data/initial-admin-token." >&2
+fi
+```
+
+If the context cannot be saved, the block stops before reading the token. Removal runs only when the login that just ran succeeds; if it fails, the file remains for the headless flow in the quick start. Do not copy the token into logs or shell history.
 
 To build the image from source, [`packaging/container/Containerfile`](../../packaging/container/Containerfile) uses a static binary on `distroless/static`, unprivileged user 65532, and a `/data` volume:
 

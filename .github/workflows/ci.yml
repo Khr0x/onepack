@@ -164,6 +164,7 @@ jobs:
       - name: Quick start and release notes
         run: |
           sh -n install.sh
+          ./tests/ops/install.sh
           docker compose config >/dev/null
           version=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(json.load(sys.stdin)["packages"][0]["version"])')
           ./scripts/changelog-notes.sh "$version" >/dev/null

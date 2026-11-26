@@ -49,22 +49,34 @@ Go back to the first terminal.
 ## 3. Set up the CLI as administrator
 
 ```bash
-onepack context add local --url http://127.0.0.1:8080
-onepack login --token-stdin < "$DEMO/data/initial-admin-token"
+unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping $DEMO/data/initial-admin-token." >&2
+elif onepack login --token-stdin < "$DEMO/data/initial-admin-token"; then
+  onepack whoami \
+    && rm "$DEMO/data/initial-admin-token"
+else
+  echo "Login failed; keeping $DEMO/data/initial-admin-token for the headless flow." >&2
+fi
 ```
 
-`login` validates the token and stores it in the system keychain. If it answers `KEYCHAIN_UNAVAILABLE` (e.g. on a server without a graphical session), pass the token in an environment variable instead:
+Clearing inherited destination variables keeps the guide on `local`; `--use` also makes it the current context. If saving the context fails, the block stops before reading the token. `login` validates the token and stores it in the system keychain. The file is removed only when that same login succeeds and `whoami` confirms it.
+
+If `login` answers `KEYCHAIN_UNAVAILABLE` (e.g. on a server without a graphical session), pass the token in an environment variable instead:
 
 ```bash
-export ONEPACK_TOKEN="$(cat "$DEMO/data/initial-admin-token")"
+unset ONEPACK_CONTEXT ONEPACK_URL
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping $DEMO/data/initial-admin-token." >&2
+elif ONEPACK_TOKEN="$(cat "$DEMO/data/initial-admin-token")"; then
+  export ONEPACK_TOKEN
+  onepack whoami
+else
+  echo "Could not read the initial token; keeping $DEMO/data/initial-admin-token." >&2
+fi
 ```
 
-Check the identity and, once the credential is stored, delete the initial credential file:
-
-```bash
-onepack whoami
-rm "$DEMO/data/initial-admin-token"   # only if you used `login`; with ONEPACK_TOKEN, store it in a secrets manager first
-```
+Store `ONEPACK_TOKEN` in a secrets manager before treating it as saved. Once it is saved, remove the file with `rm "$DEMO/data/initial-admin-token"`.
 
 `whoami` should show `admin (user, administrator)`.
 

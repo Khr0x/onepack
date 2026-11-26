@@ -66,7 +66,7 @@ docker compose run --rm onepackd init
 docker compose up -d
 ```
 
-Initialization creates the data volume and writes the initial administrative token to `/data/initial-admin-token` in the container.
+Initialization creates the data volume and writes the initial administrative token to `/data/initial-admin-token` in the container. The release image is distroless and has no shell utilities; `onepackd initial-token` reads and removes the file.
 
 ### 2. Install the CLI and create a feed
 
@@ -74,22 +74,43 @@ Initialization creates the data volume and writes the initial administrative tok
 curl -fsSL https://raw.githubusercontent.com/Khr0x/onepack/v0.1.0/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
-onepack context add local --url http://127.0.0.1:8080
-docker compose exec -T onepackd cat /data/initial-admin-token | onepack login --token-stdin
-onepack whoami
-onepack feed create internal
-docker compose exec onepackd rm /data/initial-admin-token
+unset ONEPACK_CONTEXT ONEPACK_URL ONEPACK_TOKEN
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping /data/initial-admin-token." >&2
+elif docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data \
+     | onepack login --token-stdin; then
+  onepack whoami \
+    && onepack feed create internal \
+    && docker compose exec onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
+else
+  echo "Login failed; keeping /data/initial-admin-token for the headless flow." >&2
+fi
 ```
 
-`login` stores the credential in the system keychain. On a headless machine without a keychain, supply it through the environment instead:
+Clearing the inherited variables keeps the guide on `local`; `--use` also makes it the current context. If saving the context fails, the block stops before reading the token. `login` stores the credential in the system keychain. The removal is inside the successful branch, so it depends on the login that just ran, not on a session that was already stored.
+
+On a headless machine without a keychain, supply the token through the environment instead:
 
 ```bash
-export ONEPACK_TOKEN="$(docker compose exec -T onepackd cat /data/initial-admin-token)"
-onepack whoami
-onepack feed create internal
+unset ONEPACK_CONTEXT ONEPACK_URL
+if ! onepack context add local --url http://127.0.0.1:8080 --use; then
+  echo "Could not select the local context; keeping /data/initial-admin-token." >&2
+elif ONEPACK_TOKEN="$(docker compose exec -T onepackd /usr/local/bin/onepackd initial-token print --data-dir /data)"; then
+  export ONEPACK_TOKEN
+  onepack whoami
+  onepack feed create internal
+else
+  echo "Could not read the initial token; keeping /data/initial-admin-token." >&2
+fi
 ```
 
-Once the credential is safely stored in the keychain or a secrets manager, remove the initial token file. Use a dedicated service identity with limited permissions for CI.
+Store `ONEPACK_TOKEN` in a secrets manager before treating it as saved. Once it is saved, remove the initial file:
+
+```bash
+docker compose exec -T onepackd /usr/local/bin/onepackd initial-token remove --data-dir /data
+```
+
+Use a dedicated service identity with limited permissions for CI.
 
 ### 3. Publish a NuGet package
 
