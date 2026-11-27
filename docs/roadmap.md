@@ -4,6 +4,9 @@ onepack is pre-1.0. The current milestone is a private NuGet registry that is
 safe to operate, documented, and validated with a real pilot. The next milestone
 extends the same registry to npm and PyPI.
 
+The first public release, `v0.1.0`, is pending. You can [try NuGet from source](../README.md#build-from-source) today and review the [planned HTTPS deployment](../README.md#production-deployment-planned-for-v010).
+The [CLI installation examples](../README.md#install-the-cli) show the current Cargo command and proposed package manager commands.
+
 ## v1 — Private NuGet registry
 
 - NuGet V3 publish, search, metadata, download, restore, unlist, and relist.
